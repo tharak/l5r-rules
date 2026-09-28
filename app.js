@@ -1,0 +1,135 @@
+const state = { data: null, searchMatches: [], activeMatch: 0 };
+const $ = (selector) => document.querySelector(selector);
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const pageHref = slug => `#/${encodeURIComponent(slug)}`;
+
+function currentSlug() {
+  const hash = location.hash.slice(2).split('#')[0];
+  try { return decodeURIComponent(hash || 'start'); } catch { return 'start'; }
+}
+
+function allNav() {
+  return [...state.data.navigation, ...state.data.more];
+}
+
+function pageSection(slug) {
+  for (const section of state.data.navigation) {
+    if (section.slug === slug || section.children.some(item => item.slug === slug)) return section.title;
+  }
+  return state.data.more.some(item => item.slug === slug) ? 'More pages' : 'The archive';
+}
+
+function renderNavigation() {
+  const active = currentSlug();
+  const item = (entry, nested = false) => `<a class="nav-link ${nested ? 'nested' : ''} ${entry.slug === active ? 'active' : ''}" href="${pageHref(entry.slug)}"><span class="nav-indicator"></span>${esc(entry.title)}</a>`;
+  $('#navigation').innerHTML = `<div class="nav-label">EXPLORE THE ARCHIVE</div>${item({slug:'start', title:'Overview'})}${item({slug:'all-pages', title:'All pages'})}` +
+    state.data.navigation.filter(x => x.slug !== 'start').map(section => `<div class="nav-section">${item(section)}${section.children.map(child => item(child, true)).join('')}</div>`).join('') +
+    `<div class="nav-label more-label">ADDITIONAL RULES</div>${state.data.more.map(entry => item(entry)).join('')}`;
+}
+
+function card(entry, eyebrow = 'REFERENCE') {
+  const page = state.data.pages[entry.slug];
+  return `<a class="page-card" href="${pageHref(entry.slug)}"><span class="card-top"><span class="card-icon" aria-hidden="true">${iconFor(entry.title)}</span><span class="card-arrow" aria-hidden="true">↗</span></span><span class="card-eyebrow">${esc(eyebrow)}</span><strong>${esc(entry.title)}</strong><span class="card-description">${esc(page?.excerpt || 'Explore this section of the archive.')}</span></a>`;
+}
+
+function iconFor(title) {
+  const icons = {'Book of Air':'風','Book of Earth':'地','Book of Fire':'火','Book of Water':'水','Book of the Void':'空'};
+  return icons[title] || '◈';
+}
+
+function renderHome() {
+  const books = state.data.navigation.filter(x => x.slug !== 'start');
+  const quick = ['character-creation','schools','combat','magic'].map(slug =>
+    allNav().flatMap(x => [x,...x.children]).find(x => x.slug === slug)).filter(Boolean);
+  return `<section class="home-hero"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> THE LAST HAIKU ARCHIVE</div><h1>Enter the world<br>of <em>Rokugan.</em></h1><p>A home for the Last Haiku campaign and a complete guide to the lore, characters, and rules of Legend of the Five Rings.</p><div class="hero-actions"><a class="primary-button" href="${pageHref('character-creation')}">Start exploring <span>↗</span></a><button class="text-button" id="hero-search" type="button">Search the archive <span>⌕</span></button></div></div><div class="hero-art" aria-hidden="true"><div class="art-sun"></div><div class="art-mountain one"></div><div class="art-mountain two"></div><div class="art-mountain three"></div><div class="art-kanji">五</div><div class="art-caption">THE FIVE RINGS</div></div></section>
+  <section class="home-section"><div class="section-heading"><div><div class="eyebrow muted">THE FIVE BOOKS</div><h2>Find your path</h2></div><p>Five elements. One living world.</p></div><div class="book-grid">${books.map((book,i) => `<a class="book-card book-${i}" href="${pageHref(book.slug)}"><span class="book-number">0${i+1} / 05</span><span class="book-symbol">${iconFor(book.title)}</span><span class="book-name">${esc(book.title)}</span><span class="book-detail">${book.children.length ? `${book.children.length} chapters` : 'Explore the book'} <span>↗</span></span></a>`).join('')}</div></section>
+  <section class="home-section quick-section"><div class="section-heading"><div><div class="eyebrow muted">GOOD PLACES TO BEGIN</div><h2>Explore the essentials</h2></div></div><div class="card-grid">${quick.map(x => card(x, 'POPULAR REFERENCE')).join('')}</div></section>
+  <section class="archive-note"><div class="note-symbol">◈</div><div><h2>A world shaped by honor</h2><p>Browse ${Object.keys(state.data.pages).length} pages of campaign material, rules, and lore. Every page links back to its source on the original Last Haiku wiki.</p></div><a href="https://lasthaiku.wikidot.com/" target="_blank" rel="noopener noreferrer">Visit the original <span>↗</span></a></section>`;
+}
+
+function renderArticle(page) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = page.html;
+  const headings = [...wrapper.querySelectorAll('h1, h2, h3')];
+  const toc = headings.map((heading, index) => {
+    const id = heading.id || `section-${index + 1}`;
+    heading.id = id;
+    return {id, title: heading.textContent.trim(), level: heading.tagName};
+  });
+  const relatedSection = state.data.navigation.find(section => section.children.some(x => x.slug === page.slug));
+  const related = relatedSection?.children.filter(x => x.slug !== page.slug).slice(0, 3) || [];
+  return `<div class="article-layout"><article class="article"><div class="article-intro"><div class="eyebrow muted"><span class="eyebrow-line"></span> ${esc(pageSection(page.slug).toUpperCase())}</div><h1>${esc(page.title)}</h1><div class="article-meta"><span>LAST HAIKU REFERENCE</span><span class="meta-divider"></span><span>${page.words.toLocaleString()} WORDS</span></div></div><div class="article-content">${wrapper.innerHTML}</div><div class="article-end"><div class="end-mark">◈</div><p>From the Last Haiku archive. ${esc(page.revision)}</p><a href="${esc(page.source)}" target="_blank" rel="noopener noreferrer">View original page ↗</a></div>${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article><aside class="article-aside"><div class="aside-inner">${toc.length ? `<div class="aside-label">ON THIS PAGE</div><nav class="toc">${toc.map(x => `<a class="toc-${x.level.toLowerCase()}" href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>` : ''}<div class="aside-source"><span class="aside-source-icon">↗</span><strong>Source material</strong><p>Read this page on the original Last Haiku wiki.</p><a href="${esc(page.source)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div></aside></div>`;
+}
+
+function renderDirectory() {
+  const pages = Object.values(state.data.pages).sort((a,b) => a.title.localeCompare(b.title));
+  const groups = pages.reduce((result, page) => { const letter = (page.title[0] || '#').toUpperCase(); (result[letter] ||= []).push(page); return result; }, {});
+  return `<div class="directory"><div class="eyebrow muted"><span class="eyebrow-line"></span> THE COMPLETE ARCHIVE</div><h1>All pages</h1><p>Browse every page imported from the Last Haiku wiki.</p><div class="directory-count">${pages.length} PAGES</div><div class="directory-groups">${Object.entries(groups).map(([letter, entries]) => `<section class="directory-group"><h2>${esc(letter)}</h2><div>${entries.map(page => `<a href="${pageHref(page.slug)}"><span>${esc(page.title)}</span><small>${esc(pageSection(page.slug))}</small><b>↗</b></a>`).join('')}</div></section>`).join('')}</div></div>`;
+}
+
+function render() {
+  if (!state.data) return;
+  const slug = currentSlug();
+  const page = state.data.pages[slug];
+  $('#breadcrumb').textContent = slug === 'start' ? 'The archive / Overview' : slug === 'all-pages' ? 'The archive / All pages' : `${pageSection(slug)} / ${page?.title || 'Page unavailable'}`;
+  document.title = slug === 'start' ? 'Last Haiku — Legend of the Five Rings' : `${page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable')} — Last Haiku`;
+  $('#app').innerHTML = slug === 'start' ? renderHome() : slug === 'all-pages' ? renderDirectory() : page ? renderArticle(page) : `<div class="not-found"><span>◈</span><h1>Page unavailable</h1><p>This page was not found in the source archive.</p><a class="primary-button" href="#/start">Return to overview ↗</a></div>`;
+  renderNavigation();
+  $('#hero-search')?.addEventListener('click', openSearch);
+  closeMenu();
+  const fragment = location.hash.split('#').slice(2).join('#');
+  if (fragment) requestAnimationFrame(() => document.getElementById(decodeURIComponent(fragment))?.scrollIntoView());
+  else window.scrollTo(0, 0);
+}
+
+function normalize(s) { return s.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+
+function search(query) {
+  const words = normalize(query.trim()).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  return Object.values(state.data.pages).map(page => {
+    const title = normalize(page.title), body = normalize(page.html.replace(/<[^>]+>/g, ' '));
+    if (!words.every(word => title.includes(word) || body.includes(word))) return null;
+    const score = words.reduce((sum, word) => sum + (title.includes(word) ? 10 : 0) + (body.includes(word) ? 1 : 0), 0);
+    return {...page, score};
+  }).filter(Boolean).sort((a,b) => b.score - a.score || a.title.localeCompare(b.title)).slice(0, 30);
+}
+
+function renderSearchResults() {
+  const query = $('#search-input').value;
+  const box = $('#search-results');
+  state.searchMatches = search(query);
+  state.activeMatch = 0;
+  if (!query.trim()) { box.innerHTML = `<div class="search-empty"><span>◈</span><strong>What are you looking for?</strong><p>Try “combat”, “shugenja”, or “fire spells”.</p></div>`; return; }
+  if (!state.searchMatches.length) { box.innerHTML = `<div class="search-empty"><span>⌕</span><strong>No pages found</strong><p>Try a different word or a shorter phrase.</p></div>`; return; }
+  box.innerHTML = `<div class="results-count">${state.searchMatches.length} RESULTS</div>` + state.searchMatches.map((page,i) => `<a class="search-result ${i===0?'selected':''}" href="${pageHref(page.slug)}"><span class="result-icon">◈</span><span><strong>${esc(page.title)}</strong><small>${esc(pageSection(page.slug))} · ${esc(page.excerpt)}</small></span><span class="result-arrow">↗</span></a>`).join('');
+}
+
+function openSearch() { $('#search-overlay').hidden = false; document.body.classList.add('search-open'); $('#search-input').focus(); renderSearchResults(); }
+function closeSearch() { $('#search-overlay').hidden = true; document.body.classList.remove('search-open'); $('#search-input').value = ''; }
+function closeMenu() { document.body.classList.remove('menu-open'); $('#menu-button').setAttribute('aria-expanded', 'false'); }
+
+$('#sidebar-search').addEventListener('click', openSearch);
+$('#search-button').addEventListener('click', openSearch);
+$('#search-close').addEventListener('click', closeSearch);
+$('#search-backdrop').addEventListener('click', closeSearch);
+$('#search-input').addEventListener('input', renderSearchResults);
+$('#search-results').addEventListener('click', event => { if (event.target.closest('a')) closeSearch(); });
+$('#menu-button').addEventListener('click', () => { const open = document.body.classList.toggle('menu-open'); $('#menu-button').setAttribute('aria-expanded', String(open)); });
+$('#mobile-shade').addEventListener('click', closeMenu);
+window.addEventListener('hashchange', render);
+document.addEventListener('keydown', event => {
+  const overlayOpen = !$('#search-overlay').hidden;
+  if (event.key === 'Escape') { closeSearch(); closeMenu(); return; }
+  if ((event.key === '/' || (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey))) && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { event.preventDefault(); openSearch(); return; }
+  if (!overlayOpen || !state.searchMatches.length) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    state.activeMatch = (state.activeMatch + (event.key === 'ArrowDown' ? 1 : -1) + state.searchMatches.length) % state.searchMatches.length;
+    document.querySelectorAll('.search-result').forEach((el,i) => el.classList.toggle('selected', i === state.activeMatch));
+    document.querySelectorAll('.search-result')[state.activeMatch]?.scrollIntoView({block:'nearest'});
+  }
+  if (event.key === 'Enter') { location.hash = pageHref(state.searchMatches[state.activeMatch].slug); closeSearch(); }
+});
+
+fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });

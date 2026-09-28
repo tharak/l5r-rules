@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14252b">
+  <meta name="description" content="A modern, searchable archive of the Last Haiku Legend of the Five Rings RPG rules and lore.">
+  <title>Last Haiku — Legend of the Five Rings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Site navigation">
+      <a class="brand" href="#/start" aria-label="Last Haiku home">
+        <span class="brand-mark" aria-hidden="true">五</span>
+        <span><strong>LAST HAIKU</strong><small>LEGEND OF THE FIVE RINGS</small></span>
+      </a>
+      <button class="sidebar-search" id="sidebar-search" type="button"><span class="search-icon" aria-hidden="true">⌕</span> Search the archive <kbd>/</kbd></button>
+      <nav id="navigation" aria-label="Books"></nav>
+      <div class="sidebar-footer"><span class="footer-dot"></span> A living archive of Rokugan</div>
+    </aside>
+    <div class="mobile-shade" id="mobile-shade"></div>
+    <div class="main-column">
+      <header class="topbar">
+        <button class="menu-button" id="menu-button" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
+        <div class="topbar-path"><span class="topbar-symbol">◈</span><span id="breadcrumb">The archive</span></div>
+        <div class="topbar-actions"><button id="search-button" class="icon-button" type="button" aria-label="Search">⌕</button><a class="source-link" href="https://lasthaiku.wikidot.com/" target="_blank" rel="noopener noreferrer">Original wiki <span aria-hidden="true">↗</span></a></div>
+      </header>
+      <main id="app" tabindex="-1"><div class="loading">Opening the archive…</div></main>
+      <footer class="site-footer"><span>Last Haiku · Legend of the Five Rings</span><span>Content from <a href="https://lasthaiku.wikidot.com/">Last Haiku</a> · <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a></span></footer>
+    </div>
+  </div>
+  <div class="search-overlay" id="search-overlay" hidden>
+    <div class="search-backdrop" id="search-backdrop"></div>
+    <div class="search-dialog" role="dialog" aria-modal="true" aria-label="Search the archive">
+      <div class="search-field"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="Search rules, lore, spells…" autocomplete="off"><button id="search-close" type="button" aria-label="Close search">Esc</button></div>
+      <div id="search-results" class="search-results"></div>
+      <div class="search-hint">Search titles and page text · Press ↑ ↓ to move · Enter to open</div>
+    </div>
+  </div>
+</body>
+</html>
