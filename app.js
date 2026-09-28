@@ -1,4 +1,4 @@
-const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set() };
+const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set(), selectedBook: 'book-of-air' };
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const pageHref = slug => `#/${encodeURIComponent(slug)}`;
@@ -11,6 +11,9 @@ function currentSlug() {
 function allNav() {
   return [...state.data.navigation, ...state.data.more];
 }
+
+function bookSections() { return state.data.navigation.filter(section => section.slug.startsWith('book-of-')); }
+function isBookPage(slug) { return bookSections().some(section => section.slug === slug); }
 
 function pageSection(slug) {
   const walk = (items, parents = []) => {
@@ -92,7 +95,7 @@ function expandActivePath(entries, slug, fragment) {
 function renderNavigation() {
   const active = currentSlug();
   const fragment = location.hash.split('#').slice(2).join('#');
-  const books = state.data.navigation.filter(x => x.slug !== 'start');
+  const books = bookSections();
   expandActivePath(books, active, fragment);
   const covered = new Set();
   const collect = entries => entries.forEach(entry => { covered.add(entry.slug); collect(entry.children || []); });
@@ -103,7 +106,9 @@ function renderNavigation() {
     const key = navKey(entry), children = entry.children || [], hasChildren = children.length > 0;
     const expanded = state.navExpanded.has(key), id = `nav-group-${counter++}`;
     const selected = entry.slug === active && (!entry.anchor || entry.anchor === fragment);
-    return `<div class="nav-item depth-${Math.min(depth,4)}"><div class="nav-row"><a class="nav-link ${selected ? 'active' : ''}" href="${navHref(entry)}" title="${esc(entry.title)}"><span class="nav-indicator"></span><span class="nav-text">${esc(entry.title)}</span></a>${hasChildren ? `<button class="nav-toggle" type="button" data-key="${esc(key)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${esc(entry.title)}" aria-controls="${id}" aria-expanded="${expanded}"><span aria-hidden="true">⌄</span></button>` : ''}</div>${hasChildren ? `<div class="nav-children" id="${id}" ${expanded ? '' : 'hidden'}>${children.map(child => item(child, depth + 1)).join('')}</div>` : ''}</div>`;
+    const bookButton = depth === 0 && isBookPage(entry.slug);
+    const row = bookButton ? `<button class="nav-toggle nav-book-toggle" type="button" data-key="${esc(key)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${esc(entry.title)}" aria-controls="${id}" aria-expanded="${expanded}"><span class="nav-indicator"></span><span class="nav-text">${esc(entry.title)}</span><span class="nav-chevron" aria-hidden="true">⌄</span></button>` : `<a class="nav-link ${selected ? 'active' : ''}" href="${navHref(entry)}" title="${esc(entry.title)}"><span class="nav-indicator"></span><span class="nav-text">${esc(entry.title)}</span></a>${hasChildren ? `<button class="nav-toggle" type="button" data-key="${esc(key)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${esc(entry.title)}" aria-controls="${id}" aria-expanded="${expanded}"><span class="nav-chevron" aria-hidden="true">⌄</span></button>` : ''}`;
+    return `<div class="nav-item depth-${Math.min(depth,4)}"><div class="nav-row">${row}</div>${hasChildren ? `<div class="nav-children" id="${id}" ${expanded ? '' : 'hidden'}>${children.map(child => item(child, depth + 1)).join('')}</div>` : ''}</div>`;
   };
   $('#navigation').innerHTML = `<div class="nav-label">EXPLORE THE ARCHIVE</div>${item({slug:'start', title:'Overview'})}${item({slug:'create-character', title:'Create character'})}${item({slug:'all-pages', title:'All pages'})}` +
     books.map(section => `<div class="nav-section">${item(section)}</div>`).join('') +
@@ -120,14 +125,19 @@ function iconFor(title) {
   return icons[title] || '◈';
 }
 
+function renderBookPreview(book) {
+  return `<div class="book-preview" id="book-preview" aria-live="polite"><div class="book-preview-heading"><span class="book-preview-symbol">${iconFor(book.title)}</span><div><span class="card-eyebrow">EXPLORE THE BOOK</span><h3>${esc(book.title)}</h3></div></div><div class="book-preview-links">${book.children.map(entry => `<a href="${pageHref(entry.slug)}"><span>${esc(entry.title)}</span><small>${entry.children?.length ? `${entry.children.length} topics` : 'Read section'}</small><b>↗</b></a>`).join('')}</div></div>`;
+}
+
 function renderHome() {
-  const books = state.data.navigation.filter(x => x.slug !== 'start');
+  const books = bookSections();
+  const selectedBook = books.find(book => book.slug === state.selectedBook) || books[0];
   const quick = ['character-creation','schools','combat','magic'].map(slug =>
     allNav().flatMap(x => [x,...x.children]).find(x => x.slug === slug)).filter(Boolean);
   return `<section class="home-hero"><div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> THE LAST HAIKU ARCHIVE</div><h1>Enter the world<br>of <em>Rokugan.</em></h1><p>A home for the Last Haiku campaign and a complete guide to the lore, characters, and rules of Legend of the Five Rings.</p><div class="hero-actions"><a class="primary-button" href="${pageHref('create-character')}">Create a character <span>↗</span></a><button class="text-button" id="hero-search" type="button">Search the archive <span>⌕</span></button></div></div><div class="hero-art" aria-hidden="true"><div class="art-sun"></div><div class="art-mountain one"></div><div class="art-mountain two"></div><div class="art-mountain three"></div><div class="art-kanji">五</div><div class="art-caption">THE FIVE RINGS</div></div></section>
-  <section class="home-section"><div class="section-heading"><div><div class="eyebrow muted">THE FIVE BOOKS</div><h2>Find your path</h2></div><p>Five elements. One living world.</p></div><div class="book-grid">${books.map((book,i) => `<a class="book-card book-${i}" href="${pageHref(book.slug)}"><span class="book-number">0${i+1} / 05</span><span class="book-symbol">${iconFor(book.title)}</span><span class="book-name">${esc(book.title)}</span><span class="book-detail">${book.children.length ? `${book.children.length} chapters` : 'Explore the book'} <span>↗</span></span></a>`).join('')}</div></section>
+  <section class="home-section"><div class="section-heading"><div><div class="eyebrow muted">THE FIVE BOOKS</div><h2>Find your path</h2></div><p>Five elements. One living world.</p></div><div class="book-grid">${books.map((book,i) => `<button class="book-card book-${i} ${book.slug === selectedBook.slug ? 'selected' : ''}" type="button" data-book="${book.slug}" aria-pressed="${book.slug === selectedBook.slug}"><span class="book-number">0${i+1} / 05</span><span class="book-symbol">${iconFor(book.title)}</span><span class="book-name">${esc(book.title)}</span><span class="book-detail">${book.children.length} sections <span>⌄</span></span></button>`).join('')}</div>${renderBookPreview(selectedBook)}</section>
   <section class="home-section quick-section"><div class="section-heading"><div><div class="eyebrow muted">GOOD PLACES TO BEGIN</div><h2>Explore the essentials</h2></div></div><div class="card-grid">${quick.map(x => card(x, 'POPULAR REFERENCE')).join('')}</div></section>
-  <section class="archive-note"><div class="note-symbol">◈</div><div><h2>A world shaped by honor</h2><p>Browse ${Object.keys(state.data.pages).length} pages of campaign material, rules, and lore. Every page links back to its source on the original Last Haiku wiki.</p></div><a href="https://lasthaiku.wikidot.com/" target="_blank" rel="noopener noreferrer">Visit the original <span>↗</span></a></section>`;
+  <section class="archive-note"><div class="note-symbol">◈</div><div><h2>A world shaped by honor</h2><p>Browse ${Object.keys(state.data.pages).filter(slug => !isBookPage(slug)).length} pages of campaign material, rules, and lore. Every page links back to its source on the original Last Haiku wiki.</p></div><a href="https://lasthaiku.wikidot.com/" target="_blank" rel="noopener noreferrer">Visit the original <span>↗</span></a></section>`;
 }
 
 function renderArticle(page) {
@@ -153,7 +163,7 @@ function renderArticle(page) {
 }
 
 function renderDirectory() {
-  const pages = Object.values(state.data.pages).sort((a,b) => a.title.localeCompare(b.title));
+  const pages = Object.values(state.data.pages).filter(page => !isBookPage(page.slug)).sort((a,b) => a.title.localeCompare(b.title));
   const groups = pages.reduce((result, page) => { const letter = (page.title[0] || '#').toUpperCase(); (result[letter] ||= []).push(page); return result; }, {});
   return `<div class="directory"><div class="eyebrow muted"><span class="eyebrow-line"></span> THE COMPLETE ARCHIVE</div><h1>All pages</h1><p>Browse every page imported from the Last Haiku wiki.</p><div class="directory-count">${pages.length} PAGES</div><div class="directory-groups">${Object.entries(groups).map(([letter, entries]) => `<section class="directory-group"><h2>${esc(letter)}</h2><div>${entries.map(page => `<a href="${pageHref(page.slug)}"><span>${esc(page.title)}</span><small>${esc(pageSection(page.slug))}</small><b>↗</b></a>`).join('')}</div></section>`).join('')}</div></div>`;
 }
@@ -161,6 +171,8 @@ function renderDirectory() {
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
+  const book = bookSections().find(section => section.slug === slug);
+  if (book) { location.replace(pageHref(book.children[0]?.slug || 'start')); return; }
   const page = state.data.pages[slug];
   $('#breadcrumb').textContent = slug === 'start' ? 'The archive / Overview' : slug === 'all-pages' ? 'The archive / All pages' : slug === 'create-character' ? 'Book of Fire / Create character' : `${pageSection(slug)} / ${page?.title || 'Page unavailable'}`;
   document.title = slug === 'start' ? 'Last Haiku — Legend of the Five Rings' : `${page?.title || (slug === 'all-pages' ? 'All pages' : slug === 'create-character' ? 'Create character' : 'Page unavailable')} — Last Haiku`;
@@ -168,6 +180,13 @@ function render() {
   if (slug === 'create-character') window.CharacterBuilder.mount($('#app'));
   renderNavigation();
   $('#hero-search')?.addEventListener('click', openSearch);
+  $('#app').querySelectorAll('[data-book]').forEach(button => button.addEventListener('click', () => {
+    const selected = bookSections().find(section => section.slug === button.dataset.book);
+    if (!selected) return;
+    state.selectedBook = selected.slug;
+    $('#book-preview').outerHTML = renderBookPreview(selected);
+    $('#app').querySelectorAll('[data-book]').forEach(card => { card.classList.toggle('selected', card.dataset.book === selected.slug); card.setAttribute('aria-pressed', String(card.dataset.book === selected.slug)); });
+  }));
   closeMenu();
   const fragment = location.hash.split('#').slice(2).join('#');
   if (fragment) requestAnimationFrame(() => document.getElementById(decodeURIComponent(fragment))?.scrollIntoView());
@@ -179,7 +198,7 @@ function normalize(s) { return s.toLocaleLowerCase().normalize('NFD').replace(/[
 function search(query) {
   const words = normalize(query.trim()).split(/\s+/).filter(Boolean);
   if (!words.length) return [];
-  return Object.values(state.data.pages).map(page => {
+  return Object.values(state.data.pages).filter(page => !isBookPage(page.slug)).map(page => {
     const title = normalize(page.title), body = normalize(page.html.replace(/<[^>]+>/g, ' '));
     if (!words.every(word => title.includes(word) || body.includes(word))) return null;
     const score = words.reduce((sum, word) => sum + (title.includes(word) ? 10 : 0) + (body.includes(word) ? 1 : 0), 0);

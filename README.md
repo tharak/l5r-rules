@@ -1,6 +1,6 @@
 # Last Haiku archive
 
-A modern static archive of the public [Last Haiku](https://lasthaiku.wikidot.com/) Legend of the Five Rings wiki. It includes a dark theme, foldable section navigation, full text search, article contents, mobile layouts, and links to each original page. The navigation follows each book page: Book of Earth contains Combat and Rolls, while Book of Fire contains character options and equipment.
+A modern static archive of the public [Last Haiku](https://lasthaiku.wikidot.com/) Legend of the Five Rings wiki. It includes a dark theme, foldable section navigation, full text search, article contents, mobile layouts, and links to each original page. Book titles open their menus directly; the home page lets readers choose a book and then a section. Book of Earth contains Combat and Rolls, while Book of Fire contains character options and equipment.
 
 The character creator under Book of Fire uses the wiki's family, school, skill, advantage, and disadvantage data. It calculates starting bonuses, Rings, Insight, and XP; saves the character in the browser; and can print or export a JSON sheet. It is a creation aid, so read the linked source entries for restrictions and special cases.
 
