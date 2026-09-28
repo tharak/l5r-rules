@@ -1,4 +1,4 @@
-const state = { data: null, searchMatches: [], activeMatch: 0 };
+const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set() };
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const pageHref = slug => `#/${encodeURIComponent(slug)}`;
@@ -13,18 +13,83 @@ function allNav() {
 }
 
 function pageSection(slug) {
-  for (const section of state.data.navigation) {
-    if (section.slug === slug || section.children.some(item => item.slug === slug)) return section.title;
-  }
+  const walk = (items, parents = []) => {
+    for (const item of items) {
+      if (item.slug === slug) return parents.length ? parents.join(' / ') : item.title;
+      const found = walk(item.children || [], [...parents, item.title]);
+      if (found) return found;
+    }
+    return null;
+  };
+  const section = walk(state.data.navigation);
+  if (section) return section;
   return state.data.more.some(item => item.slug === slug) ? 'More pages' : 'The archive';
+}
+
+function headingMenu(page) {
+  const document = new DOMParser().parseFromString(page.html, 'text/html');
+  const roots = [], stack = [];
+  [...document.querySelectorAll('h1, h2, h3')].forEach((heading, index) => {
+    const level = Number(heading.tagName.slice(1));
+    const node = { title: heading.textContent.trim(), slug: page.slug, anchor: heading.id || `section-${index + 1}`, children: [] };
+    while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
+    (stack.length ? stack[stack.length - 1].node.children : roots).push(node);
+    stack.push({ level, node });
+  });
+  return roots;
+}
+
+function linkedPages(page) {
+  const document = new DOMParser().parseFromString(page.html, 'text/html');
+  const seen = new Set();
+  return [...document.querySelectorAll('a[href^="#/"]')].flatMap(link => {
+    const match = /^#\/([^#]+)$/.exec(link.getAttribute('href'));
+    if (!match) return [];
+    const slug = decodeURIComponent(match[1]);
+    if (seen.has(slug) || !state.data.pages[slug]) return [];
+    seen.add(slug);
+    const title = link.textContent.trim();
+    return [{ title: /^Page \d+$/i.test(title) ? state.data.pages[slug].title : title, slug, children: headingMenu(state.data.pages[slug]) }];
+  });
+}
+
+function addDeepNavigation() {
+  const earth = state.data.navigation.find(section => section.slug === 'book-of-earth');
+  if (!earth) return;
+  for (const entry of earth.children) {
+    if (['families', 'schools', 'skills'].includes(entry.slug)) entry.children = linkedPages(state.data.pages[entry.slug]);
+  }
+}
+
+function navKey(entry) { return entry.anchor ? `${entry.slug}#${entry.anchor}` : entry.slug; }
+function navHref(entry) { return pageHref(entry.slug) + (entry.anchor ? `#${encodeURIComponent(entry.anchor)}` : ''); }
+
+function expandActivePath(entries, slug, fragment) {
+  let found = false;
+  for (const entry of entries) {
+    const childActive = expandActivePath(entry.children || [], slug, fragment);
+    const selfActive = entry.slug === slug && (!entry.anchor || entry.anchor === fragment);
+    if ((childActive || selfActive) && entry.children?.length) state.navExpanded.add(navKey(entry));
+    found ||= childActive || selfActive;
+  }
+  return found;
 }
 
 function renderNavigation() {
   const active = currentSlug();
-  const item = (entry, nested = false) => `<a class="nav-link ${nested ? 'nested' : ''} ${entry.slug === active ? 'active' : ''}" href="${pageHref(entry.slug)}"><span class="nav-indicator"></span>${esc(entry.title)}</a>`;
+  const fragment = location.hash.split('#').slice(2).join('#');
+  const books = state.data.navigation.filter(x => x.slug !== 'start');
+  expandActivePath(books, active, fragment);
+  let counter = 0;
+  const item = (entry, depth = 0) => {
+    const key = navKey(entry), children = entry.children || [], hasChildren = children.length > 0;
+    const expanded = state.navExpanded.has(key), id = `nav-group-${counter++}`;
+    const selected = entry.slug === active && (!entry.anchor || entry.anchor === fragment);
+    return `<div class="nav-item depth-${Math.min(depth,4)}"><div class="nav-row"><a class="nav-link ${selected ? 'active' : ''}" href="${navHref(entry)}" title="${esc(entry.title)}"><span class="nav-indicator"></span><span class="nav-text">${esc(entry.title)}</span></a>${hasChildren ? `<button class="nav-toggle" type="button" data-key="${esc(key)}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${esc(entry.title)}" aria-controls="${id}" aria-expanded="${expanded}"><span aria-hidden="true">⌄</span></button>` : ''}</div>${hasChildren ? `<div class="nav-children" id="${id}" ${expanded ? '' : 'hidden'}>${children.map(child => item(child, depth + 1)).join('')}</div>` : ''}</div>`;
+  };
   $('#navigation').innerHTML = `<div class="nav-label">EXPLORE THE ARCHIVE</div>${item({slug:'start', title:'Overview'})}${item({slug:'all-pages', title:'All pages'})}` +
-    state.data.navigation.filter(x => x.slug !== 'start').map(section => `<div class="nav-section">${item(section)}${section.children.map(child => item(child, true)).join('')}</div>`).join('') +
-    `<div class="nav-label more-label">ADDITIONAL RULES</div>${state.data.more.map(entry => item(entry)).join('')}`;
+    books.map(section => `<div class="nav-section">${item(section)}</div>`).join('') +
+    `<div class="nav-label more-label">ADDITIONAL RULES</div><div class="nav-more">${state.data.more.map(entry => item(entry)).join('')}</div>`;
 }
 
 function card(entry, eyebrow = 'REFERENCE') {
@@ -56,7 +121,15 @@ function renderArticle(page) {
     heading.id = id;
     return {id, title: heading.textContent.trim(), level: heading.tagName};
   });
-  const relatedSection = state.data.navigation.find(section => section.children.some(x => x.slug === page.slug));
+  const findParent = (items, parent = null) => {
+    for (const item of items) {
+      if (item.slug === page.slug) return parent;
+      const found = findParent(item.children || [], item);
+      if (found) return found;
+    }
+    return null;
+  };
+  const relatedSection = findParent(state.data.navigation);
   const related = relatedSection?.children.filter(x => x.slug !== page.slug).slice(0, 3) || [];
   return `<div class="article-layout"><article class="article"><div class="article-intro"><div class="eyebrow muted"><span class="eyebrow-line"></span> ${esc(pageSection(page.slug).toUpperCase())}</div><h1>${esc(page.title)}</h1><div class="article-meta"><span>LAST HAIKU REFERENCE</span><span class="meta-divider"></span><span>${page.words.toLocaleString()} WORDS</span></div></div><div class="article-content">${wrapper.innerHTML}</div><div class="article-end"><div class="end-mark">◈</div><p>From the Last Haiku archive. ${esc(page.revision)}</p><a href="${esc(page.source)}" target="_blank" rel="noopener noreferrer">View original page ↗</a></div>${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article><aside class="article-aside"><div class="aside-inner">${toc.length ? `<div class="aside-label">ON THIS PAGE</div><nav class="toc">${toc.map(x => `<a class="toc-${x.level.toLowerCase()}" href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>` : ''}<div class="aside-source"><span class="aside-source-icon">↗</span><strong>Source material</strong><p>Read this page on the original Last Haiku wiki.</p><a href="${esc(page.source)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div></aside></div>`;
 }
@@ -117,6 +190,17 @@ $('#search-input').addEventListener('input', renderSearchResults);
 $('#search-results').addEventListener('click', event => { if (event.target.closest('a')) closeSearch(); });
 $('#menu-button').addEventListener('click', () => { const open = document.body.classList.toggle('menu-open'); $('#menu-button').setAttribute('aria-expanded', String(open)); });
 $('#mobile-shade').addEventListener('click', closeMenu);
+$('#navigation').addEventListener('click', event => {
+  const toggle = event.target.closest('.nav-toggle');
+  if (toggle) {
+    const key = toggle.dataset.key;
+    const expanded = state.navExpanded.has(key);
+    if (expanded) state.navExpanded.delete(key); else state.navExpanded.add(key);
+    toggle.setAttribute('aria-expanded', String(!expanded));
+    toggle.setAttribute('aria-label', `${expanded ? 'Expand' : 'Collapse'} ${toggle.closest('.nav-row').querySelector('.nav-text').textContent}`);
+    toggle.closest('.nav-row').nextElementSibling.hidden = expanded;
+  } else if (event.target.closest('a')) closeMenu();
+});
 window.addEventListener('hashchange', render);
 document.addEventListener('keydown', event => {
   const overlayOpen = !$('#search-overlay').hidden;
@@ -132,4 +216,4 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Enter') { location.hash = pageHref(state.searchMatches[state.activeMatch].slug); closeSearch(); }
 });
 
-fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });
+fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; addDeepNavigation(); render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });

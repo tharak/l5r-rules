@@ -1,6 +1,6 @@
 # Last Haiku archive
 
-A modern static archive of the public [Last Haiku](https://lasthaiku.wikidot.com/) Legend of the Five Rings wiki. It includes section navigation, full text search, article contents, mobile layouts, and links to each original page.
+A modern static archive of the public [Last Haiku](https://lasthaiku.wikidot.com/) Legend of the Five Rings wiki. It includes a dark theme, foldable section navigation with detailed Families, Schools, and Skills menus, full text search, article contents, mobile layouts, and links to each original page.
 
 The source wiki states that its content is licensed under [Creative Commons Attribution-ShareAlike 3.0](https://creativecommons.org/licenses/by-sa/3.0/). The site retains attribution and the same license for imported content. Legend of the Five Rings is the property of its respective owners.
 
