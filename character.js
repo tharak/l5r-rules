@@ -1,5 +1,8 @@
 (() => {
-  const STORAGE_KEY = 'last-haiku-character-v1';
+  const LEGACY_KEY = 'last-haiku-character-v1';
+  const ROSTER_KEY = 'last-haiku-characters-v1';
+  const ACTIVE_KEY = 'last-haiku-active-character-v1';
+  const MIGRATION_KEY = 'last-haiku-characters-migrated-v1';
   const TRAIT_GROUPS = [
     {ring:'Air', mark:'風', traits:['Reflexes','Awareness']},
     {ring:'Earth', mark:'地', traits:['Stamina','Willpower']},
@@ -9,17 +12,66 @@
   ];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const blank = () => ({name:'', clan:'', family:'', school:'', concept:'', notes:'', traitBuys:{}, skills:{}, schoolChoices:[], advantages:[], disadvantages:[], purchases:[], status:1, glory:1});
-  let catalog, catalogPromise, sheet, root;
+  let catalog, catalogPromise, sheet, root, activeId;
+
+  function makeId() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+  function roster() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ROSTER_KEY));
+      if (Array.isArray(saved)) return saved;
+      const legacy = localStorage.getItem(MIGRATION_KEY) ? null : JSON.parse(localStorage.getItem(LEGACY_KEY));
+      const migrated = legacy && typeof legacy === 'object' ? [{id:makeId(),sheet:{...blank(),...legacy},updatedAt:new Date().toISOString()}] : [];
+      localStorage.setItem(ROSTER_KEY,JSON.stringify(migrated));
+      localStorage.setItem(MIGRATION_KEY,'1');
+      if (migrated[0]) localStorage.setItem(ACTIVE_KEY,migrated[0].id);
+      return migrated;
+    } catch { return []; }
+  }
+  function storeRoster(records) {
+    try { localStorage.setItem(ROSTER_KEY,JSON.stringify(records)); } catch {}
+    window.dispatchEvent(new Event('characters-changed'));
+  }
+  function list() {
+    return roster().map(record => ({id:record.id,name:record.sheet?.name || '',clan:record.sheet?.clan || '',family:record.sheet?.family || '',concept:record.sheet?.concept || '',updatedAt:record.updatedAt || ''})).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  function create() {
+    const id = makeId(), records = roster();
+    records.push({id,sheet:blank(),updatedAt:new Date().toISOString()});
+    try { localStorage.setItem(ACTIVE_KEY,id); } catch {}
+    activeId = id; storeRoster(records);
+    return id;
+  }
+  function open(id) {
+    if (!roster().some(record => record.id === id)) return false;
+    try { localStorage.setItem(ACTIVE_KEY,id); } catch {}
+    activeId = id;
+    return true;
+  }
+  function remove(id) {
+    const records = roster().filter(record => record.id !== id);
+    if (records.length === roster().length) return;
+    try {
+      if (localStorage.getItem(ACTIVE_KEY) === id) localStorage.setItem(ACTIVE_KEY,records[0]?.id || '');
+    } catch {}
+    if (activeId === id) activeId = records[0]?.id;
+    storeRoster(records);
+  }
 
   function loadSheet() {
     try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      const records = roster();
+      activeId = localStorage.getItem(ACTIVE_KEY) || records[0]?.id;
+      if (!records.some(record => record.id === activeId)) activeId = records[0]?.id || create();
+      const stored = roster().find(record => record.id === activeId)?.sheet;
       return stored && typeof stored === 'object' ? {...blank(),...stored,
         traitBuys:stored.traitBuys || {}, skills:stored.skills || {}, schoolChoices:stored.schoolChoices || [],
         advantages:stored.advantages || [], disadvantages:stored.disadvantages || [], purchases:stored.purchases || []} : blank();
     } catch { return blank(); }
   }
-  function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(sheet)); } catch {} }
+  function save() {
+    const records = roster(), record = records.find(item => item.id === activeId);
+    if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); storeRoster(records); }
+  }
   function selectedClan() { return catalog.clans.find(clan => clan.name === sheet.clan); }
   function selectedFamily() { return selectedClan()?.families.find(family => family.name === sheet.family); }
   function selectedSchool() { return selectedClan()?.schools.find(school => `${school.slug}#${school.anchor}` === sheet.school); }
@@ -106,7 +158,7 @@
   function render() {
     if (!root?.isConnected || !catalog || !location.hash.startsWith('#/create-character')) return;
     const data = build();
-    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> BOOK OF FIRE · CHARACTER CREATION</div><div class="creator-header-row"><div><h1>Create a character</h1><p>Shape a samurai of Rokugan. Your choices are saved automatically in this browser.</p></div><div class="creator-header-actions"><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory()}<div class="creator-bottom"><span>Saved on this device</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div></div>`;
+    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> BOOK OF FIRE · CHARACTER CREATION</div><div class="creator-header-row"><div><h1>Create a character</h1><p>Shape a samurai of Rokugan. Your choices are saved automatically in this browser.</p></div><div class="creator-header-actions"><a href="#/start">← Characters</a><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory()}<div class="creator-bottom"><span>Saved on this device</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div></div>`;
   }
 
   function onClick(event) {
@@ -151,7 +203,7 @@
       return;
     } else if (action === 'print') { window.print(); return;
     } else if (action === 'reset') {
-      if (!window.confirm('Start a new character? This clears the character saved in this browser.')) return;
+      if (!window.confirm('Clear this character and start over?')) return;
       sheet = blank();
     } else return;
     save(); render();
@@ -199,5 +251,5 @@
     }
   }
 
-  window.CharacterBuilder = { mount };
+  window.CharacterBuilder = { mount, list, create, open, remove };
 })();
