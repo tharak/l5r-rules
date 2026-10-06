@@ -42,43 +42,115 @@ def families_for(slug):
     return families
 
 
+def split_items(text):
+    """Separate list entries without splitting emphases or equipment alternatives."""
+    parts, start, depth = [], 0, 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(0, depth - 1)
+        elif char == "," and depth == 0:
+            parts.append(text[start:index].strip())
+            start = index + 1
+    parts.append(text[start:].strip())
+    return [part.rstrip(".") for part in parts if part]
+
+
+def parse_skills(raw):
+    # These typographical errors occur in the imported snapshot.
+    raw = raw.replace("Courtier (Manipulation, Defense", "Courtier (Manipulation), Defense")
+    raw = raw.replace("Spellcraft: any", "Spellcraft, any")
+    raw = raw.replace("Stealth (Sneaking) any", "Stealth (Sneaking), any")
+    raw = re.sub(r"(High|Bugei|Merchant|Low),\s*(?=(?:or\s+)?(?:High|Bugei|Merchant|Low)\b)", r"\1 / ", raw)
+    parts = split_items(raw)
+    skills, choices = [], []
+    aliases = {"Mediation": "Meditation", "Knivs": "Knives", "Jiujustu": "Jiujutsu",
+               "Kyujustu": "Kyujutsu", "Defenses": "Defense", "Stealthy": "Stealth",
+               "War Fans": "War Fan", "Theology": "Lore: Theology"}
+    for index, part in enumerate(parts):
+        part = re.sub(r"^and\s+(?=\w)", "", part, flags=re.I)
+        selection = part if re.search(r"\b(pick|either)\b", part, re.I) else re.sub(r"\([^)]*\)", "", part)
+        if re.search(r"\b(any|either|pick|chosen|one\s+(?:High|Low|Bugei|Skill))\b", selection, re.I) and not re.search(r"emphas", part, re.I):
+            if "following list" in part:
+                part = ", ".join(parts[index:])
+            rank = 2 if re.search(r"two ranks", part, re.I) else 1
+            count_match = re.search(r"(?:any|pick)\s+(one|two|three|[123])", part, re.I)
+            count = {"one": 1, "two": 2, "three": 3, "1": 1, "2": 2, "3": 3}[count_match.group(1).lower()] if count_match else 1
+            for _ in range(count):
+                choices.append({"prompt": part, "rank": rank, "kind": "skill"})
+            if "following list" in part:
+                break
+            continue
+        rank_match = re.search(r"\s+(\d+)$", part)
+        rank = int(rank_match.group(1)) if rank_match else 1
+        if rank_match:
+            part = part[:rank_match.start()].strip()
+        emphasis_match = re.search(r"\s*\((.+)\)$", part)
+        emphasis = emphasis_match.group(1) if emphasis_match else ""
+        name = part[:emphasis_match.start()].strip() if emphasis_match else part
+        name = re.sub(r":\s*", ": ", aliases.get(name, name))
+        notes = ""
+        if re.search(r"\b(treat|may replace)\b", emphasis, re.I):
+            notes, emphasis = emphasis, ""
+        if re.search(r"\b(pick|choose)\b", emphasis, re.I):
+            choices.append({"prompt": f"{name}: {emphasis}", "kind": "emphasis", "skill": name, "rank": 0})
+            emphasis = ""
+        skill = {"name": name, "rank": rank, "emphases": [emphasis] if emphasis else []}
+        if notes:
+            skill["notes"] = notes
+        skills.append(skill)
+    return skills, choices
+
+
 def school_info(heading, slug):
     raw_title = heading.get_text(" ", strip=True)
     name = re.sub(r"\s*\[[^]]+\]", "", raw_title).strip()
     fields = {}
+    techniques = []
     for sibling in heading.next_siblings:
         if getattr(sibling, "name", None) in ("h1", "h2", "h3"):
             break
         if not getattr(sibling, "select", None):
             continue
         for li in sibling.select("li"):
-            strong = li.find("strong")
-            if strong:
-                label = strong.get_text(" ", strip=True).rstrip(":").lower()
-                if label in ("benefit", "skills", "honor", "outfit"):
-                    fields[label] = li.get_text(" ", strip=True).split(":", 1)[-1].strip()
+            text = li.get_text(" ", strip=True)
+            field_match = re.match(r"^(Benefit|(?:Starting |School )?Skills|Honor|Outfit|Affinity\s*/\s*Deficiency|Spells|Technique)\s*:\s*\*?\*?\s*(.*)", text, re.I)
+            if field_match:
+                label = field_match.group(1).lower()
+                if label.endswith("skills"):
+                    label = "skills"
+                fields[label] = field_match.group(2)
+        for paragraph in [sibling] if sibling.name == "p" else sibling.select("p"):
+            for strong in paragraph.find_all("strong"):
+                title = strong.get_text(" ", strip=True)
+                if re.match(r"Rank\s+1\s*:", title, re.I):
+                    text = paragraph.get_text(" ", strip=True)
+                    techniques.append({"name": title, "description": text[text.index(title) + len(title):].strip()})
     benefit_match = re.search(rf"\+\s*1\s+({TRAITS})\b", fields.get("benefit", ""), re.I)
     honor_match = re.search(r"\d+(?:\.\d+)?", fields.get("honor", ""))
     skills_raw = fields.get("skills", "")
-    skills = []
-    choices = []
-    for part in skills_raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        if re.search(r"\b(any|one of|two of|choice|either)\b", part, re.I):
-            choices.append(part)
-            continue
-        rank_match = re.search(r"\s+(\d+)$", part)
-        rank = int(rank_match.group(1)) if rank_match else 1
-        if rank_match:
-            part = part[:rank_match.start()].strip()
-        skills.append({"name": part, "rank": rank})
+    skills, choices = parse_skills(skills_raw)
+    if fields.get("technique"):
+        techniques.append({"name": "Starting technique", "description": fields["technique"]})
+    outfit_items = split_items(fields.get("outfit", ""))
+    equipment, money = [], {}
+    for item in outfit_items:
+        currency = re.fullmatch(r"(\d+)\s+(koku|bu|zeni)", item, re.I)
+        if currency:
+            money[currency.group(2).lower()] = int(currency.group(1))
+        else:
+            count_match = re.search(r"any\s+(one|two|[12])\b", item, re.I)
+            count = 2 if count_match and count_match.group(1).lower() in ("two", "2") else 1
+            for _ in range(count):
+                equipment.append({"name": item, "choice": bool(re.search(r"\b(any|or)\b", item, re.I))})
     return {"name": name, "slug": slug, "anchor": heading.get("id", ""),
             "benefit": benefit_match.group(1).title() if benefit_match else "",
             "honor": float(honor_match.group()) if honor_match else None,
             "outfit": fields.get("outfit", ""), "skills": skills,
-            "choices": choices, "skillsRaw": skills_raw}
+            "choices": [choice["prompt"] for choice in choices], "skillChoices": choices, "skillsRaw": skills_raw,
+            "equipment": equipment, "money": money, "techniques": techniques,
+            "affinity": fields.get("affinity / deficiency", ""), "spells": fields.get("spells", "")}
 
 
 def schools_for(slug):
@@ -155,8 +227,23 @@ for slug, group in (("high-skills", "High"), ("bugei-skills", "Bugei"),
     for h in soup_for(slug).select("h1, h2"):
         title = h.get_text(" ", strip=True)
         if title:
+            trait_match = re.search(r"\(([^)]+)\)$", title)
+            skill_traits = re.findall(rf"\b({TRAITS})\b", trait_match.group(1)) if trait_match else []
+            specialty_traits = {}
+            if not skill_traits:
+                description = []
+                for sibling in h.next_siblings:
+                    if getattr(sibling, "name", None) in ("h1", "h2"):
+                        break
+                    if getattr(sibling, "get_text", None):
+                        description.append(sibling.get_text(" ", strip=True))
+                subtypes = " ".join(description).split("Emphases:", 1)[0]
+                for match in re.finditer(rf"([A-Za-z][A-Za-z &\-]+?)\s*\(({TRAITS})\)", subtypes):
+                    specialty = re.sub(r"^includes\s+", "", match.group(1)).strip()
+                    specialty_traits[specialty] = match.group(2)
             skills.append({"name": re.sub(r"\s*\([^)]*\)$", "", title), "group": group,
-                           "slug": slug, "anchor": h.get("id", "")})
+                           "slug": slug, "anchor": h.get("id", ""),
+                           "traits": skill_traits, "specialtyTraits": specialty_traits})
 
 
 def point_choices(label):

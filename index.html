@@ -13,8 +13,11 @@
   <link rel="stylesheet" href="dark-theme.css">
   <link rel="stylesheet" href="character.css">
   <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="account.css">
+  <script src="character-storage.js" defer></script>
   <script src="character.js" defer></script>
   <script src="app.js" defer></script>
+  <script type="module" src="firebase-service.js"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -25,6 +28,13 @@
       </a>
       <button class="sidebar-search" id="sidebar-search" type="button"><span class="search-icon" aria-hidden="true">⌕</span> Search the archive <kbd>/</kbd></button>
       <nav id="navigation" aria-label="Books"></nav>
+      <section class="account-panel" aria-label="Character saves">
+        <p id="account-name">Device characters</p>
+        <p id="account-status" role="status">Saved on this device</p>
+        <button id="account-sign-in" type="button" disabled>Sign in with Google</button>
+        <button id="account-import" type="button" hidden>Copy device characters</button>
+        <button id="account-sign-out" type="button" hidden>Sign out</button>
+      </section>
       <div class="sidebar-footer"><span class="footer-dot"></span> A living archive of Rokugan</div>
     </aside>
     <div class="mobile-shade" id="mobile-shade"></div>

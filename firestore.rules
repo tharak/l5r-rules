@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/characters/{characterId} {
+      function owner() { return request.auth != null && request.auth.uid == userId; }
+      function validCharacter() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['sheetJson', 'updatedAt'])
+          && data.keys().hasOnly(['sheetJson', 'updatedAt'])
+          && data.sheetJson is string && data.sheetJson.size() <= 900000
+          && data.updatedAt is string && data.updatedAt.size() <= 40;
+      }
+      allow read, delete: if owner();
+      allow create, update: if owner() && validCharacter();
+    }
+  }
+}

@@ -257,7 +257,7 @@ $('#app').addEventListener('click', event => {
   if (action === 'open' && window.CharacterBuilder.open(button.dataset.id)) location.hash = pageHref('create-character');
   if (action === 'remove') {
     const character = window.CharacterBuilder.list().find(item => item.id === button.dataset.id);
-    if (character && window.confirm(`Delete ${character.name || 'this character'} from this browser?`)) {
+    if (character && window.confirm(`Delete ${character.name || 'this character'}${window.CharacterStorage?.accountId ? ' from your account and synced devices' : ' from this browser'}?`)) {
       window.CharacterBuilder.remove(button.dataset.id);
     }
   }
