@@ -6,6 +6,7 @@
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
   const button = (action,text,id='',disabled=false) => `<button type="button" data-campaign="${action}" data-id="${e(id)}" ${busy||disabled?'disabled':''}>${text}</button>`;
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
+  const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
   function reset(next) {
@@ -78,11 +79,11 @@
       <div class="campaign-grid"><section class="panel campaign-content"><div class="campaign-segments" role="group" aria-label="Campaign sections">${[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[])].map(([key,label])=>`<button type="button" data-campaign="section" data-id="${key}" aria-pressed="${section===key}" ${busy?'disabled':''}>${label}</button>`).join('')}</div>
       ${section==='sessions'?`<div class="workspace-head"><h2>Sessions</h2>${isGM?button('session-new','+ Session'):''}</div><div class="session-list">${sessions.map(s=>button('session-open',e(s.title || 'Untitled session'),s.id)).join('')}</div>${s?`<label>Title<input data-campaign-field="session-title" value="${e(s.title)}" maxlength="200" ${isGM?'':'readonly'}></label><label>Session notes<textarea class="session-text" data-campaign-field="session-text" ${isGM?'':'readonly'}>
 ${e(s.text)}</textarea></label>${isGM?button('session-delete','Delete session',s.id):''}`:'<p>No sessions yet.</p>'}`:''}
-      ${section==='pcs'?`<div class="workspace-head"><h2>PC roster</h2>${button('pc-picker','+PC')}</div>${pcs.map(pc=>`<div class="roster-row"><span>${e(label(pc))}</span>${button('pc-open',own(pc)||isGM?'Edit':'View',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}</div>`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add a personal PC</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',e(pc.name||'Unnamed PC'),pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}`:''}
+      ${section==='pcs'?`<div class="workspace-head"><h2>PC roster</h2><div class="campaign-actions">${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}</div></div>${pcs.map(pc=>`<div class="roster-row"><span>${e(label(pc))}</span>${button('pc-open',own(pc)||isGM?'Edit':'View',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}</div>`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add a personal PC</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',e(pc.name||'Unnamed PC'),pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}`:''}
       ${section==='npcs'&&isGM?`<div class="workspace-head"><h2>NPCs</h2>${button('npc-new','+NPC')}</div><div class="npc-list">${npcs.map(n=>button('npc-open',e(n.name||'Unnamed NPC'),n.id)).join('')}</div>${n?`<label>Name<input data-campaign-field="npc-name" maxlength="200" value="${e(n.name)}"></label><label>Notes<textarea data-campaign-field="npc-notes">
 ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim())}${npcId?button('npc-delete','Delete NPC',npcId):''}`:''}`:''}</section>
       <section class="panel campaign-members"><h2>Members</h2>${members.map(m=>`<div class="roster-row"><span>${m.id===c.gmUid?'GM':m.id===store().uid?'You':`Player ${e(m.id.slice(0,8))}`}</span>${isGM&&m.id!==c.gmUid?button('member-remove','Remove',m.id):''}</div>`).join('')}
-      ${isGM?`<h3>Invitation</h3><p>Invite links expire after seven days.</p>${button('invite',invitation?'Replace invite link':'Create invite link')}${invitation?`<label>Invite link<input readonly value="${e(location.href.split('#')[0]+'#/invite/'+invitation.token)}"></label>${button('copy-invite','Copy link',invitation.token)}${button('revoke','Revoke invite')}`:''}`:''}</section></div>${section==='pcs'&&selectedPC?(isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':sharedSheet(selectedPC)):''}</div>`;
+      ${invitation?`<details class="invite-settings"><summary>Invite settings</summary><p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}</details>`:''}</section></div>${section==='pcs'&&selectedPC?(isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':sharedSheet(selectedPC)):''}</div>`;
   }
   function mountEditor() {
     const target = document.getElementById('campaign-editor');
@@ -109,6 +110,7 @@ ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim()
     renderPage();
   }
   async function act(action,id) {
+    if (busy) return;
     const backend = store().backend;
     error = ''; busy = true;
     try {
@@ -141,9 +143,29 @@ ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim()
         else {sheetId=id;editor=null;}
       } else if (action==='pc-remove') {store().queue(path('pcs',id),null);sheetId='';}
       else if (action==='close-sheet') {sheetId='';editor=null;}
-      else if (action==='invite') await backend.invite(active);
+      else if (action==='share-invite'||action==='invite') {
+        if (!gm()) return;
+        const campaign=active;
+        changed();
+        let token=action==='share-invite'?(await backend.get(path('private','invitation')))?.token:null;
+        if (token) {
+          try {await backend.invitation(token);}
+          catch (err) {
+            if(err.code!=='permission-denied' && err.message!=='This invitation has expired or was revoked.')throw err;
+            token=null;
+          }
+        }
+        token ||= await backend.invite(campaign);
+        if(active!==campaign || store().backend!==backend || !gm())return;
+        const url=inviteURL(token);
+        try {
+          await navigator.clipboard.writeText(url);
+          error='Invite link copied.';
+        } catch {
+          window.prompt('Copy this invite link:',url);
+        }
+      }
       else if (action==='revoke') await backend.revoke(active);
-      else if (action==='copy-invite') {await navigator.clipboard.writeText(location.href.split('#')[0]+'#/invite/'+id);error='Invite link copied.';}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;
         await backend.removeMember(active,action==='leave'?store().uid:id);

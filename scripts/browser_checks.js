@@ -66,9 +66,35 @@ async page => {
   check(await page.locator('[data-public]').count()===6,'Six privacy controls missing');
   await page.locator('[data-field="notes"]').fill('HIDDEN OWNER NOTES');
   await page.getByRole('link',{name:'← Campaign',exact:true}).click();
-  await page.getByRole('button',{name:'Create invite link',exact:true}).click();
-  await page.getByLabel('Invite link', {exact:true}).waitFor();
-  const inviteURL=await page.getByLabel('Invite link',{exact:true}).inputValue();
+  await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:'http://127.0.0.1:5000'});
+  await page.getByRole('button',{name:'Invite link',exact:true}).waitFor();
+  check(await page.locator('.campaign-actions [data-campaign="pc-picker"] + [data-campaign="share-invite"]').count()===1,'Invite link is not beside +PC');
+  await page.getByRole('button',{name:'Invite link',exact:true}).click();
+  await page.getByText('Invite link copied.',{exact:true}).waitFor();
+  const inviteURL=await page.evaluate(()=>navigator.clipboard.readText());
+  check(inviteURL.includes('#/invite/'),'Clipboard does not contain an invite URL');
+  check(await page.getByLabel('Invite link',{exact:true}).count()===0,'Inline invite form remains');
+  await page.getByRole('button',{name:'Invite link',exact:true}).click();
+  await page.getByText('Invite link copied.',{exact:true}).waitFor();
+  check(await page.evaluate(()=>navigator.clipboard.readText())===inviteURL,'Copying replaced a valid invitation');
+  for(const unavailable of [false,true]) {
+    await page.evaluate(unavailable=>{
+      window.invitePrompt=window.prompt;
+      window.inviteWrite=navigator.clipboard.writeText;
+      window.inviteFallback=null;
+      window.prompt=(message,url)=>{window.inviteFallback={message,url};return null;};
+      if(unavailable)Object.defineProperty(navigator,'clipboard',{configurable:true,value:undefined});
+      else navigator.clipboard.writeText=async()=>{throw new DOMException('Clipboard blocked','NotAllowedError');};
+    },unavailable);
+    await page.getByRole('button',{name:'Invite link',exact:true}).click();
+    await page.waitForFunction(()=>window.inviteFallback!==null);
+    check(await page.evaluate(()=>window.inviteFallback.url)===inviteURL,'Copy fallback popup has the wrong link');
+    await page.evaluate(unavailable=>{
+      if(unavailable)delete navigator.clipboard;
+      navigator.clipboard.writeText=window.inviteWrite;
+      window.prompt=window.invitePrompt;
+    },unavailable);
+  }
   const browser=page.context().browser();
   const playerContext=await browser.newContext({viewport:{width:390,height:844}});
   const player=await playerContext.newPage();player.on('pageerror',e=>errors.push(e.message));
@@ -85,6 +111,7 @@ async page => {
   check(await player.getByRole('button',{name:'NPC',exact:true}).count()===0 && await player.getByRole('heading',{name:'NPCs',exact:true}).count()===0,'NPCs leaked to player');
   check(await player.locator('[data-campaign-field="session-text"]').getAttribute('readonly')!==null,'Player can edit sessions');
   await player.getByRole('button',{name:'PC',exact:true}).click();
+  check(await player.getByRole('button',{name:'Invite link',exact:true}).count()===0,'Player can create invitations');
   await player.getByRole('button',{name:'View',exact:true}).click();
   await player.locator('.shared-sheet h2').waitFor();
   check(!(await player.locator('.shared-sheet').innerText()).includes('HIDDEN OWNER NOTES'),'Hidden notes leaked');
@@ -131,9 +158,10 @@ async page => {
   await page.goto(campaignURL);
   await page.getByRole('button',{name:'PC',exact:true}).click();
   await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
+  await page.getByText('Invite settings',{exact:true}).click();
   await page.getByRole('button',{name:'Revoke invite',exact:true}).click();
-  await page.getByRole('button',{name:'Create invite link',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('[data-campaign=invite]')?.disabled===false);
+  await page.waitForFunction(()=>!document.querySelector('.invite-settings'));
+  await page.waitForFunction(()=>document.querySelector('[data-campaign=share-invite]')?.disabled===false);
   await player.goto(inviteURL);
   await player.getByText('This invitation has expired or was revoked.',{exact:true}).waitFor();
   await player.goto(campaignURL);await player.getByRole('button',{name:'PC',exact:true}).click();await player.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
