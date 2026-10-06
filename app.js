@@ -1,4 +1,4 @@
-const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set(), dice: {rolled:5, kept:3, modifier:0, target:20, raises:0, unskilled:false}, rollHistory:[] };
+const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set() };
 const $ = (selector) => document.querySelector(selector);
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const pageHref = slug => `#/${encodeURIComponent(slug)}`;
@@ -113,51 +113,9 @@ function iconFor(title) {
   return icons[title] || '◈';
 }
 
-function renderDice() {
-  const dice = state.dice, latest = state.rollHistory[0];
-  return `<section class="dashboard-panel dashboard-dice"><div class="dashboard-panel-head"><div><span class="dashboard-kicker">ROLL & KEEP</span><h2>Dice roller</h2></div><a href="${pageHref('rolls')}" class="dashboard-rule-link">Rules ↗</a></div><form id="dice-form"><div class="dice-notation"><label><span>ROLL</span><input name="rolled" type="number" min="1" max="30" value="${dice.rolled}" required></label><strong>k</strong><label><span>KEEP</span><input name="kept" type="number" min="1" max="30" value="${dice.kept}" required></label></div><div class="dice-fields"><label>Modifier<input name="modifier" type="number" min="-100" max="100" value="${dice.modifier}"></label><label>Target number<input name="target" type="number" min="0" max="500" value="${dice.target}"></label><label>Raises<input name="raises" type="number" min="0" max="10" value="${dice.raises}"></label></div><label class="dice-unskilled"><input name="unskilled" type="checkbox" ${dice.unskilled ? 'checked' : ''}> Unskilled roll <span>(tens do not explode)</span></label><button class="dice-submit" type="submit">Roll the dice <span>◈</span></button></form><div id="dice-result" aria-live="polite">${latest ? renderRollResult(latest) : `<div class="dice-placeholder"><span>◈</span><p>Your next roll awaits.</p></div>`}</div></section>`;
-}
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
   return `<div class="workspace"><div class="workspace-head"><h1>Characters</h1><button data-dashboard="new">Create PC</button></div><div class="character-list">${characters.map(c => `<article class="character-tile"><div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div><div class="character-actions"><button data-dashboard="open" data-id="${esc(c.id)}">Edit</button><button data-dashboard="remove" data-id="${esc(c.id)}">Delete</button></div></article>`).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
-}
-
-function dieFace() {
-  if (!globalThis.crypto?.getRandomValues) return 1 + Math.floor(Math.random() * 10);
-  const value = new Uint32Array(1);
-  do { crypto.getRandomValues(value); } while (value[0] >= 4294967290);
-  return 1 + value[0] % 10;
-}
-
-function tenDiceRule(rolled, kept, modifier) {
-  const pairs = kept < 10 ? Math.min(Math.floor(Math.max(0, rolled - 10) / 2), 10 - kept) : 0;
-  rolled -= pairs * 2;
-  kept += pairs;
-  modifier += 2 * Math.max(0, rolled - 10) + 2 * Math.max(0, kept - 10);
-  return {rolled:Math.min(10, rolled), kept:Math.min(10, kept), modifier};
-}
-
-function makeRoll(options) {
-  const originalRolled = Math.max(1, Math.min(30, Number(options.rolled) || 1));
-  const originalKept = Math.max(1, Math.min(originalRolled, Number(options.kept) || 1));
-  const modifier = Math.max(-100, Math.min(100, Number(options.modifier) || 0));
-  const target = Math.max(0, Math.min(500, Number(options.target) || 0));
-  const unskilled = Boolean(options.unskilled);
-  const raises = unskilled ? 0 : Math.max(0, Math.min(10, Number(options.raises) || 0));
-  const effective = tenDiceRule(originalRolled, originalKept, modifier);
-  const dice = Array.from({length:effective.rolled}, () => {
-    const faces = [dieFace()];
-    if (!unskilled) while (faces.at(-1) === 10 && faces.length < 100) faces.push(dieFace());
-    return {faces,total:faces.reduce((sum,face) => sum + face,0)};
-  }).sort((a,b) => b.total - a.total);
-  const total = dice.slice(0,effective.kept).reduce((sum,die) => sum + die.total,0) + effective.modifier;
-  return {originalRolled,originalKept,effective,dice,total,target,raises,unskilled,needed:target + raises*5,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})};
-}
-
-function renderRollResult(result) {
-  const outcome = result.target ? result.total >= result.needed ? 'SUCCESS' : 'FAILED' : 'NO TARGET';
-  const margin = result.target ? result.total - result.needed : null;
-  return `<div class="dice-result-card"><div class="dice-result-top"><span>${result.originalRolled}k${result.originalKept}${result.effective.modifier ? ` ${result.effective.modifier > 0 ? '+' : '−'} ${Math.abs(result.effective.modifier)}` : ''}</span><time>${esc(result.time)}</time></div><div class="dice-result-main"><strong>${result.total}</strong><div><span class="dice-outcome ${outcome.toLowerCase().replace(' ','-')}">${outcome}</span>${margin !== null ? `<small>${margin >= 0 ? '+' : ''}${margin} vs TN ${result.needed}</small>` : ''}</div></div><div class="dice-values">${result.dice.map((die,index) => `<span class="die ${index < result.effective.kept ? 'kept' : ''}" title="${die.faces.join(' + ')}">${die.total}${die.faces.length > 1 ? '<sup>✦</sup>' : ''}</span>`).join('')}</div><p>Kept ${result.effective.kept} of ${result.effective.rolled} dice${result.raises ? ` · ${result.raises} ${result.raises === 1 ? 'Raise' : 'Raises'}` : ''}${result.unskilled ? ' · Unskilled' : ''}${result.effective.rolled !== result.originalRolled || result.effective.kept !== result.originalKept ? ' · Ten Dice Rule applied' : ''}</p></div>${state.rollHistory.length > 1 ? `<div class="dice-history"><span>RECENT ROLLS</span>${state.rollHistory.slice(1,5).map(previous => `<div><strong>${previous.total}</strong><small>${previous.originalRolled}k${previous.originalKept} · ${esc(previous.time)}</small></div>`).join('')}</div>` : ''}`;
 }
 
 function renderArticle(page) {
@@ -208,7 +166,7 @@ function render() {
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
-  $('#app').innerHTML = campaignRoute ? window.CampaignUI.render(slug,renderDice) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : slug === 'create-character' ? '<div class="loading">Opening character…</div>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : slug === 'create-character' ? '<div class="loading">Opening character…</div>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (slug === 'create-character') window.CharacterBuilder.mount($('#app'));
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
@@ -261,20 +219,6 @@ $('#app').addEventListener('click', event => {
       window.CharacterBuilder.remove(button.dataset.id);
     }
   }
-});
-$('#app').addEventListener('submit', event => {
-  if (event.target.id !== 'dice-form') return;
-  event.preventDefault();
-  const form = event.target, values = new FormData(form);
-  state.dice = {rolled:Number(values.get('rolled')), kept:Number(values.get('kept')), modifier:Number(values.get('modifier')), target:Number(values.get('target')), raises:Number(values.get('raises')), unskilled:values.has('unskilled')};
-  const result = makeRoll(state.dice);
-  state.dice = {rolled:result.originalRolled, kept:result.originalKept, modifier:Number(values.get('modifier')) || 0, target:result.target, raises:result.raises, unskilled:result.unskilled};
-  state.rollHistory.unshift(result);
-  state.rollHistory.length = Math.min(state.rollHistory.length,5);
-  $('#dice-result').innerHTML = renderRollResult(result);
-  form.querySelector('[name="rolled"]').value = result.originalRolled;
-  form.querySelector('[name="kept"]').value = result.originalKept;
-  form.querySelector('[name="raises"]').value = result.raises;
 });
 window.addEventListener('characters-changed', () => { if (state.data && currentSlug() === 'characters') render();
   else if (state.data && (currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });

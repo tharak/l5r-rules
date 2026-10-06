@@ -10,6 +10,7 @@ async page => {
     await page.getByRole('button',{name:'Create campaign',exact:true}).click();
     await page.locator('[data-campaign-field="title"]').waitFor();
     const url=page.url();
+    await page.getByRole('button',{name:'PC',exact:true}).click();
     await page.getByRole('button',{name:'+PC',exact:true}).click();
     await page.locator('[data-campaign="pc-link"][data-id="'+personalId+'"]').click();
     await page.waitForFunction(id=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').some(pc=>pc.characterId===id),personalId);
@@ -18,6 +19,7 @@ async page => {
   const first=await create('Existing PC campaign one');
   const second=await create('Existing PC campaign two');
   const mirror=await page.context().newPage();await mirror.goto(first);
+  await mirror.getByRole('button',{name:'PC',exact:true}).click();
   await mirror.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await page.getByRole('button',{name:'Edit',exact:true}).click();
   await page.locator('[data-field="name"]').waitFor();

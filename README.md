@@ -4,7 +4,7 @@ Campaigns, personal PCs, and five searchable books for Legend of the Five Rings.
 
 Signed-out users create, edit, print, and export device PCs. Google sign-in gives each account its own personal roster and cloud sync. **Copy device characters** explicitly imports device PCs with their existing IDs. Existing browser keys, account caches, pending writes, and active selections migrate to `l5r-rules` names.
 
-Creating a campaign makes its creator the sole GM. Members link their own personal PCs; each association references the same live sheet. The GM edits the title and plain-text sessions, manages private name-and-notes NPCs, and removes members or PCs. Players read sessions, remove their own associations, and leave campaigns. Membership removal removes that player's associations. Campaign deletion preserves personal PCs. Each campaign includes a roll-and-keep dice roller. Sessions autosave plain text with its line breaks intact.
+Creating a campaign makes its creator the sole GM. Members link their own personal PCs; each association references the same live sheet. The GM edits the title and plain-text sessions, manages private name-and-notes NPCs, and removes members or PCs. Players read sessions, remove their own associations, and leave campaigns. Membership removal removes that player's associations. Campaign deletion preserves personal PCs. Sessions, PCs, and GM-only NPCs share a panel with a segmented selector. Sessions autosave plain text with its line breaks intact. **Save NPC** saves a new NPC and clears the form for the next entry.
 
 GMs create, copy, replace, or revoke invitations. Invite links last seven days; signing in and pressing **Join campaign** is required. Invitations are stored separately from member-readable campaign data.
 

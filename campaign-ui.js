@@ -1,10 +1,10 @@
 (() => {
   const store = () => window.CampaignStorage;
   const e = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let accountUid = null, active = '', sessionId = '', npcId = '', sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
+  let accountUid = null, active = '', section = 'sessions', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   const sheets = new Map(), stops = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='') => `<button type="button" data-campaign="${action}" data-id="${e(id)}" ${busy?'disabled':''}>${text}</button>`;
+  const button = (action,text,id='',disabled=false) => `<button type="button" data-campaign="${action}" data-id="${e(id)}" ${busy||disabled?'disabled':''}>${text}</button>`;
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
@@ -12,7 +12,7 @@
     if (next === active) return;
     watchGeneration++;
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
-    active = next; sessionId = npcId = sheetId = ''; picking = false; editor = null; error = '';
+    active = next; section = 'sessions'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
   }
   async function watch(pc,full=false) {
     const key = pc.id+(full?':full':':public');
@@ -45,7 +45,7 @@
     if (!data) return '<p>Loading shared sheet…</p>';
     return `<section class="panel shared-sheet"><div class="workspace-head"><h2>${e(label(pc))}</h2>${button('close-sheet','Close')}${button('print-shared','Print')}${button('export-shared','Export JSON')}</div>${Object.entries(data.sections).map(([key,value])=>`<section><h3>${e(window.SheetSharing.labels[window.SheetSharing.keys.indexOf(key)])}</h3>${fields(value)}</section>`).join('') || '<p>This PC has no public sections.</p>'}</section>`;
   }
-  function render(slug,dice) {
+  function render(slug) {
     renderAgain ||= () => {};
     if (accountUid !== store().uid) { active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
     if (!store().uid) { reset(''); return `<div class="workspace"><h1>Campaigns</h1><p>Sign in with Google to create or join shared campaigns.</p>${button('sign-in','Sign in with Google')}<p><a href="#/characters">Open device characters</a></p></div>`; }
@@ -66,21 +66,23 @@
     const c = store().get(`campaigns/${active}`);
     if (!c) { reset(''); return '<div class="workspace"><h1>Campaign unavailable</h1><p>Loading, or membership is no longer active.</p><a href="#/campaigns">Campaigns</a></div>'; }
     const isGM = gm(), sessions = store().list(path('sessions','')), npcs = isGM ? store().list(path('npcs','')) : [], pcs = store().list(path('pcs','')), members = store().list(path('members',''));
+    if (!isGM && section === 'npcs') section = 'sessions';
     if (!sessionId || !sessions.some(s=>s.id===sessionId)) sessionId = sessions[0]?.id || '';
-    const s = sessions.find(s=>s.id===sessionId), n = npcs.find(n=>n.id===npcId);
+    const s = sessions.find(s=>s.id===sessionId), n = npcDraft || npcs.find(n=>n.id===npcId);
     for (const pc of pcs) if (!own(pc)) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?`<label class="campaign-title">Campaign title<input data-campaign-field="title" maxlength="200" value="${e(c.title)}"></label>`:`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div><p class="campaign-status" role="status">${e(error || store().status)}</p>
-      <div class="campaign-grid"><section class="panel"><div class="workspace-head"><h2>Sessions</h2>${isGM?button('session-new','+ Session'):''}</div><div class="session-list">${sessions.map(s=>button('session-open',e(s.title || 'Untitled session'),s.id)).join('')}</div>${s?`<label>Title<input data-campaign-field="session-title" value="${e(s.title)}" maxlength="200" ${isGM?'':'readonly'}></label><label>Session notes<textarea class="session-text" data-campaign-field="session-text" ${isGM?'':'readonly'}>
-${e(s.text)}</textarea></label>${isGM?button('session-delete','Delete session',s.id):''}`:'<p>No sessions yet.</p>'}</section>
-      <section class="panel"><div class="workspace-head"><h2>PC roster</h2>${button('pc-picker','+PC')}</div>${pcs.map(pc=>`<div class="roster-row"><span>${e(label(pc))}</span>${button('pc-open',own(pc)||isGM?'Edit':'View',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}</div>`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add a personal PC</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',e(pc.name||'Unnamed PC'),pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}
-      <h3>Members</h3>${members.map(m=>`<div class="roster-row"><span>${m.id===c.gmUid?'GM':m.id===store().uid?'You':`Player ${e(m.id.slice(0,8))}`}</span>${isGM&&m.id!==c.gmUid?button('member-remove','Remove',m.id):''}</div>`).join('')}
-      ${isGM?`<h3>Invitation</h3><p>Invite links expire after seven days.</p>${button('invite',invitation?'Replace invite link':'Create invite link')}${invitation?`<label>Invite link<input readonly value="${e(location.href.split('#')[0]+'#/invite/'+invitation.token)}"></label>${button('copy-invite','Copy link',invitation.token)}${button('revoke','Revoke invite')}`:''}`:''}</section>
-      ${isGM?`<section class="panel"><div class="workspace-head"><h2>NPCs</h2>${button('npc-new','+NPC')}</div>${npcs.map(n=>button('npc-open',e(n.name||'Unnamed NPC'),n.id)).join('')}${n?`<label>Name<input data-campaign-field="npc-name" maxlength="200" value="${e(n.name)}"></label><label>Notes<textarea data-campaign-field="npc-notes">
-${e(n.notes)}</textarea></label>${button('npc-delete','Delete NPC',n.id)}`:''}</section>`:''}${dice()}</div>${selectedPC?(isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':sharedSheet(selectedPC)):''}</div>`;
+      <div class="campaign-grid"><section class="panel campaign-content"><div class="campaign-segments" role="group" aria-label="Campaign sections">${[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[])].map(([key,label])=>`<button type="button" data-campaign="section" data-id="${key}" aria-pressed="${section===key}" ${busy?'disabled':''}>${label}</button>`).join('')}</div>
+      ${section==='sessions'?`<div class="workspace-head"><h2>Sessions</h2>${isGM?button('session-new','+ Session'):''}</div><div class="session-list">${sessions.map(s=>button('session-open',e(s.title || 'Untitled session'),s.id)).join('')}</div>${s?`<label>Title<input data-campaign-field="session-title" value="${e(s.title)}" maxlength="200" ${isGM?'':'readonly'}></label><label>Session notes<textarea class="session-text" data-campaign-field="session-text" ${isGM?'':'readonly'}>
+${e(s.text)}</textarea></label>${isGM?button('session-delete','Delete session',s.id):''}`:'<p>No sessions yet.</p>'}`:''}
+      ${section==='pcs'?`<div class="workspace-head"><h2>PC roster</h2>${button('pc-picker','+PC')}</div>${pcs.map(pc=>`<div class="roster-row"><span>${e(label(pc))}</span>${button('pc-open',own(pc)||isGM?'Edit':'View',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}</div>`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add a personal PC</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',e(pc.name||'Unnamed PC'),pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}`:''}
+      ${section==='npcs'&&isGM?`<div class="workspace-head"><h2>NPCs</h2>${button('npc-new','+NPC')}</div><div class="npc-list">${npcs.map(n=>button('npc-open',e(n.name||'Unnamed NPC'),n.id)).join('')}</div>${n?`<label>Name<input data-campaign-field="npc-name" maxlength="200" value="${e(n.name)}"></label><label>Notes<textarea data-campaign-field="npc-notes">
+${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim())}${npcId?button('npc-delete','Delete NPC',npcId):''}`:''}`:''}</section>
+      <section class="panel campaign-members"><h2>Members</h2>${members.map(m=>`<div class="roster-row"><span>${m.id===c.gmUid?'GM':m.id===store().uid?'You':`Player ${e(m.id.slice(0,8))}`}</span>${isGM&&m.id!==c.gmUid?button('member-remove','Remove',m.id):''}</div>`).join('')}
+      ${isGM?`<h3>Invitation</h3><p>Invite links expire after seven days.</p>${button('invite',invitation?'Replace invite link':'Create invite link')}${invitation?`<label>Invite link<input readonly value="${e(location.href.split('#')[0]+'#/invite/'+invitation.token)}"></label>${button('copy-invite','Copy link',invitation.token)}${button('revoke','Revoke invite')}`:''}`:''}</section></div>${section==='pcs'&&selectedPC?(isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':sharedSheet(selectedPC)):''}</div>`;
   }
   function mountEditor() {
     const target = document.getElementById('campaign-editor');
@@ -116,11 +118,19 @@ ${e(n.notes)}</textarea></label>${button('npc-delete','Delete NPC',n.id)}`:''}</
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
+      else if (action==='section') {if(['sessions','pcs','npcs'].includes(id) && (id!=='npcs'||gm()))section=id;}
       else if (action==='session-new') { sessionId=crypto.randomUUID();store().queue(path('sessions',sessionId),{title:'New session',text:'',updatedAt:new Date().toISOString()}); }
       else if (action==='session-open') sessionId=id;
       else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
-      else if (action==='npc-new') {npcId=crypto.randomUUID();store().queue(path('npcs',npcId),{name:'New NPC',notes:'',updatedAt:new Date().toISOString()});}
-      else if (action==='npc-open') npcId=id;
+      else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};}
+      else if (action==='npc-open') {npcId=id;npcDraft=null;}
+      else if (action==='npc-save') {
+        const draft=npcDraft || store().get(path('npcs',npcId));
+        if (!gm() || !draft || !draft.name.trim()) return;
+        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:draft.notes,updatedAt:new Date().toISOString()});
+        npcId='';npcDraft={name:'',notes:''};
+        store().flush();
+      }
       else if (action==='npc-delete') {if(window.confirm('Delete this NPC?'))store().queue(path('npcs',id),null);}
       else if (action==='pc-picker') picking=!picking;
       else if (action==='pc-link') {await backend.link(active,id);picking=false;}
@@ -153,11 +163,22 @@ ${e(n.notes)}</textarea></label>${button('npc-delete','Delete NPC',n.id)}`:''}</
   document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');if(b)act(b.dataset.campaign,b.dataset.id);});
   document.addEventListener('input',event=>{
     const field=event.target.dataset.campaignField;if(!field||!gm())return;
+    if (field==='npc-name') {
+      const save=document.querySelector('[data-campaign="npc-save"]');
+      if(save)save.disabled=busy || !event.target.value.trim();
+    }
+    if (field.startsWith('npc-') && npcDraft) {
+      npcDraft[field.slice(4)]=event.target.value;
+      return;
+    }
     if(field==='title') {const c=store().get(`campaigns/${active}`);if(event.target.value.trim())store().queue(`campaigns/${active}`,{...c,title:event.target.value});return;}
     const kind=field.startsWith('session-')?'sessions':'npcs',id=kind==='sessions'?sessionId:npcId;
     const data=store().get(path(kind,id));if(data)store().queue(path(kind,id),{...data,[field.split('-')[1]==='title'?'title':field.split('-')[1]==='text'?'text':field.split('-')[1]==='name'?'name':'notes']:event.target.value,updatedAt:new Date().toISOString()});
   });
-  document.addEventListener('focusout',event=>{if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);});
+  document.addEventListener('focusout',event=>{
+    if (event.relatedTarget?.closest('[data-campaign]') || (event.target.dataset.campaignField?.startsWith('npc-') && npcDraft)) return;
+    if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
+  });
   window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/campaigns/'+creatorCampaign))creatorCampaign=null;});
   window.CampaignUI={render,refresh,mountEditor,creatorReturn:()=>creatorCampaign?'#/campaigns/'+creatorCampaign:null};
 })();
