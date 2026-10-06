@@ -5,6 +5,8 @@
   const sheets = new Map(), stops = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
   const button = (action,text,id='',disabled=false) => `<button type="button" data-campaign="${action}" data-id="${e(id)}" ${busy||disabled?'disabled':''}>${text}</button>`;
+  const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
+  const statusPanel = () => `<p class="campaign-status" role="status" ${statusMessage() ? '' : 'hidden'}>${e(statusMessage())}</p>`;
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
   const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
@@ -52,7 +54,7 @@
   function render(slug) {
     renderAgain ||= () => {};
     if (accountUid !== store().uid) { active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
-    if (!store().uid) { reset(''); return `<div class="workspace"><h1>Campaigns</h1><p>Sign in with Google to create or join shared campaigns.</p>${button('sign-in','Sign in with Google')}<p><a href="#/characters">Open device characters</a></p></div>`; }
+    if (!store().uid) { reset(''); return `<div class="workspace"><h1>Campaigns</h1><p>Use Account in the top right to sign in and create or join shared campaigns.</p><p><a href="#/characters">Open device characters</a></p></div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
       if (inviteLoaded !== token) {
@@ -64,7 +66,7 @@
     }
     if (slug === 'campaigns') {
       reset('');
-      return `<div class="workspace"><div class="workspace-head"><h1>Campaigns</h1>${button('create','Create campaign')}</div><p role="status">${e(error || store().status)}</p><div class="campaign-list">${store().list('campaigns/').map(c=>`<a class="panel" href="#/campaigns/${e(c.id)}"><h2>${e(c.title)}</h2><p>${c.gmUid===store().uid?'GM':'Player'}</p></a>`).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? `<details><summary>Retained drafts</summary>${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}</details>` : ''}</div>`;
+      return `<div class="workspace"><div class="workspace-head"><h1>Campaigns</h1>${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${store().list('campaigns/').map(c=>`<a class="panel" href="#/campaigns/${e(c.id)}"><h2>${e(c.title)}</h2><p>${c.gmUid===store().uid?'GM':'Player'}</p></a>`).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? `<details><summary>Retained drafts</summary>${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}</details>` : ''}</div>`;
     }
     reset(slug.slice('campaigns/'.length));
     const c = store().get(`campaigns/${active}`);
@@ -78,7 +80,7 @@
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?`<label class="campaign-title">Campaign title<input data-campaign-field="title" maxlength="200" value="${e(c.title)}"></label>`:`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div><p class="campaign-status" role="status">${e(error || store().status)}</p>
+    return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?`<label class="campaign-title">Campaign title<input data-campaign-field="title" maxlength="200" value="${e(c.title)}"></label>`:`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       <div class="campaign-grid"><section class="panel campaign-content"><div class="campaign-segments" role="group" aria-label="Campaign sections">${[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[])].map(([key,label])=>`<button type="button" data-campaign="section" data-id="${key}" aria-pressed="${section===key}" ${busy?'disabled':''}>${label}</button>`).join('')}</div>
       ${section==='sessions'?`<div class="workspace-head"><h2>Sessions</h2>${isGM?button('session-new','+ Session'):''}</div><div class="session-list">${sessions.map(s=>button('session-open',e(s.title || 'Untitled session'),s.id)).join('')}</div>${s?`<label>Title<input data-campaign-field="session-title" value="${e(s.title)}" maxlength="200" ${isGM?'':'readonly'}></label><label>Session notes<textarea class="session-text" data-campaign-field="session-text" ${isGM?'':'readonly'}>
 ${e(s.text)}</textarea></label>${isGM?button('session-save','Save session')+button('session-delete','Delete session',s.id):button('session-close','Close')}`:sessions.length?'':'<p>No sessions yet.</p>'}`:''}
@@ -106,7 +108,7 @@ ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim()
     renderAgain = renderPage;
     const focused = document.activeElement;
     if (focused && document.getElementById('app')?.contains(focused) && ['INPUT','TEXTAREA','SELECT'].includes(focused.tagName)) {
-      const status = document.querySelector('.campaign-status'); if(status)status.textContent=error||store().status;
+      const status = document.querySelector('.campaign-status'); if(status){status.textContent=statusMessage();status.hidden=!statusMessage();}
       return;
     }
     renderPage();
@@ -116,7 +118,6 @@ ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim()
     const backend = store().backend;
     error = ''; busy = true;
     try {
-      if (action==='sign-in') { document.getElementById('account-sign-in').click(); return; }
       if (!backend) throw new Error('Sign in first.');
       if (action==='create') {
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
