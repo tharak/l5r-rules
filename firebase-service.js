@@ -48,7 +48,7 @@ try {
     user = account;
     if (!account) { window.CharacterStorage.connect(null); window.CampaignStorage.connect(null,null); }
     else {
-      const backend = createCampaignBackend(db,dbSDK,account.uid);
+      const backend = createCampaignBackend(db,dbSDK,account.uid,()=>account.displayName || 'Player');
       window.CampaignStorage.connect(account.uid,backend);
       const path = dbSDK.collection(db,'users',account.uid,'characters');
       window.CharacterStorage.connect(account.uid, (receive, fail) => dbSDK.onSnapshot(path, {includeMetadataChanges:true}, snapshot => {

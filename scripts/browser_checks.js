@@ -6,7 +6,7 @@ async page => {
   for (const c of page.context().browser().contexts()) if (c !== page.context()) await c.close();
   await page.goto('http://127.0.0.1:5000/?emulators#/campaigns');
   await page.getByRole('button',{name:'Create campaign',exact:true}).waitFor();
-  await page.evaluate(()=>{window.prompt=()=> 'Browser campaign';window.confirm=()=>true;});
+  await page.evaluate(async()=>{const sdk=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js');await sdk.updateProfile(sdk.getAuth().currentUser,{displayName:'GM Tester'});window.prompt=()=> 'Browser campaign';window.confirm=()=>true;});
 
   await page.getByRole('button',{name:'Create campaign',exact:true}).click();
   await page.locator('[data-campaign-field="title"]').waitFor();
@@ -18,8 +18,14 @@ async page => {
   await page.getByRole('heading',{name:'Sessions',exact:true}).click();
   await page.waitForFunction(()=>window.CampaignStorage.status==='Saved to campaign').catch(e=>{throw new Error('Autosave did not complete: '+e.message);});
   await page.reload();
+  await page.getByRole('button',{name:'Session One',exact:true}).click();
   await page.locator('[data-campaign-field="session-text"]').waitFor();
   check(await page.locator('[data-campaign-field="session-text"]').inputValue()===notes,'Session autosave changed line breaks');
+  await page.getByRole('button',{name:'Save session',exact:true}).click();
+  check(await page.locator('[data-campaign-field="session-text"]').count()===0,'Saving did not close session editor');
+  await page.getByRole('button',{name:'Session One',exact:true}).click();
+  check(await page.locator('[data-campaign-field="session-text"]').inputValue()===notes,'Session save lost notes');
+  check(await page.getByRole('heading',{name:'Members',exact:true}).count()===0,'Members view still rendered');
   check(await page.locator('#dice-form').count()===0,'Dice roller still rendered');
   check(await page.getByRole('button',{name:'Sessions',exact:true}).getAttribute('aria-pressed')==='true','Sessions not selected');
   await page.getByRole('button',{name:'NPC',exact:true}).click();
@@ -28,10 +34,12 @@ async page => {
   await page.locator('[data-campaign-field="npc-name"]').fill('Hidden NPC');
   await page.locator('[data-campaign-field="npc-notes"]').fill('GM-only notes');
   await page.getByRole('button',{name:'Save NPC',exact:true}).click();
-  check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='','NPC name did not clear');
-  check(await page.locator('[data-campaign-field="npc-notes"]').inputValue()==='','NPC notes did not clear');
-  check(await page.getByRole('button',{name:'Save NPC',exact:true}).isDisabled(),'Blank NPC can be saved');
+  check(await page.locator('[data-campaign-field="npc-name"]').count()===0,'NPC creation editor did not close');
   await page.getByRole('button',{name:'Hidden NPC',exact:true}).waitFor();
+  await page.getByRole('button',{name:'+NPC',exact:true}).click();
+  check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='','New NPC retained a previous name');
+  check(await page.locator('[data-campaign-field="npc-notes"]').inputValue()==='','New NPC retained previous notes');
+  check(await page.getByRole('button',{name:'Save NPC',exact:true}).isDisabled(),'Blank NPC can be saved');
   await page.locator('[data-campaign-field="npc-name"]').fill('Second NPC');
   await page.locator('[data-campaign-field="npc-notes"]').fill('\nSecond notes\nLast line');
   await page.getByRole('button',{name:'PC',exact:true}).click();
@@ -51,7 +59,7 @@ async page => {
   await page.locator('[data-campaign-field="npc-name"]').fill('Updated NPC');
   await page.getByRole('button',{name:'Save NPC',exact:true}).click();
   await page.getByRole('button',{name:'Updated NPC',exact:true}).waitFor();
-  check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='','Saving an edited NPC did not clear the form');
+  check(await page.locator('[data-campaign-field="npc-name"]').count()===0,'Saving an edited NPC did not close its editor');
   check(await page.locator('.npc-list button').count()===2,'Saving an edited NPC created a duplicate');
   for(const width of [390,1440]) {
     await page.setViewportSize({width,height:900});
@@ -65,7 +73,10 @@ async page => {
   await page.locator('[data-field="name"]').fill('GM Personal PC');
   check(await page.locator('[data-public]').count()===6,'Six privacy controls missing');
   await page.locator('[data-field="notes"]').fill('HIDDEN OWNER NOTES');
-  await page.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await page.getByRole('button',{name:'Save PC',exact:true}).click();
+  await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
+  await page.getByText('GM Personal PC (GM Tester)',{exact:true}).waitFor();
+  check(await page.locator('[data-field="name"]').count()===0,'Saving personal PC did not close its editor');
   await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:'http://127.0.0.1:5000'});
   await page.getByRole('button',{name:'Invite link',exact:true}).waitFor();
   check(await page.locator('.campaign-actions [data-campaign="pc-picker"] + [data-campaign="share-invite"]').count()===1,'Invite link is not beside +PC');
@@ -102,13 +113,15 @@ async page => {
   await player.waitForFunction(()=>window.CampaignStorage && document.getElementById('account-sign-in')?.disabled===false);
   await player.evaluate(async()=>{
     const sdk=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js');
-    await sdk.createUserWithEmailAndPassword(sdk.getAuth(),'player-'+Date.now()+'@example.test','test-password-123');
+    const credential=await sdk.createUserWithEmailAndPassword(sdk.getAuth(),'player-'+Date.now()+'@example.test','test-password-123');
+    await sdk.updateProfile(credential.user,{displayName:'Player Tester'});
   });
   await player.getByRole('button',{name:'Join campaign',exact:true}).waitFor();
   check((await player.locator('#navigation a').count())===3,'Mobile tabs are missing');
   await player.getByRole('button',{name:'Join campaign',exact:true}).click();
   await player.getByRole('button',{name:'PC',exact:true}).waitFor();
   check(await player.getByRole('button',{name:'NPC',exact:true}).count()===0 && await player.getByRole('heading',{name:'NPCs',exact:true}).count()===0,'NPCs leaked to player');
+  await player.getByRole('button',{name:'Session One',exact:true}).click();
   check(await player.locator('[data-campaign-field="session-text"]').getAttribute('readonly')!==null,'Player can edit sessions');
   await player.getByRole('button',{name:'PC',exact:true}).click();
   check(await player.getByRole('button',{name:'Invite link',exact:true}).count()===0,'Player can create invitations');
@@ -127,7 +140,8 @@ async page => {
   await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
   await page.locator('[data-public="identity"]').uncheck();
   await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
-  await page.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await page.getByRole('button',{name:'Save PC',exact:true}).click();
+  await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('Private PC')&&!document.querySelector('#app').textContent.includes('GM Personal PC'));
   await player.getByRole('button',{name:'View',exact:true}).click();
   await player.getByText('This PC has no public sections.',{exact:true}).waitFor();
@@ -135,22 +149,27 @@ async page => {
   await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
   await page.locator('[data-public="identity"]').check();
   await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
-  await page.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await page.getByRole('button',{name:'Save PC',exact:true}).click();
+  await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await player.getByRole('button',{name:'+PC',exact:true}).click();
   await player.getByRole('button',{name:'Create PC',exact:true}).click();
   await player.locator('[data-field="name"]').waitFor();
   await player.locator('[data-field="name"]').fill('Player PC');
   await player.locator('[data-field="notes"]').fill('PLAYER PRIVATE NOTES');
-  await player.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await player.getByRole('button',{name:'Save PC',exact:true}).click();
+  await player.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
+  await player.getByText('Player PC (Player Tester)',{exact:true}).waitFor();
   await page.reload();await page.getByRole('button',{name:'PC',exact:true}).click();await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('#app').textContent.includes('Player PC')).catch(e=>{throw new Error('GM roster did not update: '+e.message);});
+  await page.getByText('Player PC (Player Tester)',{exact:true}).waitFor();
   const row=page.locator('.roster-row').filter({hasText:'Player PC'});
   await row.getByRole('button',{name:'Edit',exact:true}).click();
   await page.locator('#campaign-editor [data-field="name"]').waitFor();
   check(await page.locator('#campaign-editor [data-field="notes"]').inputValue()==='PLAYER PRIVATE NOTES','GM full sheet unavailable');
   check(await page.locator('#campaign-editor [data-public]:disabled').count()===6,'GM can change privacy');
   await page.locator('#campaign-editor [data-field="name"]').fill('Live GM Edit');
-  await page.locator('#campaign-editor h1').click();
+  await page.getByRole('button',{name:'Save PC',exact:true}).click();
+  check(await page.locator('#campaign-editor').count()===0,'Saving GM-edited PC did not close its editor');
   await page.waitForFunction(()=>window.CampaignStorage.status==='Saved to campaign').catch(e=>{throw new Error('Autosave did not complete: '+e.message);});
   await player.waitForFunction(()=>window.CharacterBuilder.list().some(c=>c.name==='Live GM Edit')).catch(e=>{throw new Error('GM edit did not reach owner: '+e.message);});
   await player.getByRole('link',{name:'Characters',exact:true}).click();

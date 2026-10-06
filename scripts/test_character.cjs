@@ -30,6 +30,7 @@ async function character(saved) {
   const click = dataset => root.onclick({target:{closest:() => ({dataset})}});
   return {
     root, inputs, change, click,
+    route:() => context.location.hash,
     school(clan,name) {
       change({field:'clan'},clan);
       const school = catalog.clans.find(entry => entry.name === clan).schools.find(entry => entry.name === name);
@@ -43,6 +44,20 @@ async function character(saved) {
     }
   };
 }
+
+test('Save PC preserves personal edits and closes the sheet to Characters',async()=>{
+  const c=await character();
+  c.inputs['#summary-name']={textContent:''};
+  c.inputs['.creator-print-sheet']={outerHTML:''};
+  c.root.oninput({target:{dataset:{field:'name'},value:'Saved PC'}});
+  c.root.oninput({target:{dataset:{field:'notes'},value:'Personal notes'}});
+  c.click({action:'save-close'});
+  assert.equal(c.route(),'#/characters');
+  const restored=await c.reload();
+  const data=await restored.data();
+  assert.equal(data.character.name,'Saved PC');
+  assert.equal(data.character.notes,'Personal notes');
+});
 
 test('school skill ranks, emphases, trait, honor, outfit and training are free grants', async () => {
   const c = await character(); c.school('Crab','Hida Pragmatist');

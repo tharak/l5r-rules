@@ -36,8 +36,9 @@
     try {
       if (window.CharacterStorage) window.CharacterStorage.save(records);
       else localStorage.setItem(ROSTER_KEY,JSON.stringify(records));
-    } catch { window.alert?.('Your browser could not save this change. Export your character to keep a backup.'); }
+    } catch { window.alert?.('Your browser could not save this change. Export your character to keep a backup.'); return false; }
     window.dispatchEvent(new Event('characters-changed'));
+    return true;
   }
   function list() {
     return roster().map(record => ({id:record.id,name:record.sheet?.name || '',clan:record.sheet?.clan || '',family:record.sheet?.family || '',concept:record.sheet?.concept || '',updatedAt:record.updatedAt || ''})).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -79,9 +80,10 @@
     } catch { return blank(); }
   }
   function save() {
-    if (external) { external.save(sheet); return; }
+    if (external) { external.save(sheet); return true; }
     const records = roster(), record = records.find(item => item.id === activeId);
-    if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); storeRoster(records); }
+    if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); return storeRoster(records); }
+    return false;
   }
   function selectedClan() { return catalog.clans.find(clan => clan.name === sheet.clan); }
   function selectedFamily() { return selectedClan()?.families.find(family => family.name === sheet.family); }
@@ -299,7 +301,7 @@ ${escapeHtml(sheet.notes)}</textarea></label></div>${renderEquipment(data)}<div 
   function render() {
     if (!root?.isConnected || !catalog || (!external && !location.hash.startsWith('#/create-character'))) return;
     const data = build();
-    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> l5r-rules</div><div class="creator-header-row"><div><h1>Character</h1><p>Changes save automatically.</p></div><div class="creator-header-actions"><a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory(data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div>${renderPrintSheet(data)}</div>`;
+    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> l5r-rules</div><div class="creator-header-row"><div><h1>Character</h1><p>Changes save automatically.</p></div><div class="creator-header-actions"><a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a><button type="button" data-action="save-close">Save PC</button><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory(data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div>${renderPrintSheet(data)}</div>`;
     const visibility = window.SheetSharing?.visibility(sheet) || sheet.visibility;
     if (visibility && root.querySelectorAll) {
       const ids = {identity:'creator-identity',traits:'creator-traits',skills:'creator-skills',options:'creator-options',story:'creator-story',summary:'creator-summary'};
@@ -314,6 +316,15 @@ ${escapeHtml(sheet.notes)}</textarea></label></div>${renderEquipment(data)}<div 
     const button = event.target.closest('[data-action]');
     if (!button) return;
     const action = button.dataset.action;
+    if (action === 'save-close') {
+      const editing=external, returnHref=window.CampaignUI?.creatorReturn() || '#/characters';
+      try {
+        if(!save())return;
+        if(editing) {window.CampaignStorage?.flush();editing.close();}
+        else {window.CharacterStorage?.flush();location.hash=returnHref;}
+      } catch { window.alert?.('Your browser could not save this change. Export your character to keep a backup.'); }
+      return;
+    }
     if (action === 'trait') {
       const trait = button.dataset.trait, current = build().traits[trait];
       if (Number(button.dataset.delta) > 0 && current.rank < 4) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;

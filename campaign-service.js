@@ -1,4 +1,5 @@
-export function createCampaignBackend(db,sdk,uid) {
+export function createCampaignBackend(db,sdk,uid,displayName='') {
+  const playerName = () => String((typeof displayName==='function'?displayName():displayName) || '').trim().slice(0,200) || 'Player';
   const ref = path => sdk.doc(db,path);
   const get = async path => { const s = await sdk.getDoc(ref(path)); return s.exists() ? s.data() : null; };
   const commit = async changes => {
@@ -16,6 +17,10 @@ export function createCampaignBackend(db,sdk,uid) {
   }
   return {
     get,commit,saveCharacter,
+    async syncPlayerName(c) {
+      const membership=await get(memberPath(c));
+      if(membership && membership.displayName!==playerName())await sdk.updateDoc(ref(memberPath(c)),{displayName:playerName()});
+    },
     write:(path,data)=> path.includes('/sheetEdits/') ? saveCharacter(data.ownerUid,data.characterId,data.sheet,data.updatedAt) : data === null ? sdk.deleteDoc(ref(path)) : sdk.setDoc(ref(path),data),
     subscribe(events) {
       const subscriptions = new Map();
@@ -26,6 +31,7 @@ export function createCampaignBackend(db,sdk,uid) {
         for (const id of subscriptions.keys()) if (!ids.includes(id)) cancel(id);
         for (const id of ids) if (!subscriptions.has(id)) {
           const stops = []; subscriptions.set(id,stops);
+          let profileSynced=false;
           const fail = error => { if (error.code === 'permission-denied') cancel(id); else events.error(error); };
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
           watch(`campaigns/${id}`);
@@ -35,7 +41,15 @@ export function createCampaignBackend(db,sdk,uid) {
           for (const collection of collections) {
             const path = `campaigns/${id}/${collection}`;
             stops.push(sdk.onSnapshot(sdk.collection(db,path),s=>{
-              for (const d of s.docChanges()) events.receive(`${path}/${d.doc.id}`,d.type==='removed'?null:d.doc.data());
+              for (const d of s.docChanges()) {
+                events.receive(`${path}/${d.doc.id}`,d.type==='removed'?null:d.doc.data());
+                // Existing memberships acquire their owner's Google display name on sign-in.
+                if(collection==='members' && d.doc.id===uid && d.type!=='removed' && !profileSynced) {
+                  // Sync once per sign-in so an older tab cannot undo a newer profile name.
+                  profileSynced=true;
+                  if(d.doc.data().displayName!==playerName())sdk.updateDoc(ref(`${path}/${uid}`),{displayName:playerName()}).catch(events.error);
+                }
+              }
             },fail));
           }
         }
@@ -45,7 +59,7 @@ export function createCampaignBackend(db,sdk,uid) {
     },
     async create(title) {
       const id = crypto.randomUUID(), membershipId = crypto.randomUUID();
-      await commit([[`campaigns/${id}`,{title,gmUid:uid}],[memberPath(id),{gmUid:uid,membershipId,inviteToken:''}],[indexPath(id),{gmUid:uid,membershipId}]]);
+      await commit([[`campaigns/${id}`,{title,gmUid:uid}],[memberPath(id),{gmUid:uid,membershipId,inviteToken:'',displayName:playerName()}],[indexPath(id),{gmUid:uid,membershipId}]]);
       return id;
     },
     async invite(c) {
@@ -67,13 +81,13 @@ export function createCampaignBackend(db,sdk,uid) {
     async join(token) {
       const invite = await this.invitation(token), c = invite.campaignId;
       // gmUid is copied from the invitation's campaign by rules; the invite includes no member data.
-      if (await get(indexPath(c))) return c;
+      if (await get(indexPath(c))) {await this.syncPlayerName(c);return c;}
       const membershipId = crypto.randomUUID();
       await sdk.runTransaction(db,async transaction=>{
         const invitation = await transaction.get(ref(`invites/${token}`));
         if (!invitation.exists()) throw new Error('Invitation revoked.');
         const gmUid = invitation.data().gmUid;
-        const membership = {gmUid,membershipId,inviteToken:token};
+        const membership = {gmUid,membershipId,inviteToken:token,displayName:playerName()};
         transaction.set(ref(memberPath(c)),membership);
         transaction.set(ref(indexPath(c)),{gmUid,membershipId});
       });
@@ -85,6 +99,7 @@ export function createCampaignBackend(db,sdk,uid) {
       await saveCharacter(uid,id,own.sheet,own.updatedAt);
       const member = await get(memberPath(c));
       if (!member) throw new Error('Campaign membership is no longer active.');
+      await this.syncPlayerName(c);
       const pcId = crypto.randomUUID();
       await commit([[`campaigns/${c}/pcs/${pcId}`,{ownerUid:uid,characterId:id,membershipId:member.membershipId}]]);
       return pcId;

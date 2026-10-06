@@ -16,7 +16,8 @@ async page => {
     await live.getByRole('button',{name:'Export JSON ↗',exact:true}).click();
     const exported=await exportPromise,stream=await exported.createReadStream();let text='';for await(const part of stream)text+=part;
     check(JSON.parse(text).source==='l5r-rules','Export branding is incorrect');
-    await live.getByRole('link',{name:'← Characters',exact:true}).click();
+    await live.getByRole('button',{name:'Save PC',exact:true}).click();
+    await live.waitForURL(/#\/characters$/);
     await live.getByRole('heading',{name:'Live device PC',exact:true}).waitFor();
     await live.getByRole('link',{name:'Books',exact:true}).click();
     await live.getByRole('heading',{name:'Books',exact:true}).waitFor();

@@ -96,16 +96,21 @@ service cloud.firestore {
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
       allow delete: if gm(c);
       match /members/{u} {
+        function validName() {
+          return !('displayName' in request.resource.data) || (request.resource.data.displayName is string && request.resource.data.displayName.size() <= 200);
+        }
         function invitation() {
           let i = get(/databases/$(database)/documents/invites/$(request.resource.data.inviteToken)).data;
           return i.campaignId == c && i.expiresAt > request.time && i.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid;
         }
         allow read: if joined(c);
-        allow create: if owner(u) && request.resource.data.keys().hasOnly(['gmUid','membershipId','inviteToken'])
+        allow create: if owner(u) && request.resource.data.keys().hasOnly(['gmUid','membershipId','inviteToken','displayName']) && validName()
           && request.resource.data.membershipId is string && request.resource.data.membershipId.size() <= 80
           && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
           && (request.resource.data.gmUid == u || invitation())
           && getAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c)).data.membershipId == request.resource.data.membershipId;
+        allow update: if owner(u) && joined(c) && validName()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName']);
         allow delete: if ((gm(c) && (campaign(c).gmUid != u || !existsAfter(/databases/$(database)/documents/campaigns/$(c)))) || (owner(u) && campaign(c).gmUid != u))
           && !existsAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c));
       }

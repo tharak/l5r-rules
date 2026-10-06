@@ -25,7 +25,8 @@ async page => {
   await page.locator('[data-field="name"]').waitFor();
   await page.locator('[data-field="name"]').fill('Live across campaigns');
   await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
-  await page.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await page.getByRole('button',{name:'Save PC',exact:true}).click();
+  await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await mirror.waitForFunction(()=>document.querySelector('#app').textContent.includes('Live across campaigns'));
   await page.getByRole('button',{name:'Remove',exact:true}).click();
   await page.waitForFunction(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').length===0);

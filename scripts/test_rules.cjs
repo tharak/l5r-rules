@@ -2,7 +2,7 @@ const {test,before,after} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {initializeTestEnvironment,assertSucceeds,assertFails} = require('@firebase/rules-unit-testing');
-const {doc,collection,getDoc,getDocs,setDoc,deleteDoc,writeBatch,Timestamp} = require('firebase/firestore');
+const {doc,collection,getDoc,getDocs,setDoc,updateDoc,deleteDoc,writeBatch,Timestamp} = require('firebase/firestore');
 let env;
 const projectId='demo-l5r-rules-rules-tests';
 const sections={identity:{name:'PC'},traits:{rings:{Earth:2},traits:{}},skills:{skills:{}},options:{advantages:[],disadvantages:[]},story:{notes:'SECRET'},summary:{insight:100,combat:{}}};
@@ -53,6 +53,18 @@ test('campaign, session, NPC and membership permissions',async()=>{
  await assertFails(setDoc(r(db('outsider'),'campaigns/c/members/outsider'),{gmUid:'gm',membershipId:'new',inviteToken:''}));
  await assertFails(deleteDoc(r(db('alice'),'campaigns/c/members/bob')));
  await assertFails(deleteDoc(r(db('gm'),'campaigns/c/members/gm')));
+});
+test('members publish only their own display names without changing membership authority',async()=>{
+ const own=r(db('alice'),'campaigns/c/members/alice');
+ await assertSucceeds(updateDoc(own,{displayName:'Alice'}));
+ assert.equal((await getDoc(r(db('bob'),'campaigns/c/members/alice'))).data().displayName,'Alice');
+ for(const u of ['gm','bob','outsider',null])await assertFails(updateDoc(r(db(u),'campaigns/c/members/alice'),{displayName:'Forged'}));
+ await assertFails(updateDoc(own,{displayName:123}));
+ await assertFails(updateDoc(own,{displayName:'x'.repeat(201)}));
+ await assertFails(updateDoc(own,{displayName:'Alice',membershipId:'forged'}));
+ await assertFails(updateDoc(own,{displayName:'Alice',gmUid:'alice'}));
+ await assertFails(updateDoc(own,{displayName:'Alice',inviteToken:'forged'}));
+ await assertFails(updateDoc(own,{displayName:'Alice',email:'private@example.test'}));
 });
 test('invitations require explicit joining, expire after seven days, and revoke immediately',async()=>{
  const d=db('gm'),now=Timestamp.now();

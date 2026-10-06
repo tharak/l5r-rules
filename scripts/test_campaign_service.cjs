@@ -14,7 +14,7 @@ test('campaign service CRUD, invitation replacement, linking, editing, leaving a
   return {full,public:{revision:full.revision,sections:Object.fromEntries(Object.entries(full.sections).filter(([k])=>s.visibility[k]))}};
  }}};
  const {createCampaignBackend}=await import('../campaign-service.js');
- const gm=createCampaignBackend(gmDB,sdk,'gm'),alice=createCampaignBackend(aliceDB,sdk,'alice'),bob=createCampaignBackend(bobDB,sdk,'bob');
+ const gm=createCampaignBackend(gmDB,sdk,'gm','Game Master'),alice=createCampaignBackend(aliceDB,sdk,'alice','Alice'),bob=createCampaignBackend(bobDB,sdk,'bob','Bob');
  let stop;
  try {
   await env.clearFirestore();
@@ -24,6 +24,11 @@ test('campaign service CRUD, invitation replacement, linking, editing, leaving a
   assert.equal((await loaded).title,'Service campaign');
   await gm.write(`campaigns/${c}`,{title:'Renamed',gmUid:'gm'});
   const token=await gm.invite(c);await alice.join(token);assert.equal(await alice.join(token),c);
+  assert.equal((await gm.get(`campaigns/${c}/members/gm`)).displayName,'Game Master');
+  assert.equal((await gm.get(`campaigns/${c}/members/alice`)).displayName,'Alice');
+  await sdk.updateDoc(sdk.doc(aliceDB,`campaigns/${c}/members/alice`),{displayName:sdk.deleteField()});
+  await alice.syncPlayerName(c);
+  assert.equal((await gm.get(`campaigns/${c}/members/alice`)).displayName,'Alice');
   await alice.saveCharacter('alice','pc',sheet,'now');
   const pcId=await alice.link(c,'pc');
   await gm.write(`campaigns/${c}/sessions/s`,{title:'Session',text:'a\n\nb',updatedAt:'now'});
