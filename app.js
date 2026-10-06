@@ -149,6 +149,49 @@ function renderArticle(page) {
 
 }
 
+let rulesDialog;
+function openRules(href) {
+  const match=/^#\/([^#]+)(?:#(.*))?$/.exec(href);
+  if(!match || !state.data)return;
+  let slug,anchor;
+  try {slug=decodeURIComponent(match[1]);anchor=decodeURIComponent(match[2] || '');}catch{return;}
+  if(!rulesDialog) {
+    rulesDialog=document.createElement('dialog');
+    rulesDialog.className='rules-popup';
+    rulesDialog.setAttribute('aria-labelledby','rules-popup-title');
+    rulesDialog.innerHTML='<div class="rules-popup-header"><h2 id="rules-popup-title"></h2><button type="button" aria-label="Close rules" autofocus>Close</button></div><div class="rules-popup-body"></div>';
+    document.body.append(rulesDialog);
+    rulesDialog.querySelector('button').addEventListener('click',()=>rulesDialog.close());
+    rulesDialog.addEventListener('close',()=>{
+      document.body.classList.remove('rules-open');
+      rulesDialog.querySelector('.rules-popup-body').replaceChildren();
+    });
+    rulesDialog.addEventListener('click',event=>{
+      if(event.target!==rulesDialog)return;
+      const box=rulesDialog.getBoundingClientRect();
+      if(event.clientX<box.left || event.clientX>box.right || event.clientY<box.top || event.clientY>box.bottom)rulesDialog.close();
+    });
+  }
+  const page=state.data.pages[slug],body=rulesDialog.querySelector('.rules-popup-body');
+  rulesDialog.dataset.slug=slug;
+  rulesDialog.querySelector('h2').textContent=page?.title || 'Rules unavailable';
+  body.innerHTML=page ? renderArticle(page) : '<p>This rule reference is unavailable.</p>';
+  if(!rulesDialog.open){rulesDialog.showModal();document.body.classList.add('rules-open');}
+  body.scrollTop=0;
+  if(anchor)requestAnimationFrame(()=>{
+    const target=Array.from(body.querySelectorAll('[id]')).find(node=>node.id===anchor);
+    if(target)body.scrollTop+=target.getBoundingClientRect().top-body.getBoundingClientRect().top;
+  });
+}
+
+document.addEventListener('click',event=>{
+  const link=event.target.closest('a[data-rule-reference], .rules-popup a[href^="#"]');
+  if(!link || event.button!==0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)return;
+  event.preventDefault();
+  const href=link.getAttribute('href');
+  openRules(href.startsWith('#/') ? href : pageHref(rulesDialog.dataset.slug)+href);
+});
+
 function renderDirectory() {
   const pages = Object.values(state.data.pages).filter(page => !isBookPage(page.slug) && page.slug !== 'start').sort((a,b) => a.title.localeCompare(b.title));
   const groups = pages.reduce((result, page) => { const letter = (page.title[0] || '#').toUpperCase(); (result[letter] ||= []).push(page); return result; }, {});
@@ -224,8 +267,9 @@ window.addEventListener('characters-changed', () => { if (state.data && currentS
   else if (state.data && (currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('campaigns-changed', () => { if (state.data && /^(campaigns|invite\/)/.test(currentSlug())) window.CampaignUI.refresh(render); });
 window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => {if(rulesDialog?.open)rulesDialog.close();render();});
 document.addEventListener('keydown', event => {
+  if(rulesDialog?.open)return;
   const overlayOpen = !$('#search-overlay').hidden;
   if (event.key === 'Escape') { closeSearch(); closeMenu(); return; }
   if ((event.key === '/' || (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey))) && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { event.preventDefault(); openSearch(); return; }

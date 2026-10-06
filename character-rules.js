@@ -6,6 +6,7 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   function normalize(input = {}) {
     const s = {...input,version:2,phase:input.phase === 'advancement' ? 'advancement' : 'creation'};
+    s.startingXP = integer(input.startingXP ?? input.progression?.baseline?.startingXP ?? 40);
     for (const key of ['name','clan','family','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
     for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions']) s[key] = {...input[key]};
     for (const key of ['schoolChoices','equipmentChoices','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
@@ -279,7 +280,8 @@
     const history=s.progression.history;
     d.xpAwards=history.filter(e=>e.kind==='award').reduce((sum,e)=>sum+number(e.amount),0);
     d.xpSpent=baseline ? number(baseline.spent)+history.filter(e=>['purchase','refund','correction'].includes(e.kind)).reduce((sum,e)=>sum+number(e.amount),0) : d.creationCost;
-    d.xpRemaining=40+xpEarned+d.xpAwards-d.xpSpent;
+    d.startingXP=s.startingXP;
+    d.xpRemaining=d.startingXP+xpEarned+d.xpAwards-d.xpSpent;
     if(baseline) {
       const payments=paidItems(s);
       for(const a of d.advantages){a.quoteCost=a.cost;a.cost=payments[`advantage:${a.id}`]?.cost ?? a.cost;}
@@ -420,7 +422,7 @@
     sheet.phase='advancement';
     sheet.training=d.training.map(t=>({school:`${t.school.slug}#${t.school.anchor}`,rank:t.rank}));
     sheet.money={...d.money};sheet.honor=d.honor;sheet.glory=d.glory;sheet.status=d.status;
-    sheet.progression={baseline:{spent:d.xpSpent,earned:d.xpEarned,costItems:clone(d.costItems),traitBases:Object.fromEntries(Object.entries(d.traits).map(([t,v])=>[t,v.base])),skillGrants:clone(C.schoolGrants(d.school,sheet,catalog).skills),disadvantageCosts:Object.fromEntries(d.disadvantages.map(a=>[a.id,a.cost])),outfit:clone(d.equipment.filter(e=>e.source==='school' && !e.key.endsWith(':Katana') && !e.key.endsWith(':Wakizashi')).map(({item,equipped,...e})=>e)),money:{...d.money},roninFamilyCost:d.roninFamilyCost},history:[],startedAt:new Date().toISOString()};
+    sheet.progression={baseline:{startingXP:d.startingXP,spent:d.xpSpent,earned:d.xpEarned,costItems:clone(d.costItems),traitBases:Object.fromEntries(Object.entries(d.traits).map(([t,v])=>[t,v.base])),skillGrants:clone(C.schoolGrants(d.school,sheet,catalog).skills),disadvantageCosts:Object.fromEntries(d.disadvantages.map(a=>[a.id,a.cost])),outfit:clone(d.equipment.filter(e=>e.source==='school' && !e.key.endsWith(':Katana') && !e.key.endsWith(':Wakizashi')).map(({item,equipped,...e})=>e)),money:{...d.money},roninFamilyCost:d.roninFamilyCost},history:[],startedAt:new Date().toISOString()};
     return {sheet,violations:[]};
   }
   function paidItems(sheet) {
@@ -437,6 +439,7 @@
     const old=calculate(before,catalog),next=calculate(after,catalog),paid=paidItems(before);
     const now=new Date().toISOString(),history=after.progression.history;
     const append=e=>history.push({id:`xp-${now}-${history.length}`,at:now,...e});
+    if(old.startingXP!==next.startingXP)append({kind:'correction',amount:0,label:`Starting XP ${old.startingXP} → ${next.startingXP}`,explanation:explanation || 'Starting XP budget adjusted.'});
     for(const [key,e] of Object.entries(next.costItems))if(!old.costItems[key])append({kind:'purchase',key,label:e.label,amount:e.cost});
     for(const [key,e] of Object.entries(old.costItems))if(!next.costItems[key])append({kind:'refund',key,label:e.label,amount:-(paid[key]?.cost ?? 0),explanation:explanation || 'Removed purchase; refunded its recorded paid cost.'});
     // Explicit price edits are corrections; a changed clan/discount never reprices an old purchase.
@@ -459,5 +462,24 @@
     s.progression.history.push({id:`award-${Date.now()}-${s.progression.history.length}`,at:new Date().toISOString(),kind:'award',amount:number(amount),label:'XP award / correction',explanation:String(explanation).trim()});
     return s;
   }
-  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems};
+  function resetSection(input,section,catalog) {
+    const s=normalize(input);
+    if(s.phase!=='creation')return s;
+    const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','emphases:','school-choice:'],options:['disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
+    if(!exceptionPrefixes[section])return s;
+    if(section==='identity') {
+      Object.assign(s,{name:'',clan:'',family:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
+      s.disadvantages=s.disadvantages.filter(a=>!a.grantSchool);
+    } else if(section==='traits')s.traitBuys={};
+    else if(section==='skills')Object.assign(s,{skills:{},skillTraits:{},emphases:{},legacyEmphases:{},schoolChoices:[]});
+    else if(section==='options') {
+      Object.assign(s,{advantages:[],disadvantages:[],ancestors:[]});
+      if(/Shinmaki/i.test(C.school(s.school,catalog)?.name || ''))s.disadvantages.push({id:'school-grant-disturbing-countenance',name:'Disturbing Countenance',cost:0,free:true,grantSchool:s.school});
+    } else if(section==='abilities')s.abilities=[];
+    else if(section==='story')Object.assign(s,{concept:'',notes:'',heritage:'',equipmentChoices:[],equipment:[],equipped:{},money:null,honor:null,glory:1,status:['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1,taint:0,woundsTaken:0,purchases:[],modifiers:{},modifierReason:''});
+    else if(section==='summary')Object.assign(s,{startingXP:40,woundsTaken:0,modifiers:{},modifierReason:''});
+    s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
+    return s;
+  }
+  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems,resetSection};
 })();

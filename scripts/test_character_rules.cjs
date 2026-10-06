@@ -27,6 +27,42 @@ test('Insight boundaries include 250 and all later ranks; Courtier and Etiquette
  for(const [insight,rank] of [[149,1],[150,2],[174,2],[175,3],[199,3],[200,4],[224,4],[225,5],[249,5],[250,6],[274,6],[275,7],[300,8],[325,9]])assert.equal(R.insightRank(insight),rank);
  const s=R.normalize({skills:{Courtier:3,Etiquette:7}}),d=calc(s);assert.equal(d.insight,123);assert.equal(d.masteryInsight,13);
 });
+test('editable starting XP defaults to 40 and survives advancement without repricing purchases',()=>{
+ const legacy=starting();assert.equal(calc(legacy).startingXP,40);
+ const s=starting();s.startingXP=75;s.skills.Defense=3;let d=calc(s);assert.equal(d.xpRemaining,70);
+ let p=play(s);assert.equal(p.progression.baseline.startingXP,75);
+ p=R.award(p,10,'Session award');const spent=calc(p).xpSpent;
+ p=change(p,s=>s.startingXP=100);d=calc(p);assert.equal(d.xpSpent,spent);assert.equal(d.xpRemaining,105);
+ assert.ok(p.progression.history.some(e=>e.kind==='correction'&&e.label==='Starting XP 75 → 100'));
+ const again=R.normalize(plain(p));assert.equal(calc(again).xpRemaining,105);
+ s.startingXP=0;assert.equal(calc(s).xpRemaining,-5);
+ assert.equal(R.normalize({startingXP:-5}).startingXP,0);
+});
+test('creation section resets preserve identity, privacy and unrelated purchases while recalculating school grants',()=>{
+ const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.notes='Keep my notes';s.traitBuys.Strength=1;s.skills.Defense=3;
+ s.advantages=[{id:'large',name:'Large',baseCost:4}];s.purchases=[{id:'custom',name:'Other purchase',cost:2}];s.abilities=[{id:'power',kind:'custom',name:'Custom power',cost:3}];
+ s.exceptions=[{id:'trait-approval',code:'rank:trait:Strength',explanation:'Old trait approval'},{id:'power-approval',code:'ability:power',explanation:'Keep power approval'}];
+ const original=JSON.stringify(s),visibility=plain(s.visibility);
+ const traits=R.resetSection(s,'traits',catalog);assert.equal(calc(traits).traits.Strength.rank,3);assert.equal(calc(traits).xpSpent,calc(s).xpSpent-16);assert.equal(traits.notes,s.notes);assert.equal(traits.skills.Defense,3);assert.deepEqual(plain(traits.exceptions),[plain(s.exceptions[1])]);
+ const skills=R.resetSection(s,'skills',catalog);assert.equal(calc(skills).skills.Defense.rank,1);assert.equal(calc(skills).skills['Heavy Weapons'].rank,1);assert.equal(calc(skills).xpSpent,calc(s).xpSpent-5);assert.equal(skills.traitBuys.Strength,1);
+ const options=R.resetSection(s,'options',catalog);assert.equal(calc(options).xpSpent,calc(s).xpSpent-3);assert.equal(options.purchases[0].name,'Other purchase');
+ const abilities=R.resetSection(s,'abilities',catalog);assert.equal(abilities.abilities.length,0);assert.equal(calc(abilities).xpSpent,calc(s).xpSpent-3);assert.equal(abilities.notes,s.notes);
+ const story=R.resetSection(s,'story',catalog);assert.equal(story.notes,'');assert.equal(story.purchases.length,0);assert.equal(story.startingXP,80);assert.ok(calc(story).equipment.some(e=>e.source==='school'));
+ const identity=R.resetSection(s,'identity',catalog);assert.equal(identity.school,'');assert.equal(identity.notes,s.notes);assert.equal(identity.skills.Defense,3);
+ const summary=R.resetSection(s,'summary',catalog);assert.equal(summary.startingXP,40);assert.equal(summary.notes,s.notes);assert.equal(summary.school,s.school);
+ for(const reset of [traits,skills,options,abilities,story,identity,summary]){assert.equal(reset.id,s.id);assert.deepEqual(plain(reset.visibility),visibility);}
+ assert.equal(JSON.stringify(s),original,'Reset mutated the original sheet');
+ const nextSchool=starting('Crane','Kakita Bushi');const changed=R.normalize({...s,clan:nextSchool.clan,family:nextSchool.family,school:nextSchool.school});
+ const reset=R.resetSection(changed,'skills',catalog);assert.equal(calc(reset).skills.Iaijutsu.rank,1);assert.ok(!calc(reset).skills['Heavy Weapons']);
+});
+test('creation resets retain automatic spells and required school disadvantages; advancement history is preserved',()=>{
+ const shugenja=starting('Crab','Kuni Shugenja');shugenja.abilities=[{id:'custom',name:'Custom',kind:'custom',cost:3}];
+ assert.equal(calc(R.resetSection(shugenja,'abilities',catalog)).abilities.filter(a=>a.slug==='universal-spells').length,3);
+ const monk=C.schools(catalog).find(s=>/Shinmaki/.test(s.name));assert.ok(monk);
+ const s=R.normalize({clan:'Brotherhood of Shinsei',school:monk.slug+'#'+monk.anchor});const reset=R.resetSection(s,'options',catalog);
+ assert.ok(reset.disadvantages.some(a=>a.name==='Disturbing Countenance'&&a.free&&a.cost===0));
+ const p=play(starting());p.skills.Defense=3;assert.deepEqual(plain(R.resetSection(p,'skills',catalog)),plain(R.normalize(p)));
+});
 test('free school skills/emphases and purchased emphases are separate; mastery benefits affect unarmed damage',()=>{
  const s=starting();s.emphases['Heavy Weapons']=['Tetsubo'];
  assert.equal(calc(s).creationCost,0); // Already a free school emphasis.

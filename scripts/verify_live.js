@@ -10,7 +10,17 @@ async page => {
     await live.getByRole('link',{name:'Characters',exact:true}).click();
     await live.getByRole('button',{name:'Create PC',exact:true}).click();
     await live.locator('[data-field="name"]').waitFor();
+    check(await live.getByRole('heading',{name:'Creation review',exact:true}).count()===0,'Creation review card remains');
+    check(await live.locator('[data-action="reset-section"]').count()===7,'Creation resets missing');
+    await live.locator('[data-field="startingXP"]').fill('65');await live.locator('[data-field="startingXP"]').blur();
+    check((await live.locator('.creator-overview').innerText()).includes('XP 65'),'Starting XP did not recalculate');
     await live.locator('[data-field="name"]').fill('Live device PC');
+    const editorURL=live.url();
+    await live.getByRole('link',{name:'Creation rules ↗',exact:true}).click();
+    await live.getByRole('dialog').waitFor();
+    check(live.url()===editorURL,'Rules reference left the editor');
+    await live.getByRole('button',{name:'Close rules',exact:true}).click();
+    check(await live.locator('[data-field="name"]').inputValue()==='Live device PC','Rules popup lost draft inputs');
     check(await live.locator('[data-public]').count()===7,'Privacy controls missing');
     const exportPromise=live.waitForEvent('download');
     await live.getByRole('button',{name:'Export JSON ↗',exact:true}).click();
@@ -18,6 +28,7 @@ async page => {
     const document=JSON.parse(text);
     check(document.source==='l5r-rules','Export branding is incorrect');
     check(document.character.version===2 && document.character.phase==='creation','Versioned creation model missing');
+    check(document.character.startingXP===65,'Starting XP missing from saved export');
     check(document.character.visibility.abilities===false,'Abilities should start private');
     check(await live.locator('#creator-abilities').count()===1,'Abilities editor missing');
     await live.getByRole('button',{name:'Save PC',exact:true}).click();
@@ -45,6 +56,6 @@ async page => {
     check(await live.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile overflow');
     await live.screenshot({path:'output/playwright/l5r-live-mobile.png',fullPage:true});
     check(errors.length===0,'Live browser errors: '+errors.join('; '));
-    return 'Live site passed: home redirect, Google sign-in availability, device PCs and export, five books, article references, inline contents, full-text search, source cleanup and mobile navigation.';
+    return 'Live site passed: creation resets, editable starting XP, rules popup, review card removed, home redirect, top-bar sign-in, device PCs/export, books, article references, search and mobile navigation.';
   } finally {await context.close();}
 }
