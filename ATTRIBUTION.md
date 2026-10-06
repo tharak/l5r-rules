@@ -1,0 +1,128 @@
+# Imported content attribution
+
+The rules snapshot was imported from [Last Haiku](https://lasthaiku.wikidot.com/), which states a [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) license. Imported content retains that license. Legend of the Five Rings belongs to its respective owners. This document is excluded from deployment.
+
+Source pages:
+
+- Start: https://lasthaiku.wikidot.com/start
+- Book Of Air: https://lasthaiku.wikidot.com/book-of-air
+- Book Of Earth: https://lasthaiku.wikidot.com/book-of-earth
+- Book Of Fire: https://lasthaiku.wikidot.com/book-of-fire
+- Book Of Water: https://lasthaiku.wikidot.com/book-of-water
+- Book Of The Void: https://lasthaiku.wikidot.com/book-of-the-void
+- Equipment: https://lasthaiku.wikidot.com/equipment
+- Katas: https://lasthaiku.wikidot.com/katas
+- Maho: https://lasthaiku.wikidot.com/maho
+- Traits: https://lasthaiku.wikidot.com/traits
+- Combat: https://lasthaiku.wikidot.com/combat
+- Rolls: https://lasthaiku.wikidot.com/rolls
+- Heritage: https://lasthaiku.wikidot.com/heritage
+- Multi Elemental Spells: https://lasthaiku.wikidot.com/multi-elemental-spells
+- The Nothing: https://lasthaiku.wikidot.com/the-nothing
+- Mass Battle: https://lasthaiku.wikidot.com/battle
+- Nezumi: https://lasthaiku.wikidot.com/nezumi
+- Naga: https://lasthaiku.wikidot.com/naga
+- Tsuno: https://lasthaiku.wikidot.com/tsuno
+- Legend Of The Burning Sands: https://lasthaiku.wikidot.com/legend-of-the-burning-sands
+- Playable Returned Spirits: https://lasthaiku.wikidot.com/playable-returned-spirits
+- Tokugi: https://lasthaiku.wikidot.com/tokugi
+- History of the Emerald Empire: https://lasthaiku.wikidot.com/history
+- Religion in Rokugan: https://lasthaiku.wikidot.com/religion
+- Bushido: https://lasthaiku.wikidot.com/bushido
+- People and Social Classes: https://lasthaiku.wikidot.com/people
+- Character Generation: https://lasthaiku.wikidot.com/character-creation
+- Book Of Earth - Families of Rokugan: https://lasthaiku.wikidot.com/families
+- Schools: https://lasthaiku.wikidot.com/schools
+- Advantages: https://lasthaiku.wikidot.com/advantages
+- Disadvantages: https://lasthaiku.wikidot.com/disadvantages
+- Ancestors: https://lasthaiku.wikidot.com/ancestors
+- Skills: https://lasthaiku.wikidot.com/skills
+- Magic: https://lasthaiku.wikidot.com/magic
+- Universal Spells: https://lasthaiku.wikidot.com/universal-spells
+- Air Spells: https://lasthaiku.wikidot.com/air-spells
+- Earth Spells: https://lasthaiku.wikidot.com/earth-spells
+- Fire Spells: https://lasthaiku.wikidot.com/fire-spells
+- Water Spells: https://lasthaiku.wikidot.com/water-spells
+- Void Spells: https://lasthaiku.wikidot.com/void-spells
+- Kiho: https://lasthaiku.wikidot.com/kiho
+- Shadowlands Taint: https://lasthaiku.wikidot.com/shadowlands-taint
+- Crab Clan Tables: https://lasthaiku.wikidot.com/htcrab
+- Crane Clan Tables: https://lasthaiku.wikidot.com/htcrane
+- Dragon Clan Tables: https://lasthaiku.wikidot.com/htdragon
+- Lion Clan Tables: https://lasthaiku.wikidot.com/htlion
+- Mantis Clan Tables: https://lasthaiku.wikidot.com/htmantis
+- Phoenix Clan Tables: https://lasthaiku.wikidot.com/htphoenix
+- Scorpion Clan Tables: https://lasthaiku.wikidot.com/htscorpion
+- Spider Clan Tables: https://lasthaiku.wikidot.com/htspider
+- Unicorn Clan Tables: https://lasthaiku.wikidot.com/htunicorn
+- Minor Clan Tables: https://lasthaiku.wikidot.com/htminor
+- Brotherhood of Shinsei Tables: https://lasthaiku.wikidot.com/htbrotherhood
+- Ronin Tables: https://lasthaiku.wikidot.com/htronin
+- Imperial Families Tables: https://lasthaiku.wikidot.com/htimperial
+- Nezumi Tribes: https://lasthaiku.wikidot.com/nezumi-tribes
+- Nezumi Schools: https://lasthaiku.wikidot.com/nezumi-schools
+- Naga Bloodlines: https://lasthaiku.wikidot.com/naga-bloodlines
+- Naga Schools: https://lasthaiku.wikidot.com/naga-schools
+- Families of the Burning Sands: https://lasthaiku.wikidot.com/bsfamily
+- Medinaat Schools: https://lasthaiku.wikidot.com/scmedin
+- Dahabi Schools: https://lasthaiku.wikidot.com/scdahab
+- Qabal Schools: https://lasthaiku.wikidot.com/scqabal
+- Assassin Schools: https://lasthaiku.wikidot.com/scass
+- Ashalan Schools: https://lasthaiku.wikidot.com/scasha
+- Ra'Shari Schools: https://lasthaiku.wikidot.com/scrashari
+- Senpet Schools: https://lasthaiku.wikidot.com/scsenpet
+- Yodotai Schools: https://lasthaiku.wikidot.com/scyodotai
+- Ebonite Schools: https://lasthaiku.wikidot.com/scebon
+- Jackal Schools: https://lasthaiku.wikidot.com/scjackal
+- Sahir Spell: https://lasthaiku.wikidot.com/sahir-spell
+- Cokaloi: https://lasthaiku.wikidot.com/cokaloi
+- Jinn: https://lasthaiku.wikidot.com/jinn
+- Kenshi Schools: https://lasthaiku.wikidot.com/kenshi-schools
+- Character Generation: https://lasthaiku.wikidot.com/chargen
+- Families of the Crab Clan: https://lasthaiku.wikidot.com/fcrab
+- Families of the Crane Clan: https://lasthaiku.wikidot.com/fcrane
+- Families of the Dragon Clan: https://lasthaiku.wikidot.com/fdragon
+- Families of the Lion Clan: https://lasthaiku.wikidot.com/flion
+- Families of the Mantis Clan: https://lasthaiku.wikidot.com/fmantis
+- Families of the Phoenix Clan: https://lasthaiku.wikidot.com/fphoenix
+- Families of the Scorpion Clan: https://lasthaiku.wikidot.com/fscorpion
+- Families of the Spider Clan: https://lasthaiku.wikidot.com/fspider
+- Families of the Unicorn Clan: https://lasthaiku.wikidot.com/funicorn
+- Families of the Minor Clans: https://lasthaiku.wikidot.com/fminor
+- The Imperial Families: https://lasthaiku.wikidot.com/fimperial
+- Ronin Families: https://lasthaiku.wikidot.com/fronin
+- Crab Clan Schools: https://lasthaiku.wikidot.com/sccrab
+- Crane Clan Schools: https://lasthaiku.wikidot.com/sccrane
+- Dragon Clan Schools: https://lasthaiku.wikidot.com/scdragon
+- Lion Clan Schools: https://lasthaiku.wikidot.com/sclion
+- Mantis Clan Schools: https://lasthaiku.wikidot.com/scmantis
+- Phoenix Clan Schools: https://lasthaiku.wikidot.com/scphoenix
+- Scorpion Clan Schools: https://lasthaiku.wikidot.com/scscorpion
+- Spider Clan Schools: https://lasthaiku.wikidot.com/scspider
+- Unicorn Clan Schools: https://lasthaiku.wikidot.com/scunicorn
+- Minor Clan Schools: https://lasthaiku.wikidot.com/scminor
+- Imperial Family Schools: https://lasthaiku.wikidot.com/scimperial
+- Monk Schools: https://lasthaiku.wikidot.com/scmonk
+- Ronin Schools: https://lasthaiku.wikidot.com/scronin
+- Miscellaneous Schools: https://lasthaiku.wikidot.com/scmisc
+- Lost Clans Schools: https://lasthaiku.wikidot.com/sclost
+- Court of Minor Clans Schools: https://lasthaiku.wikidot.com/sccourt
+- Court of Minor Clans Schools 2: https://lasthaiku.wikidot.com/sccourt2
+- Court of Minor Clans Schools 3: https://lasthaiku.wikidot.com/sccourt3
+- Shapeshifter: https://lasthaiku.wikidot.com/shapeshifter
+- High Skills: https://lasthaiku.wikidot.com/high-skills
+- Bugei Skills: https://lasthaiku.wikidot.com/bugei-skills
+- Merchant Skills: https://lasthaiku.wikidot.com/merchant-skills
+- Low Skills: https://lasthaiku.wikidot.com/low-skills
+- Mutations: https://lasthaiku.wikidot.com/mutations
+- Minor Shadowlands Powers: https://lasthaiku.wikidot.com/minor-shadowlands-powers
+- Major Shadowlands Powers: https://lasthaiku.wikidot.com/major-shadowlands-powers
+- Akutenshi Powers: https://lasthaiku.wikidot.com/akutenshi-powers
+- Name Magic: https://lasthaiku.wikidot.com/name-magic
+- Memory Sticks: https://lasthaiku.wikidot.com/memory-sticks
+- Pearls: https://lasthaiku.wikidot.com/pearls
+- 20 Questions: https://lasthaiku.wikidot.com/20-questions
+- Advanced Fetishes: https://lasthaiku.wikidot.com/advanced-fetishes
+- Kagaku: https://lasthaiku.wikidot.com/kagaku
+- Tattoos: https://lasthaiku.wikidot.com/tattoos
+- Dragon Spells: https://lasthaiku.wikidot.com/dragon-spells

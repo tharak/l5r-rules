@@ -1,39 +1,47 @@
-# Last Haiku archive
+# l5r-rules
 
-A modern static archive of the public [Last Haiku](https://lasthaiku.wikidot.com/) Legend of the Five Rings wiki. It includes a dark theme, foldable section navigation, full text search, article contents, mobile layouts, and links to each original page. Book titles open their menus directly. Book of Earth contains Combat and Rolls, while Book of Fire contains the original character creation guide, character options, and equipment.
+Campaigns, personal PCs, and five searchable books for Legend of the Five Rings. The responsive top bar keeps Campaigns, Characters, and Books visible on mobile. Existing article hashes and `#/create-character` still work; the old home route opens Campaigns. Import attribution and licensing are in [ATTRIBUTION.md](ATTRIBUTION.md), which is excluded from the hosting build.
 
-The campaign desk lists locally saved characters and has a roll and keep dice roller. The new character creator uses the wiki's family, school, skill, advantage, and disadvantage data. It calculates starting bonuses, Rings, Insight, and XP; saves multiple characters in the browser; and can print or export a JSON sheet. An existing single character save is migrated into the roster. It is a creation aid, so read the linked source entries for restrictions and special cases.
+Signed-out users create, edit, print, and export device PCs. Google sign-in gives each account its own personal roster and cloud sync. **Copy device characters** explicitly imports device PCs with their existing IDs. Existing browser keys, account caches, pending writes, and active selections migrate to `l5r-rules` names.
 
-Selecting a school adds its free skill ranks and emphases, outfit, starting money, and training details. School skill and equipment choices are saved with the character. Changing schools replaces its grants while retaining personal equipment, purchased skill ranks, and story notes. The printed sheet and JSON export include the resulting skills and equipment.
+Creating a campaign makes its creator the sole GM. Members link their own personal PCs; each association references the same live sheet. The GM edits the title and plain-text sessions, manages private name-and-notes NPCs, and removes members or PCs. Players read sessions, remove their own associations, and leave campaigns. Membership removal removes that player's associations. Campaign deletion preserves personal PCs. Each campaign includes a roll-and-keep dice roller. Sessions autosave plain text with its line breaks intact.
 
-Trait and skill changes also recalculate skill roll pools, initiative, base Armor TN, healing, unarmed damage, Void Points, and cumulative wound thresholds. Skills use their source trait by default; choose a different trait for a particular task or a skill whose trait varies. These values update in the creator, printed sheet, and JSON export.
+GMs create, copy, replace, or revoke invitations. Invite links last seven days; signing in and pressing **Join campaign** is required. Invitations are stored separately from member-readable campaign data.
 
-The source wiki states that its content is licensed under [Creative Commons Attribution-ShareAlike 3.0](https://creativecommons.org/licenses/by-sa/3.0/). The site retains attribution and the same license for imported content. Legend of the Five Rings is the property of its respective owners.
+Each PC has six **Public** checkboxes. Identity starts public; the other sections start private. Owners control these settings. GMs can edit full linked sheets but cannot change their privacy. Other players read, print, and export only selected sections. A PC without public identity uses a neutral roster label. Skills share ranks and emphases, while summary and combat share their displayed derived totals when selected. Training is part of identity; concept, notes, equipment, and money are part of story.
 
-## Local use
+## Data and sync
 
-Serve the repository root with any static file server, for example `python3 -m http.server 8000`, and open `http://localhost:8000`.
+Canonical sheets stay at `/users/{uid}/characters/{id}`. Each save atomically writes the full sheet and `/users/{uid}/publicCharacters/{id}` with matching revisions. Rules compare each projected section against the full document's explicit visibility mask and sections. Legacy cloud sheets remain readable by their owners and upgrade on their next save or campaign link.
 
-Run `node scripts/test_character.cjs` to check school grants, XP accounting, choices, school changes, saved characters, and dependent stats.
+Campaigns have immutable `gmUid` and editable `title`, plus separate `members`, `sessions`, `npcs`, and `pcs` collections. Account membership indexes discover campaigns. Separate per-viewer grants for public reading and GM editing identify a campaign, PC association, and membership generation. Rules check current membership and the linked owner's membership generation on every read. Rejoining cannot revive an old grant or PC association.
 
-## Firebase
+Character and campaign edits save locally immediately and retry connection errors. Firestore uses the last accepted write for concurrent edits. Sessions are separate documents; oversized text stays in a local unsaved draft. Shared caches clear on sign-out and membership loss. Access-denied writes stop retrying and retain a detached draft visible from Campaigns. Account-specific pending writes survive sign-out. A browser storage failure can prevent durable saves; export important sheets as backups.
 
-The site uses the `l5r-rules` Firebase project and is hosted at https://l5r-rules.web.app. Google sign-in enables private character saves in Cloud Firestore (São Paulo, `southamerica-east1`). Each account has its own roster and browser cache. Signed-out characters stay on the device; after signing in, choose **Copy device characters** to add them to your account. Repeating the copy skips characters already in the account.
+## Development and validation
 
-Changes save locally immediately and sync after a short delay. Offline edits and deletions are queued and retried when connected; signing out retains that account's pending changes for its next sign-in. The sidebar reports whether cloud sync has completed. Edits to the same character from multiple devices use the last write accepted by Firestore, so avoid editing one sheet simultaneously on two devices. Browser-local characters are specific to the site address: export important saves before switching from a previous host.
-
-`firebase-config.js` contains the public web app configuration; access is protected by `firestore.rules`, which permits only the account owner to read or change `/users/{uid}/characters/{id}`. Google is enabled in [Firebase Authentication](https://console.firebase.google.com/project/l5r-rules/authentication/providers). Additional hosting domains must be added to Authentication's authorized domains.
-
-Deploy with the signed-in Firebase CLI:
+Serve the repository root with `python3 -m http.server 8000`, or run `npm run build` and preview `dist/`. Production is https://l5r-rules.web.app.
 
 ```sh
-node scripts/test_character.cjs
-node scripts/test_character_sync.cjs
+npm ci
+npm test
+firebase emulators:start --only auth,firestore,hosting --project demo-l5r-rules
+# In a second terminal:
+npm run test:rules
+```
+
+The emulators require Java 21 or later. Open `http://127.0.0.1:5000/?emulators` for isolated browser testing against `demo-l5r-rules`. Without this opt-in, sign-in and saves use production Firebase. The security and service suites use separate emulator projects from the browser app. The rules suite checks owners, GMs, players, outsiders, anonymous users, stale and forged grants, invitation expiry/revocation, hidden-field reads, visibility changes, and PC association removal. The service suite exercises campaign CRUD, invitation replacement, linking, live edits across campaigns, member removal, leaving, and deletion. Unit tests cover character calculations, account sync, storage migration, all visibility masks, and durable campaign drafts.
+
+For browser verification, sign in with a Google test account in the emulator widget, then run `playwright-cli run-code --filename scripts/browser_checks.js`. It checks desktop and mobile navigation, long sessions, joining, new PCs, private roster labels, NPC privacy, player print/export, and live GM edits. Run `scripts/browser_link_checks.js` through the same CLI command to check existing PCs in two campaigns and campaign deletion.
+
+Deploy after checks:
+
+```sh
 firebase deploy --only hosting,firestore:rules
 ```
 
-The Hosting predeploy hook builds `dist/` from an explicit list of web assets. The source PDF, scripts, configuration, and Git files are excluded. To preview the deployment locally, run `node scripts/build_site.cjs` and `firebase emulators:start --only hosting`, then open http://localhost:5000. This preview uses production sign-in and cloud saves by default. For isolated local development, run the Auth, Firestore, and Hosting emulators and append `?emulators` to the local URL; the Firestore emulator requires Java. Run `node scripts/test_character_sync.cjs` to verify account isolation, device imports, offline retries, deletions, and account changes during uploads.
+The predeploy build copies an explicit web-asset list and sanitizes imported source links. Repository documents, scripts, tests, configuration, and the source PDF are excluded.
 
-## Refreshing content
+## Refreshing books
 
-`scripts/import_wiki.py` fetches the public wiki pages into `public/wiki.json` and `public/assets`. `scripts/build_character_data.py` derives the creator catalog from that snapshot. Both scripts use Beautiful Soup 4. Run them in that order after installing `beautifulsoup4` in the Python environment. Imported pages are a snapshot; the published site does not automatically sync with the source wiki.
+`scripts/import_wiki.py` refreshes `public/wiki.json` and assets. `scripts/build_character_data.py` derives the creator catalog. Both require Beautiful Soup 4. After importing, retain source attribution in `ATTRIBUTION.md`; the build removes source metadata, localizes available article links, and preserves the text of other outbound links. Imported content is a snapshot and does not automatically refresh.

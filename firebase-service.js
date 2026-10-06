@@ -1,3 +1,4 @@
+import {createCampaignBackend} from './campaign-service.js';
 import {firebaseConfig} from './firebase-config.js';
 
 const name = document.getElementById('account-name');
@@ -32,33 +33,38 @@ try {
     import('https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js'),
     import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js')
   ]);
-  const app = appSDK.initializeApp(firebaseConfig);
+  const emulatorMode = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulators');
+  const app = appSDK.initializeApp(emulatorMode ? {...firebaseConfig,projectId:'demo-l5r-rules'} : firebaseConfig);
   const auth = authSDK.getAuth(app), db = dbSDK.getFirestore(app);
   const provider = new authSDK.GoogleAuthProvider();
   provider.setCustomParameters({prompt:'select_account'});
   // Emulator connections are opt-in and restricted to local development origins.
-  if (['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulators')) {
+  if (emulatorMode) {
     authSDK.connectAuthEmulator(auth,'http://127.0.0.1:9099', {disableWarnings:true});
     dbSDK.connectFirestoreEmulator(db,'127.0.0.1',8080);
   }
   window.addEventListener('character-sync-changed', update);
   authSDK.onAuthStateChanged(auth, account => {
     user = account;
-    if (!account) window.CharacterStorage.connect(null);
+    if (!account) { window.CharacterStorage.connect(null); window.CampaignStorage.connect(null,null); }
     else {
+      const backend = createCampaignBackend(db,dbSDK,account.uid);
+      window.CampaignStorage.connect(account.uid,backend);
       const path = dbSDK.collection(db,'users',account.uid,'characters');
       window.CharacterStorage.connect(account.uid, (receive, fail) => dbSDK.onSnapshot(path, {includeMetadataChanges:true}, snapshot => {
         try {
           const records = snapshot.docs.map(doc => {
             const data = doc.data(), sheet = JSON.parse(data.sheetJson);
             if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) throw new Error('Invalid character data');
+            sheet.visibility = data.visibility || window.SheetSharing.visibility(sheet);
             return {id:doc.id, sheet, updatedAt:data.updatedAt};
           });
           receive(records, snapshot.metadata.fromCache);
         } catch (error) { fail(error); }
       }, fail), (id, record) => {
         const ref = dbSDK.doc(path,id);
-        return record ? dbSDK.setDoc(ref,{sheetJson:JSON.stringify(record.sheet),updatedAt:record.updatedAt}) : dbSDK.deleteDoc(ref);
+        if (record) return backend.saveCharacter(account.uid,id,record.sheet,record.updatedAt);
+        const batch = dbSDK.writeBatch(db); batch.delete(ref); batch.delete(dbSDK.doc(db,'users',account.uid,'publicCharacters',id)); return batch.commit();
       });
     }
     update();
@@ -71,7 +77,7 @@ try {
   });
   logout.addEventListener('click', async () => {
     busy = true; update();
-    try { await authSDK.signOut(auth); }
+    try { await authSDK.signOut(auth); location.reload(); }
     catch (error) { showError(error); }
     finally { busy = false; login.disabled = logout.disabled = copy.disabled = false; }
   });

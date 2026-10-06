@@ -1,9 +1,17 @@
 (() => {
-  const GUEST_KEY = 'last-haiku-characters-v1';
+  // Migrate every account cache/outbox and active selection without changing IDs.
+  for (let i = 0; i < (localStorage.length || 0); i++) {
+    const old = localStorage.key(i);
+    if (old?.startsWith('last-haiku-')) {
+      const next = old.replace('last-haiku-','l5r-rules-');
+      if (localStorage.getItem(next) === null) localStorage.setItem(next,localStorage.getItem(old));
+    }
+  }
+  const GUEST_KEY = 'l5r-rules-characters-v1';
   let uid = null, pending = {}, write, unsubscribe, timer, generation = 0, ready = false, running = false;
   let status = 'Saved on this device';
-  const key = () => uid ? `last-haiku-account-${uid}-characters-v1` : GUEST_KEY;
-  const pendingKey = () => `last-haiku-account-${uid}-pending-v1`;
+  const key = () => uid ? `l5r-rules-account-${uid}-characters-v1` : GUEST_KEY;
+  const pendingKey = () => `l5r-rules-account-${uid}-pending-v1`;
   const read = (name, fallback) => {
     try { return JSON.parse(localStorage.getItem(name)) ?? fallback; } catch { return fallback; }
   };
@@ -56,10 +64,11 @@
     } catch (error) {
       if (session === generation) {
         console.error('Character sync failed', error);
-        setStatus('Saved on this device · Cloud sync unavailable');
+        if (error.code === 'permission-denied') { write = null; ready = false; setStatus('Access revoked · Draft retained on this device'); }
+        else setStatus('Saved on this device · Cloud sync unavailable');
       }
     } finally {
-      if (session === generation) { running = false; if (Object.keys(pending).length) timer = setTimeout(flush, 10000); }
+      if (session === generation) { running = false; if (write && ready && Object.keys(pending).length) timer = setTimeout(flush, 10000); }
     }
   }
   function connect(accountId, subscribe, writer) {
@@ -106,7 +115,7 @@
     return imported.length;
   }
   window.CharacterStorage = {records, save, connect, importDevice, flush,
-    activeKey:() => uid ? `last-haiku-account-${uid}-active-v1` : 'last-haiku-active-character-v1',
+    activeKey:() => uid ? `l5r-rules-account-${uid}-active-v1` : 'l5r-rules-active-character-v1',
     get accountId() { return uid; }, get status() { return status; }
   };
   window.addEventListener('online', flush);

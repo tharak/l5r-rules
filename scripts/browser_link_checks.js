@@ -1,0 +1,40 @@
+async page => {
+  const check=(value,message)=>{if(!value)throw new Error(message);};
+  await page.goto('http://127.0.0.1:5000/?emulators#/campaigns');
+  await page.getByRole('button',{name:'Create campaign',exact:true}).waitFor();
+  const personalId=await page.evaluate(()=>CharacterBuilder.list()[0].id);
+  const create=async(title)=>{
+    await page.getByRole('link',{name:'Campaigns',exact:true}).first().click();
+    await page.getByRole('button',{name:'Create campaign',exact:true}).waitFor();
+    await page.evaluate(title=>{window.prompt=()=>title;window.confirm=()=>true;},title);
+    await page.getByRole('button',{name:'Create campaign',exact:true}).click();
+    await page.locator('[data-campaign-field="title"]').waitFor();
+    const url=page.url();
+    await page.getByRole('button',{name:'+PC',exact:true}).click();
+    await page.locator('[data-campaign="pc-link"][data-id="'+personalId+'"]').click();
+    await page.waitForFunction(id=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').some(pc=>pc.characterId===id),personalId);
+    return url;
+  };
+  const first=await create('Existing PC campaign one');
+  const second=await create('Existing PC campaign two');
+  const mirror=await page.context().newPage();await mirror.goto(first);
+  await mirror.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Edit',exact:true}).click();
+  await page.locator('[data-field="name"]').waitFor();
+  await page.locator('[data-field="name"]').fill('Live across campaigns');
+  await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
+  await page.getByRole('link',{name:'← Campaign',exact:true}).click();
+  await mirror.waitForFunction(()=>document.querySelector('#app').textContent.includes('Live across campaigns'));
+  await page.getByRole('button',{name:'Remove',exact:true}).click();
+  await page.waitForFunction(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').length===0);
+  check(await page.evaluate(id=>CharacterStorage.records().some(c=>c.id===id),personalId),'Removing association deleted personal PC');
+  await page.evaluate(()=>window.confirm=()=>true);
+  await page.getByRole('button',{name:'Delete campaign',exact:true}).click();
+  await page.waitForURL(/#\/campaigns$/);
+  await mirror.evaluate(()=>window.confirm=()=>true);
+  await mirror.getByRole('button',{name:'Delete campaign',exact:true}).click();
+  await mirror.waitForURL(/#\/campaigns$/);
+  check(await page.evaluate(id=>CharacterStorage.records().some(c=>c.id===id),personalId),'Campaign deletion deleted personal PC');
+  await mirror.close();
+  return 'Existing PC picker, live sheets across campaigns, association removal, and campaign deletion passed.';
+}

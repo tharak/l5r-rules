@@ -4,8 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10191c">
-  <meta name="description" content="A modern, searchable archive of the Last Haiku Legend of the Five Rings RPG rules and lore.">
-  <title>Last Haiku — Legend of the Five Rings</title>
+  <meta name="description" content="Campaigns, characters, and books for Legend of the Five Rings.">
+  <title>l5r-rules</title>
+  <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
@@ -14,38 +15,26 @@
   <link rel="stylesheet" href="character.css">
   <link rel="stylesheet" href="dashboard.css">
   <link rel="stylesheet" href="account.css">
+  <link rel="stylesheet" href="campaign.css">
+  <script src="sheet-sharing.js" defer></script>
   <script src="character-storage.js" defer></script>
+  <script src="campaign-storage.js" defer></script>
   <script src="character.js" defer></script>
+  <script src="campaign-ui.js" defer></script>
   <script src="app.js" defer></script>
   <script type="module" src="firebase-service.js"></script>
 </head>
 <body>
   <div class="app-shell">
-    <aside class="sidebar" id="sidebar" aria-label="Site navigation">
-      <a class="brand" href="#/start" aria-label="Last Haiku home">
-        <span class="brand-mark" aria-hidden="true">五</span>
-        <span><strong>LAST HAIKU</strong><small>LEGEND OF THE FIVE RINGS</small></span>
-      </a>
-      <button class="sidebar-search" id="sidebar-search" type="button"><span class="search-icon" aria-hidden="true">⌕</span> Search the archive <kbd>/</kbd></button>
-      <nav id="navigation" aria-label="Books"></nav>
-      <section class="account-panel" aria-label="Character saves">
-        <p id="account-name">Device characters</p>
-        <p id="account-status" role="status">Saved on this device</p>
-        <button id="account-sign-in" type="button" disabled>Sign in with Google</button>
-        <button id="account-import" type="button" hidden>Copy device characters</button>
-        <button id="account-sign-out" type="button" hidden>Sign out</button>
-      </section>
-      <div class="sidebar-footer"><span class="footer-dot"></span> A living archive of Rokugan</div>
-    </aside>
-    <div class="mobile-shade" id="mobile-shade"></div>
     <div class="main-column">
       <header class="topbar">
-        <button class="menu-button" id="menu-button" type="button" aria-label="Open menu" aria-expanded="false">☰</button>
-        <div class="topbar-path"><span class="topbar-symbol">◈</span><span id="breadcrumb">The archive</span></div>
-        <div class="topbar-actions"><button id="search-button" class="icon-button" type="button" aria-label="Search">⌕</button><a class="source-link" href="https://lasthaiku.wikidot.com/" target="_blank" rel="noopener noreferrer">Original wiki <span aria-hidden="true">↗</span></a></div>
+        <a class="site-brand" href="#/campaigns">l5r-rules</a>
+        <nav id="navigation" aria-label="Site"><a href="#/campaigns">Campaigns</a><a href="#/characters">Characters</a><a href="#/books">Books</a></nav>
+        <div class="topbar-actions"><button id="search-button" type="button" aria-label="Search">Search</button><details class="account-menu"><summary>Account</summary><section class="account-panel" aria-label="Account"><p id="account-name">Device characters</p><p id="account-status" role="status">Saved on this device</p><button id="account-sign-in" type="button" disabled>Sign in with Google</button><button id="account-import" type="button" hidden>Copy device characters</button><button id="account-sign-out" type="button" hidden>Sign out</button></section></details></div>
       </header>
+      <div id="breadcrumb" class="breadcrumb"></div>
       <main id="app" tabindex="-1"><div class="loading">Opening the archive…</div></main>
-      <footer class="site-footer"><span>Last Haiku · Legend of the Five Rings</span><span>Content from <a href="https://lasthaiku.wikidot.com/">Last Haiku</a> · <a href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a></span></footer>
+      <footer class="site-footer">l5r-rules</footer>
     </div>
   </div>
   <div class="search-overlay" id="search-overlay" hidden>

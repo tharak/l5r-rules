@@ -1,17 +1,157 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/characters/{characterId} {
-      function owner() { return request.auth != null && request.auth.uid == userId; }
-      function validCharacter() {
-        let data = request.resource.data;
-        return data.keys().hasAll(['sheetJson', 'updatedAt'])
-          && data.keys().hasOnly(['sheetJson', 'updatedAt'])
-          && data.sheetJson is string && data.sheetJson.size() <= 900000
-          && data.updatedAt is string && data.updatedAt.size() <= 40;
+    function signed() { return request.auth != null; }
+    function owner(u) { return signed() && request.auth.uid == u; }
+    function campaign(c) { return get(/databases/$(database)/documents/campaigns/$(c)).data; }
+    function gm(c) { return signed() && campaign(c).gmUid == request.auth.uid; }
+    function member(c,u) {
+      return exists(/databases/$(database)/documents/campaigns/$(c))
+        && exists(/databases/$(database)/documents/campaigns/$(c)/members/$(u));
+    }
+    function joined(c) { return signed() && member(c,request.auth.uid); }
+    function validPC(c,pc,u,id) {
+      let data = get(/databases/$(database)/documents/campaigns/$(c)/pcs/$(pc)).data;
+      return data.ownerUid == u && data.characterId == id && member(c,u)
+        && data.membershipId == get(/databases/$(database)/documents/campaigns/$(c)/members/$(u)).data.membershipId;
+    }
+    function granted(u,id,full) {
+      let grantId = (full ? 'full_' : 'public_') + request.auth.uid;
+      let grant = get(/databases/$(database)/documents/users/$(u)/characters/$(id)/grants/$(grantId)).data;
+      return signed() && joined(grant.campaignId)
+        && grant.membershipId == get(/databases/$(database)/documents/campaigns/$(grant.campaignId)/members/$(request.auth.uid)).data.membershipId && validPC(grant.campaignId,grant.pcId,u,id)
+        && (!full || gm(grant.campaignId));
+    }
+    function mask(v) {
+      return v is map && v.keys().hasAll(['identity','traits','skills','options','story','summary'])
+        && v.keys().hasOnly(['identity','traits','skills','options','story','summary'])
+        && v.identity is bool && v.traits is bool && v.skills is bool && v.options is bool && v.story is bool && v.summary is bool;
+    }
+    function projectionSection(f,p,k) {
+      return f.visibility[k] ? (k in p.sections && p.sections[k] == f.sections[k]) : !(k in p.sections);
+    }
+    function projection(f,p) {
+      return p.keys().hasOnly(['revision','sections']) && p.revision == f.revision && p.sections is map
+        && p.sections.keys().hasOnly(['identity','traits','skills','options','story','summary'])
+        && projectionSection(f,p,'identity') && projectionSection(f,p,'traits') && projectionSection(f,p,'skills')
+        && projectionSection(f,p,'options') && projectionSection(f,p,'story') && projectionSection(f,p,'summary');
+    }
+    function sectionShape(s) {
+      return s.identity is map && s.identity.keys().hasOnly(['name','clan','family','school','training','affinity','spells'])
+        && s.traits is map && s.traits.keys().hasOnly(['rings','traits'])
+        && s.skills is map && s.skills.keys().hasOnly(['skills'])
+        && s.options is map && s.options.keys().hasOnly(['advantages','disadvantages'])
+        && s.story is map && s.story.keys().hasOnly(['concept','notes','equipment','money','glory','status','purchases'])
+        && s.summary is map && s.summary.keys().hasOnly(['insight','insightRank','xpSpent','xpRemaining','xpEarned','combat']);
+    }
+    function validFull(u,id) {
+      let f = request.resource.data;
+      let p = getAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id)).data;
+      return f.keys().hasAll(['sheetJson','updatedAt','revision','visibility','sections'])
+        && f.keys().hasOnly(['sheetJson','updatedAt','revision','visibility','sections'])
+        && f.sheetJson is string && f.sheetJson.size() <= 400000
+        && f.updatedAt is string && f.updatedAt.size() <= 40 && f.revision is string && f.revision.size() <= 80
+        && mask(f.visibility) && f.sections is map
+        && f.sections.keys().hasAll(['identity','traits','skills','options','story','summary'])
+        && f.sections.keys().hasOnly(['identity','traits','skills','options','story','summary'])
+        && sectionShape(f.sections) && projection(f,p);
+    }
+    match /users/{u}/characters/{id} {
+      allow list: if owner(u);
+      allow get: if owner(u) || granted(u,id,true);
+      allow create: if owner(u) && validFull(u,id);
+      allow update: if validFull(u,id) && (owner(u) || (granted(u,id,true)
+        && request.resource.data.visibility == resource.data.visibility));
+      allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id));
+      match /grants/{viewer} {
+        allow get: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
+        allow create, update: if signed() && (viewer == 'public_' + request.auth.uid || (viewer == 'full_' + request.auth.uid && gm(request.resource.data.campaignId))) && request.resource.data.keys().hasOnly(['campaignId','pcId','membershipId'])
+          && request.resource.data.membershipId == get(/databases/$(database)/documents/campaigns/$(request.resource.data.campaignId)/members/$(request.auth.uid)).data.membershipId
+          && joined(request.resource.data.campaignId)
+          && validPC(request.resource.data.campaignId,request.resource.data.pcId,u,id);
+        allow delete: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
       }
-      allow read, delete: if owner();
-      allow create, update: if owner() && validCharacter();
+    }
+    match /users/{u}/publicCharacters/{id} {
+      allow list: if owner(u);
+      allow get: if owner(u) || granted(u,id,false);
+      allow create, update: if (owner(u) || granted(u,id,true))
+        && projection(getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data,request.resource.data);
+      allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/characters/$(id));
+    }
+    match /users/{u}/campaigns/{c} {
+      allow read: if owner(u);
+      allow create: if (owner(u) || gm(c)) && request.resource.data.keys().hasOnly(['gmUid','membershipId'])
+        && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
+        && request.resource.data.membershipId == getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(u)).data.membershipId;
+      allow delete: if (owner(u) || gm(c)) && !existsAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(u));
+    }
+    match /campaigns/{c} {
+      allow read: if joined(c);
+      allow create: if signed() && request.resource.data.keys().hasOnly(['title','gmUid'])
+        && request.resource.data.gmUid == request.auth.uid && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+        && getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid)).data.gmUid == request.auth.uid;
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title'])
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
+      allow delete: if gm(c);
+      match /members/{u} {
+        function invitation() {
+          let i = get(/databases/$(database)/documents/invites/$(request.resource.data.inviteToken)).data;
+          return i.campaignId == c && i.expiresAt > request.time && i.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid;
+        }
+        allow read: if joined(c);
+        allow create: if owner(u) && request.resource.data.keys().hasOnly(['gmUid','membershipId','inviteToken'])
+          && request.resource.data.membershipId is string && request.resource.data.membershipId.size() <= 80
+          && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
+          && (request.resource.data.gmUid == u || invitation())
+          && getAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c)).data.membershipId == request.resource.data.membershipId;
+        allow delete: if ((gm(c) && (campaign(c).gmUid != u || !existsAfter(/databases/$(database)/documents/campaigns/$(c)))) || (owner(u) && campaign(c).gmUid != u))
+          && !existsAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c));
+      }
+      match /sessions/{id} {
+        allow read: if joined(c);
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['title','text','updatedAt'])
+          && request.resource.data.title is string && request.resource.data.title.size() <= 200
+          && request.resource.data.text is string && request.resource.data.text.size() <= 900000
+          && request.resource.data.updatedAt is string;
+        allow delete: if gm(c);
+      }
+      match /npcs/{id} {
+        allow read: if gm(c);
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['name','notes','updatedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 200
+          && request.resource.data.notes is string && request.resource.data.notes.size() <= 900000
+          && request.resource.data.updatedAt is string;
+        allow delete: if gm(c);
+      }
+      match /pcs/{id} {
+        allow read: if joined(c);
+        allow create: if joined(c) && request.resource.data.keys().hasOnly(['ownerUid','characterId','membershipId'])
+          && request.resource.data.ownerUid == request.auth.uid
+          && request.resource.data.characterId is string
+          && request.resource.data.membershipId == get(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid)).data.membershipId
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid)/characters/$(request.resource.data.characterId));
+        allow delete: if gm(c) || (joined(c) && resource.data.ownerUid == request.auth.uid);
+      }
+      match /private/{id} {
+        allow read: if gm(c);
+        allow create, update: if gm(c) && id == 'invitation' && request.resource.data.keys().hasOnly(['token'])
+          && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.token)).data.campaignId == c;
+        allow delete: if gm(c);
+      }
+    }
+    match /invites/{token} {
+      allow get: if signed() && resource.data.expiresAt > request.time;
+      allow create: if gm(request.resource.data.campaignId)
+        && request.resource.data.keys().hasOnly(['campaignId','gmUid','createdAt','expiresAt'])
+        && request.resource.data.gmUid == request.auth.uid
+        && request.resource.data.createdAt is timestamp && request.resource.data.expiresAt is timestamp
+        && request.resource.data.createdAt <= request.time && request.resource.data.createdAt > request.time - duration.value(5,'m')
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(7,'d')
+        && getAfter(/databases/$(database)/documents/campaigns/$(request.resource.data.campaignId)/private/invitation).data.token == token;
+      allow delete: if gm(resource.data.campaignId);
     }
   }
 }

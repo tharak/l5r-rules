@@ -11,8 +11,8 @@ const source = fs.readFileSync(path.join(rootDir, 'character.js'), 'utf8');
 async function character(saved) {
   const storage = new Map();
   if (saved) {
-    storage.set('last-haiku-characters-v1', JSON.stringify([{id:'saved', sheet:saved}]));
-    storage.set('last-haiku-active-character-v1', 'saved');
+    storage.set('l5r-rules-characters-v1', JSON.stringify([{id:'saved', sheet:saved}]));
+    storage.set('l5r-rules-active-character-v1', 'saved');
   }
   const inputs = {};
   const root = {isConnected:true, innerHTML:'', querySelector:selector => inputs[selector]};
@@ -38,8 +38,8 @@ async function character(saved) {
     },
     async data() {click({action:'export'}); return JSON.parse(await exported.text());},
     async reload() {
-      const id = storage.get('last-haiku-active-character-v1');
-      return character(JSON.parse(storage.get('last-haiku-characters-v1')).find(entry => entry.id === id).sheet);
+      const id = storage.get('l5r-rules-active-character-v1');
+      return character(JSON.parse(storage.get('l5r-rules-characters-v1')).find(entry => entry.id === id).sheet);
     }
   };
 }

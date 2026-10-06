@@ -1,8 +1,8 @@
 (() => {
-  const LEGACY_KEY = 'last-haiku-character-v1';
-  const ROSTER_KEY = 'last-haiku-characters-v1';
-  const ACTIVE_KEY = 'last-haiku-active-character-v1';
-  const MIGRATION_KEY = 'last-haiku-characters-migrated-v1';
+  const LEGACY_KEY = 'l5r-rules-character-v1';
+  const ROSTER_KEY = 'l5r-rules-characters-v1';
+  const ACTIVE_KEY = 'l5r-rules-active-character-v1';
+  const MIGRATION_KEY = 'l5r-rules-characters-migrated-v1';
   const TRAIT_GROUPS = [
     {ring:'Earth', mark:'E', traits:['Stamina','Willpower']},
     {ring:'Air', mark:'A', traits:['Reflexes','Awareness']},
@@ -13,17 +13,18 @@
   const TRAIT_NAMES = TRAIT_GROUPS.flatMap(group => group.traits);
   const WOUND_LEVELS = ['Healthy (+0)','Nicked (+3)','Grazed (+5)','Hurt (+10)','Injured (+15)','Crippled (+20)','Down (+40)','Out'];
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const blank = () => ({name:'', clan:'', family:'', school:'', concept:'', notes:'', traitBuys:{}, skills:{}, skillTraits:{}, schoolChoices:[], equipmentChoices:[], equipment:[], advantages:[], disadvantages:[], purchases:[], status:1, glory:1});
-  let catalog, catalogPromise, sheet, root, activeId;
+  const blank = () => ({name:'', clan:'', family:'', school:'', concept:'', notes:'', traitBuys:{}, skills:{}, skillTraits:{}, schoolChoices:[], equipmentChoices:[], equipment:[], advantages:[], disadvantages:[], purchases:[], status:1, glory:1, visibility:{identity:true,traits:false,skills:false,options:false,story:false,summary:false}});
+  let catalog, catalogPromise, sheet, root, activeId, external = null;
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
 
   function makeId() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
   function roster() {
     try {
       if (window.CharacterStorage?.accountId) return window.CharacterStorage.records();
-      const saved = JSON.parse(localStorage.getItem(ROSTER_KEY));
+      const saved = JSON.parse(localStorage.getItem(ROSTER_KEY) || localStorage.getItem('last-haiku-characters-v1'));
+      if (saved && !localStorage.getItem(ROSTER_KEY)) { localStorage.setItem(ROSTER_KEY,JSON.stringify(saved)); localStorage.setItem(ACTIVE_KEY,localStorage.getItem('last-haiku-active-character-v1') || saved[0]?.id || ''); }
       if (Array.isArray(saved)) return saved;
-      const legacy = localStorage.getItem(MIGRATION_KEY) ? null : JSON.parse(localStorage.getItem(LEGACY_KEY));
+      const legacy = localStorage.getItem(MIGRATION_KEY) ? null : JSON.parse(localStorage.getItem(LEGACY_KEY) || localStorage.getItem('last-haiku-character-v1'));
       const migrated = legacy && typeof legacy === 'object' ? [{id:makeId(),sheet:{...blank(),...legacy},updatedAt:new Date().toISOString()}] : [];
       localStorage.setItem(ROSTER_KEY,JSON.stringify(migrated));
       localStorage.setItem(MIGRATION_KEY,'1');
@@ -78,6 +79,7 @@
     } catch { return blank(); }
   }
   function save() {
+    if (external) { external.save(sheet); return; }
     const records = roster(), record = records.find(item => item.id === activeId);
     if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); storeRoster(records); }
   }
@@ -205,7 +207,7 @@
     const clanOptions = ['Great Clans','Minor Clans','Other'].map(group => `<optgroup label="${group}">${catalog.clans.filter(clan => clan.group === group).map(clan => option(clan.name, clan.name, clan.name === sheet.clan)).join('')}</optgroup>`).join('');
     const familyOptions = (clan?.families || []).map(family => option(family.name, `${family.name} · +1 ${family.trait}`, family.name === sheet.family)).join('');
     const schoolOptions = (clan?.schools || []).map(school => option(`${school.slug}#${school.anchor}`, `${school.name}${school.benefit ? ` · +1 ${school.benefit}` : ''}`, `${school.slug}#${school.anchor}` === sheet.school)).join('');
-    return `<section class="creator-panel creator-identity" id="creator-identity"><div class="creator-panel-head"><span class="creator-step">01</span><div><h2>Identity & training</h2><p>Choose a clan, family, and starting school.</p></div></div><div class="creator-fields"><label>Name<input data-field="name" type="text" value="${escapeHtml(sheet.name)}" placeholder="Your character’s name"></label><label>Clan<select data-field="clan">${option('', 'Choose a clan', !sheet.clan)}${clanOptions}</select></label><label>Family<select data-field="family" ${clan ? '' : 'disabled'}>${option('', 'Choose a family', !sheet.family)}${familyOptions}</select></label><label>School<select data-field="school" ${clan ? '' : 'disabled'}>${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}</select></label></div><div class="creator-bonuses"><div><small>FAMILY BENEFIT</small><strong>${data.family ? `+1 ${escapeHtml(data.family.trait)}` : 'Choose a family'}</strong>${data.family ? `<a href="${sourceLink(data.family.slug,data.family.anchor)}">View family ↗</a>` : ''}</div><div><small>SCHOOL BENEFIT</small><strong>${data.school?.benefit ? `+1 ${escapeHtml(data.school.benefit)}` : 'Choose a school'}</strong>${data.school ? `<a href="${sourceLink(data.school.slug,data.school.anchor)}">View school ↗</a>` : ''}</div></div>${data.school ? `<div class="creator-school-note"><strong>Starting school</strong><p><b>Honor:</b> ${data.school.honor ?? 'See school'} · <b>Skills:</b> ${escapeHtml(data.school.skillsRaw || 'See school')}</p>${data.school.choices.length ? `<p><b>Choose:</b> ${escapeHtml([...new Set(data.school.choices)].join('; '))}. Complete your school choices in the Skills section.</p>` : ''}<p><b>Outfit:</b> ${escapeHtml(data.school.outfit || 'See school description')}</p></div>` : ''}<p class="creator-rule">Imperial families require GM approval in the source rules. Selecting a Ronin family adds its required 5 XP cost automatically.</p></section>`;
+    return `<section class="creator-panel creator-identity" id="creator-identity"><div class="creator-panel-head"><span class="creator-step">01</span><div><h2>Identity & training</h2><p>Choose a clan, family, and starting school.</p></div></div><div class="creator-fields"><label>Name<input data-field="name" type="text" value="${escapeHtml(sheet.name)}" placeholder="Your character’s name"></label><label>Clan<select data-field="clan">${option('', 'Choose a clan', !sheet.clan)}${clanOptions}</select></label><label>Family<select data-field="family" ${clan ? '' : 'disabled'}>${option('', 'Choose a family', !sheet.family)}${familyOptions}</select></label><label>School<select data-field="school" ${clan ? '' : 'disabled'}>${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}</select></label></div><div class="creator-bonuses"><div><small>FAMILY BENEFIT</small><strong>${data.family ? `+1 ${escapeHtml(data.family.trait)}` : 'Choose a family'}</strong>${data.family ? `<a href="${sourceLink(data.family.slug,data.family.anchor)}">View family ↗</a>` : ''}</div><div><small>SCHOOL BENEFIT</small><strong>${data.school?.benefit ? `+1 ${escapeHtml(data.school.benefit)}` : 'Choose a school'}</strong>${data.school ? `<a href="${sourceLink(data.school.slug,data.school.anchor)}">View school ↗</a>` : ''}</div></div>${data.school ? `<div class="creator-school-note"><strong>Starting school</strong><p><b>Honor:</b> ${data.school.honor ?? 'See school'} · <b>Skills:</b> ${escapeHtml(data.school.skillsRaw || 'See school')}</p>${data.school.choices.length ? `<p><b>Choose:</b> ${escapeHtml([...new Set(data.school.choices)].join('; '))}. Complete your school choices in the Skills section.</p>` : ''}<p><b>Outfit:</b> ${escapeHtml(data.school.outfit || 'See school description')}</p></div>` : ''}${renderTraining(data)}<p class="creator-rule">Imperial families require GM approval in the source rules. Selecting a Ronin family adds its required 5 XP cost automatically.</p></section>`;
   }
 
   function renderTraits(data) {
@@ -248,13 +250,14 @@
   }
 
   function renderStory(data) {
-    return `<section class="creator-panel" id="creator-story"><div class="creator-panel-head"><span class="creator-step">05</span><div><h2>Story & equipment</h2><p>Record your role in the Empire and any remaining choices.</p></div></div><div class="creator-fields"><label>Character concept<input data-field="concept" type="text" value="${escapeHtml(sheet.concept)}" placeholder="A loyal yojimbo, an ambitious courtier…"></label><label>Status<input data-field="status" type="number" min="0" max="10" step="0.1" value="${Number(sheet.status)}"></label><label>Glory<input data-field="glory" type="number" min="0" max="10" step="0.1" value="${Number(sheet.glory)}"></label><label class="creator-wide">Notes & heritage<textarea data-field="notes" rows="7" placeholder="Add your heritage and story notes here.">${escapeHtml(sheet.notes)}</textarea></label></div>${renderEquipment(data)}${renderTraining(data)}<div class="creator-purchases"><h3>Other XP purchases</h3><p>Use this for Emphases (2 XP), kata, kiho, or other approved purchases.</p><div class="creator-add-row"><input id="purchase-name" type="text" placeholder="Purchase name"><input id="purchase-cost" type="number" min="0" max="100" step="1" placeholder="XP"><button type="button" data-action="add-purchase">Add</button></div>${sheet.purchases.length ? `<div class="creator-option-list">${sheet.purchases.map((entry,index) => `<div class="creator-option-row"><span>${escapeHtml(entry.name)}</span><strong>${Number(entry.cost) || 0} XP</strong><button type="button" data-action="remove-purchase" data-index="${index}" aria-label="Remove ${escapeHtml(entry.name)}">×</button></div>`).join('')}</div>` : ''}</div><p class="creator-rule">For heritage and detailed background prompts, see <a href="${sourceLink('heritage')}">Heritage</a> and <a href="${sourceLink('chargen')}">Character Generation</a>.</p></section>`;
+    return `<section class="creator-panel" id="creator-story"><div class="creator-panel-head"><span class="creator-step">05</span><div><h2>Story & equipment</h2><p>Record your role in the Empire and any remaining choices.</p></div></div><div class="creator-fields"><label>Character concept<input data-field="concept" type="text" value="${escapeHtml(sheet.concept)}" placeholder="A loyal yojimbo, an ambitious courtier…"></label><label>Status<input data-field="status" type="number" min="0" max="10" step="0.1" value="${Number(sheet.status)}"></label><label>Glory<input data-field="glory" type="number" min="0" max="10" step="0.1" value="${Number(sheet.glory)}"></label><label class="creator-wide">Notes & heritage<textarea data-field="notes" rows="7" placeholder="Add your heritage and story notes here.">
+${escapeHtml(sheet.notes)}</textarea></label></div>${renderEquipment(data)}<div class="creator-purchases"><h3>Other XP purchases</h3><p>Use this for Emphases (2 XP), kata, kiho, or other approved purchases.</p><div class="creator-add-row"><input id="purchase-name" type="text" placeholder="Purchase name"><input id="purchase-cost" type="number" min="0" max="100" step="1" placeholder="XP"><button type="button" data-action="add-purchase">Add</button></div>${sheet.purchases.length ? `<div class="creator-option-list">${sheet.purchases.map((entry,index) => `<div class="creator-option-row"><span>${escapeHtml(entry.name)}</span><strong>${Number(entry.cost) || 0} XP</strong><button type="button" data-action="remove-purchase" data-index="${index}" aria-label="Remove ${escapeHtml(entry.name)}">×</button></div>`).join('')}</div>` : ''}</div><p class="creator-rule">For heritage and detailed background prompts, see <a href="${sourceLink('heritage')}">Heritage</a> and <a href="${sourceLink('chargen')}">Character Generation</a>.</p></section>`;
   }
 
   function renderSummary(data) {
     const ringList = TRAIT_GROUPS.map(group => `<div><span>${group.mark} ${group.ring}</span><strong>${data.rings[group.ring]}</strong></div>`).join('');
     const track = (label, value) => `<div class="creator-reputation-row"><div><span>${label}</span><strong>${value}</strong></div><div class="creator-track" aria-hidden="true">${Array.from({length:10},(_,index) => `<i class="${index < Math.floor(Number(value) || 0) ? 'filled' : ''}"></i>`).join('')}</div></div>`;
-    return `<aside class="creator-summary"><div class="creator-summary-inner"><div class="creator-summary-seal" aria-hidden="true">◈</div><small class="creator-summary-kicker">CHARACTER RECORD</small><h2 id="summary-name">${escapeHtml(sheet.name || 'Unnamed samurai')}</h2><p>${escapeHtml([sheet.clan, sheet.family, data.school?.name].filter(Boolean).join(' · ') || 'Choose a clan to begin')}</p><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><span>EXPERIENCE POINTS REMAINING</span><strong>${data.xpRemaining}</strong><small>40 starting + ${data.xpEarned} disadvantage − ${data.xpSpent} spent</small></div><div class="creator-ledger-heading">Honor & standing</div><div class="creator-reputation">${track('Honor', data.school?.honor ?? '—')}${track('Glory', sheet.glory)}${track('Status', sheet.status)}</div><div class="creator-ledger-heading">The five rings</div><div class="creator-summary-rings">${ringList}</div><div class="creator-ledger-heading">Insight</div><div class="creator-derived"><div><span>Rings × 10 + Skills</span><strong>${data.insight}</strong></div><div><span>Insight Rank</span><strong>${data.insightRank}</strong></div></div><div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (base)</span><strong>${data.combat.baseArmorTN}</strong></div><div><span>Healing / day</span><strong>${data.combat.healing}</strong></div><div><span>Unarmed damage</span><strong>${data.combat.unarmedDamage.notation}</strong></div><div><span>Void Points</span><strong>${data.combat.voidPoints}</strong></div><div><span>Wound capacity</span><strong>${data.combat.wounds.maximum}</strong></div></div><div class="creator-ledger-heading">Wounds · cumulative totals</div><div class="creator-wounds">${data.combat.wounds.levels.map(level => `<div><span>${level.label}</span><strong>${level.total}</strong></div>`).join('')}<small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div><div class="creator-summary-links"><a href="${sourceLink('chargen')}">Creation rules ↗</a><a href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
+    return `<aside class="creator-summary" id="creator-summary"><div class="creator-summary-inner"><div class="creator-summary-seal" aria-hidden="true">◈</div><small class="creator-summary-kicker">CHARACTER RECORD</small><h2 id="summary-name">${escapeHtml(sheet.name || 'Unnamed samurai')}</h2><p>${escapeHtml([sheet.clan, sheet.family, data.school?.name].filter(Boolean).join(' · ') || 'Choose a clan to begin')}</p><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><span>EXPERIENCE POINTS REMAINING</span><strong>${data.xpRemaining}</strong><small>40 starting + ${data.xpEarned} disadvantage − ${data.xpSpent} spent</small></div><div class="creator-ledger-heading">Honor & standing</div><div class="creator-reputation">${track('Honor', data.school?.honor ?? '—')}${track('Glory', sheet.glory)}${track('Status', sheet.status)}</div><div class="creator-ledger-heading">The five rings</div><div class="creator-summary-rings">${ringList}</div><div class="creator-ledger-heading">Insight</div><div class="creator-derived"><div><span>Rings × 10 + Skills</span><strong>${data.insight}</strong></div><div><span>Insight Rank</span><strong>${data.insightRank}</strong></div></div><div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (base)</span><strong>${data.combat.baseArmorTN}</strong></div><div><span>Healing / day</span><strong>${data.combat.healing}</strong></div><div><span>Unarmed damage</span><strong>${data.combat.unarmedDamage.notation}</strong></div><div><span>Void Points</span><strong>${data.combat.voidPoints}</strong></div><div><span>Wound capacity</span><strong>${data.combat.wounds.maximum}</strong></div></div><div class="creator-ledger-heading">Wounds · cumulative totals</div><div class="creator-wounds">${data.combat.wounds.levels.map(level => `<div><span>${level.label}</span><strong>${level.total}</strong></div>`).join('')}<small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div><div class="creator-summary-links"><a href="${sourceLink('chargen')}">Creation rules ↗</a><a href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
   }
 
   function renderPrintSheet(data) {
@@ -294,9 +297,17 @@
   }
 
   function render() {
-    if (!root?.isConnected || !catalog || !location.hash.startsWith('#/create-character')) return;
+    if (!root?.isConnected || !catalog || (!external && !location.hash.startsWith('#/create-character'))) return;
     const data = build();
-    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> BOOK OF FIRE · CHARACTER CREATION</div><div class="creator-header-row"><div><h1>Create a character</h1><p>Shape a samurai of Rokugan. Your choices are saved automatically. Sign in to keep them across devices.</p></div><div class="creator-header-actions"><a href="#/start">← Characters</a><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory(data)}<div class="creator-bottom"><span data-save-status>${escapeHtml(window.CharacterStorage?.status || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div>${renderPrintSheet(data)}</div>`;
+    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="eyebrow muted"><span class="eyebrow-line"></span> l5r-rules</div><div class="creator-header-row"><div><h1>Character</h1><p>Changes save automatically.</p></div><div class="creator-header-actions"><a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div><div class="creator-layout"><div class="creator-main">${renderIdentity(data)}${renderTraits(data)}${renderSkills(data)}${renderOptions(data)}${renderStory(data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>${renderSummary(data)}</div>${renderPrintSheet(data)}</div>`;
+    const visibility = window.SheetSharing?.visibility(sheet) || sheet.visibility;
+    if (visibility && root.querySelectorAll) {
+      const ids = {identity:'creator-identity',traits:'creator-traits',skills:'creator-skills',options:'creator-options',story:'creator-story',summary:'creator-summary'};
+      for (const [key,id] of Object.entries(ids)) {
+        const panel = root.querySelector('#'+id);
+        if (panel) panel.insertAdjacentHTML('afterbegin',`<label class="section-public"><input type="checkbox" data-public="${key}" ${visibility[key] ? 'checked' : ''} ${external ? 'disabled' : ''}> Public</label>`);
+      }
+    }
   }
 
   function onClick(event) {
@@ -340,7 +351,7 @@
     } else if (action === 'remove-purchase') {
       sheet.purchases.splice(Number(button.dataset.index),1);
     } else if (action === 'export') {
-      const data = {character:sheet, derived:build(), exportedAt:new Date().toISOString(), source:'Last Haiku'};
+      const data = {character:sheet, derived:build(), exportedAt:new Date().toISOString(), source:'l5r-rules'};
       const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
       const url = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = url; link.download = `${(sheet.name || 'rokugan-character').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-')}.json`;
@@ -349,12 +360,18 @@
     } else if (action === 'print') { window.print(); return;
     } else if (action === 'reset') {
       if (!window.confirm('Clear this character and start over?')) return;
+      const visibility = sheet.visibility;
       sheet = blank();
+      if (external) sheet.visibility = visibility;
     } else return;
     save(); render();
   }
 
   function onChange(event) {
+    if (event.target.dataset.public) {
+      if (external) return;
+      sheet.visibility = {...window.SheetSharing.visibility(sheet),[event.target.dataset.public]:event.target.checked}; save(); render(); return;
+    }
     const field = event.target.dataset.field;
     if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }
     else if (field === 'family') sheet.family = event.target.value;
@@ -384,12 +401,13 @@
     root.querySelector('.creator-print-sheet').outerHTML = renderPrintSheet(build());
   }
 
-  async function mount(element) {
+  async function mount(element, shared = null) {
+    external = shared;
     root = element;
     root.onclick = onClick;
     root.onchange = onChange;
     root.oninput = onInput;
-    sheet = loadSheet();
+    sheet = shared ? {...blank(),...shared.sheet} : loadSheet();
     try {
       catalogPromise ||= fetch('public/character-data.json').then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -409,16 +427,29 @@
     }
   }
 
-  window.CharacterBuilder = { mount, list, create, open, remove };
+  async function sections(input) {
+    catalogPromise ||= fetch('public/character-data.json').then(r => r.json());
+    catalog = await catalogPromise;
+    const previous = sheet;
+    try { sheet = {...blank(),...input}; return window.SheetSharing.sections(sheet,build()); }
+    finally { sheet = previous; }
+  }
+  window.CharacterBuilder = { mount, list, create, open, remove, sections };
   window.addEventListener?.('characters-remote-changed', () => {
     if (root?.isConnected && location.hash.startsWith('#/create-character')) {
       if (!roster().some(record => record.id === activeId)) { location.hash = '#/start'; return; }
+      if (external) return;
       sheet = loadSheet(); render();
     }
     window.dispatchEvent(new Event('characters-changed'));
   });
+  window.addEventListener?.('campaigns-changed', () => {
+    if (!external) return;
+    const label = root?.querySelector?.('[data-save-status]');
+    if (label) label.textContent = window.CampaignStorage.status;
+  });
   window.addEventListener?.('character-sync-changed', () => {
     const label = root?.querySelector?.('[data-save-status]');
-    if (label) label.textContent = window.CharacterStorage.status;
+    if (label && !external) label.textContent = window.CharacterStorage.status;
   });
 })();
