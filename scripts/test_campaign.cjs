@@ -10,9 +10,9 @@ function sandbox(files,storage=new Map()) {
  for(const file of files)vm.runInNewContext(fs.readFileSync(file,'utf8'),context);
  return {window,storage};
 }
-test('all 64 visibility masks project only selected sections with matching revisions',()=>{
+test('all 128 visibility masks project only selected sections with matching revisions',()=>{
  const {window:w}=sandbox(['sheet-sharing.js']),api=w.SheetSharing;
- for(let bits=0;bits<64;bits++){
+ for(let bits=0;bits<128;bits++){
   const visibility=Object.fromEntries(api.keys.map((k,i)=>[k,!!(bits&(1<<i))]));
   const sections=Object.fromEntries(api.keys.map(k=>[k,{secret:k}]));
   const p=api.project({revision:'same',visibility,sections});
@@ -20,7 +20,7 @@ test('all 64 visibility masks project only selected sections with matching revis
   assert.deepEqual(Object.keys(p.sections),Array.from(api.keys.filter(k=>visibility[k])));
   for(const k of api.keys)assert.equal(JSON.stringify(p).includes('"secret":"'+k+'"'),visibility[k]);
  }
- assert.deepEqual(JSON.parse(JSON.stringify(api.visibility({}))),{identity:true,traits:false,skills:false,options:false,story:false,summary:false});
+ assert.deepEqual(JSON.parse(JSON.stringify(api.visibility({}))),{identity:true,traits:false,skills:false,options:false,story:false,summary:false,abilities:false});
 });
 test('migration preserves device and account IDs, active selection and durable pending edits',()=>{
  const storage=new Map([

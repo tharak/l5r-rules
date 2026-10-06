@@ -24,6 +24,7 @@ async function character(saved) {
     fetch:async () => ({ok:true, json:async () => catalog}),
     URL:{createObjectURL(blob){exported = blob; return 'blob:test';}, revokeObjectURL(){}},
     document:{createElement:() => ({click(){}})}, setTimeout(){}});
+  for (const file of ['character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
   const change = (dataset,value) => root.onchange({target:{dataset,value}});

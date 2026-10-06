@@ -44,6 +44,38 @@ test('GM and player grants, outsiders, anonymous reads, forged grants, and visib
  const forged={...changed,revision:'r4',visibility:{...mask,story:true}};
  await assertFails(batch(db('gm'),[['users/alice/characters/pc',forged],['users/alice/publicCharacters/pc',{revision:'r4',sections:{identity:sections.identity,story:sections.story}}]]));
 });
+test('all 128 seven-section masks exclude hidden abilities from player responses and reject private metadata in public sections',async()=>{
+ const allSections={...sections,abilities:{abilities:[{name:'SECRET POWER',kind:'custom',description:'private ability'}]}};
+ for(let bits=0;bits<128;bits++) {
+  const visibility=Object.fromEntries(Object.keys(allSections).map((key,i)=>[key,!!(bits&(1<<i))]));
+  const f={...full,revision:'mask-'+bits,visibility,sections:allSections,sheetJson:JSON.stringify({progression:{history:[{explanation:'PRIVATE HISTORY'}]},exceptions:[{explanation:'PRIVATE APPROVAL'}]})};
+  const p={revision:f.revision,sections:Object.fromEntries(Object.entries(allSections).filter(([key])=>visibility[key]))};
+  await assertSucceeds(batch(db('alice'),[['users/alice/characters/masks',f],['users/alice/publicCharacters/masks',p]]));
+  if(bits===0) {
+   await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/pcs/masks_pc'),{ownerUid:'alice',characterId:'masks',membershipId:'alice-membership'}));
+   await assertSucceeds(setDoc(r(db('bob'),'users/alice/characters/masks/grants/public_bob'),{campaignId:'c',pcId:'masks_pc',membershipId:'bob-membership'}));
+  }
+  const response=(await assertSucceeds(getDoc(r(db('bob'),'users/alice/publicCharacters/masks')))).data();
+  assert.equal(JSON.stringify(response).includes('SECRET POWER'),visibility.abilities);
+  assert.ok(!JSON.stringify(response).includes('PRIVATE HISTORY'));
+  assert.ok(!JSON.stringify(response).includes('PRIVATE APPROVAL'));
+  assert.equal(Object.keys(response.sections).length,Object.values(visibility).filter(Boolean).length);
+ }
+ await assertFails(getDoc(r(db('bob'),'users/alice/characters/masks')));
+ const bad={...full,revision:'private-fields',visibility:{...mask,abilities:true},sections:{...allSections,abilities:{abilities:[],exceptions:['PRIVATE']}}};
+ await assertFails(batch(db('alice'),[['users/alice/characters/bad',bad],['users/alice/publicCharacters/bad',{revision:bad.revision,sections:{identity:sections.identity,abilities:bad.sections.abilities}}]]));
+});
+test('legacy six-section documents accept GM migration with Abilities private; only owners can publish Abilities',async()=>{
+ await assertSucceeds(batch(db('alice'),[['users/alice/characters/legacy7',full],['users/alice/publicCharacters/legacy7',projection]]));
+ await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/pcs/legacy7_pc'),{ownerUid:'alice',characterId:'legacy7',membershipId:'alice-membership'}));
+ await assertSucceeds(setDoc(r(db('gm'),'users/alice/characters/legacy7/grants/full_gm'),{campaignId:'c',pcId:'legacy7_pc',membershipId:'gm-membership'}));
+ const next={...full,revision:'v2',visibility:{...mask,abilities:false},sections:{...sections,abilities:{abilities:[{name:'Secret'}]}}};
+ await assertSucceeds(batch(db('gm'),[['users/alice/characters/legacy7',next],['users/alice/publicCharacters/legacy7',{...projection,revision:'v2'}]]));
+ const published={...next,revision:'v3',visibility:{...next.visibility,abilities:true}},p={revision:'v3',sections:{...projection.sections,abilities:next.sections.abilities}};
+ await assertFails(batch(db('gm'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
+ await assertFails(batch(db('bob'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
+ await assertSucceeds(batch(db('alice'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
+});
 test('campaign, session, NPC and membership permissions',async()=>{
  for(const u of ['alice','bob']){await assertSucceeds(getDoc(r(db(u),'campaigns/c/sessions/s')));await assertFails(getDoc(r(db(u),'campaigns/c/npcs/n')));await assertFails(setDoc(r(db(u),'campaigns/c/sessions/s'),{title:'Forged',text:'',updatedAt:'now'}));}
  await assertSucceeds(getDoc(r(db('gm'),'campaigns/c/npcs/n')));

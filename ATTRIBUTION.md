@@ -2,6 +2,8 @@
 
 The rules snapshot was imported from [Last Haiku](https://lasthaiku.wikidot.com/), which states a [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) license. Imported content retains that license. Legend of the Five Rings belongs to its respective owners. This document is excluded from deployment.
 
+Structured weapon and armor statistics and skill mastery descriptions reuse the resource catalogs in the user's [LegendOfTheFiveRings core library](https://github.com/tharak/LegendOfTheFiveRings/tree/main/Sources/LegendOfTheFiveRings/Resources). Ability, ancestor, and supplementary school descriptions come from the source pages below. Rules calculations were checked against the fourth-edition printed core rulebook; the source PDF is excluded from deployment.
+
 Source pages:
 
 - Start: https://lasthaiku.wikidot.com/start

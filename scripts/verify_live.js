@@ -11,11 +11,15 @@ async page => {
     await live.getByRole('button',{name:'Create PC',exact:true}).click();
     await live.locator('[data-field="name"]').waitFor();
     await live.locator('[data-field="name"]').fill('Live device PC');
-    check(await live.locator('[data-public]').count()===6,'Privacy controls missing');
+    check(await live.locator('[data-public]').count()===7,'Privacy controls missing');
     const exportPromise=live.waitForEvent('download');
     await live.getByRole('button',{name:'Export JSON ↗',exact:true}).click();
     const exported=await exportPromise,stream=await exported.createReadStream();let text='';for await(const part of stream)text+=part;
-    check(JSON.parse(text).source==='l5r-rules','Export branding is incorrect');
+    const document=JSON.parse(text);
+    check(document.source==='l5r-rules','Export branding is incorrect');
+    check(document.character.version===2 && document.character.phase==='creation','Versioned creation model missing');
+    check(document.character.visibility.abilities===false,'Abilities should start private');
+    check(await live.locator('#creator-abilities').count()===1,'Abilities editor missing');
     await live.getByRole('button',{name:'Save PC',exact:true}).click();
     await live.waitForURL(/#\/characters$/);
     await live.getByRole('heading',{name:'Live device PC',exact:true}).waitFor();

@@ -24,25 +24,26 @@ service cloud.firestore {
     }
     function mask(v) {
       return v is map && v.keys().hasAll(['identity','traits','skills','options','story','summary'])
-        && v.keys().hasOnly(['identity','traits','skills','options','story','summary'])
-        && v.identity is bool && v.traits is bool && v.skills is bool && v.options is bool && v.story is bool && v.summary is bool;
+        && v.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
+        && v.identity is bool && v.traits is bool && v.skills is bool && v.options is bool && v.story is bool && v.summary is bool && (!('abilities' in v) || v.abilities is bool);
     }
     function projectionSection(f,p,k) {
-      return f.visibility[k] ? (k in p.sections && p.sections[k] == f.sections[k]) : !(k in p.sections);
+      return f.visibility.get(k,false) ? (k in p.sections && p.sections[k] == f.sections[k]) : !(k in p.sections);
     }
     function projection(f,p) {
       return p.keys().hasOnly(['revision','sections']) && p.revision == f.revision && p.sections is map
-        && p.sections.keys().hasOnly(['identity','traits','skills','options','story','summary'])
+        && p.sections.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
         && projectionSection(f,p,'identity') && projectionSection(f,p,'traits') && projectionSection(f,p,'skills')
-        && projectionSection(f,p,'options') && projectionSection(f,p,'story') && projectionSection(f,p,'summary');
+        && projectionSection(f,p,'options') && projectionSection(f,p,'story') && projectionSection(f,p,'summary') && projectionSection(f,p,'abilities');
     }
     function sectionShape(s) {
       return s.identity is map && s.identity.keys().hasOnly(['name','clan','family','school','training','affinity','spells'])
         && s.traits is map && s.traits.keys().hasOnly(['rings','traits'])
         && s.skills is map && s.skills.keys().hasOnly(['skills'])
-        && s.options is map && s.options.keys().hasOnly(['advantages','disadvantages'])
-        && s.story is map && s.story.keys().hasOnly(['concept','notes','equipment','money','glory','status','purchases'])
-        && s.summary is map && s.summary.keys().hasOnly(['insight','insightRank','xpSpent','xpRemaining','xpEarned','combat']);
+        && s.options is map && s.options.keys().hasOnly(['advantages','disadvantages','ancestors'])
+        && s.story is map && s.story.keys().hasOnly(['concept','notes','heritage','equipment','money','honor','glory','status','taint','purchases'])
+        && s.summary is map && s.summary.keys().hasOnly(['insight','insightRank','schoolRank','xpSpent','xpRemaining','xpEarned','combat'])
+        && (!('abilities' in s) || (s.abilities is map && s.abilities.keys().hasOnly(['abilities']))) ;
     }
     function validFull(u,id) {
       let f = request.resource.data;
@@ -53,15 +54,21 @@ service cloud.firestore {
         && f.updatedAt is string && f.updatedAt.size() <= 40 && f.revision is string && f.revision.size() <= 80
         && mask(f.visibility) && f.sections is map
         && f.sections.keys().hasAll(['identity','traits','skills','options','story','summary'])
-        && f.sections.keys().hasOnly(['identity','traits','skills','options','story','summary'])
+        && f.sections.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
+        && (('abilities' in f.visibility) == ('abilities' in f.sections))
         && sectionShape(f.sections) && projection(f,p);
+    }
+    function unchangedMask(a,b) {
+      return a.identity == b.identity && a.traits == b.traits && a.skills == b.skills
+        && a.options == b.options && a.story == b.story && a.summary == b.summary
+        && a.get('abilities',false) == b.get('abilities',false);
     }
     match /users/{u}/characters/{id} {
       allow list: if owner(u);
       allow get: if owner(u) || granted(u,id,true);
       allow create: if owner(u) && validFull(u,id);
       allow update: if validFull(u,id) && (owner(u) || (granted(u,id,true)
-        && request.resource.data.visibility == resource.data.visibility));
+        && unchangedMask(request.resource.data.visibility,resource.data.visibility)));
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id));
       match /grants/{viewer} {
         allow get: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
