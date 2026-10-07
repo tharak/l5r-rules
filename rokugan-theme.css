@@ -168,6 +168,12 @@
   .creator-overview { background: var(--wash); border-color: var(--line); color: var(--muted); }
   .creator-ring, .creator-skill-list, .creator-option-list, .creator-equipment-list,
   .creator-empty, .creator-ability-list details { background: #fffbf2; border-color: var(--line); color: var(--muted); }
+  /* Share the Ring tint between traits and the skills that use them. */
+  .creator-ring[data-ring="Earth"], .creator-skill-row[data-ring="Earth"] { background: #f1ead8; }
+  .creator-ring[data-ring="Air"], .creator-skill-row[data-ring="Air"] { background: #eef1e3; }
+  .creator-ring[data-ring="Water"], .creator-skill-row[data-ring="Water"] { background: #e8f0f3; }
+  .creator-ring[data-ring="Fire"], .creator-skill-row[data-ring="Fire"] { background: #f8e9e2; }
+  .creator-ring[data-ring="Void"], .creator-skill-row[data-ring="Void"] { background: #efe9f4; }
   .creator-ring-head > b { background: var(--wash); color: var(--ink); border-color: #b9aa8d; }
   .rank-control { border-color: #b9aa8d; border-radius: 2px; }
   .rank-control b { color: var(--ink); }

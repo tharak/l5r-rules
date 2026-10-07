@@ -30,7 +30,7 @@ async function character(saved) {
   const change = (dataset,value) => root.onchange({target:{dataset,value}});
   const click = dataset => root.onclick({target:{closest:() => ({dataset})}});
   return {
-    root, inputs, change, click,
+    root, inputs, change, click, window,
     route:() => context.location.hash,
     school(clan,name) {
       change({field:'clan'},clan);
@@ -248,4 +248,95 @@ test('Insight Rank changes propagate to initiative and healing', async () => {
   assert.equal(d.insightRank,1);
   assert.equal(d.combat.initiative.notation,'4k3');
   assert.equal(d.combat.healing,7);
+});
+
+function sectionHtml(c,key) {
+  return c.root.innerHTML.match(new RegExp(`<section[^>]*id="creator-${key}"[\\s\\S]*?</section>`))?.[0] || '';
+}
+
+test('required art and spell choices appear visibly in their own sections',async()=>{
+  const c=await character();
+  c.school('Crane','Kakita Artisan');
+  assert.match(sectionHtml(c,'skills'),/data-school-decision="chosenArt"/);
+  assert.match(sectionHtml(c,'skills'),/Select one granted art/);
+  assert.doesNotMatch(sectionHtml(c,'identity'),/data-school-decision="chosenArt"|Select one granted art/);
+  assert.doesNotMatch(c.root.innerHTML,/Rules &amp; table exceptions|Rules & table exceptions|creator-exceptions|Record exception/);
+  ['Acting','Artisan: Painting','Perform: Song'].forEach((value,index)=>c.change({choiceIndex:String(index)},value));
+  c.change({schoolDecision:'chosenArt'},'Acting');
+  assert.doesNotMatch(sectionHtml(c,'skills'),/Select one granted art/);
+  c.school('Phoenix','Isawa Shugenja');
+  const abilities=sectionHtml(c,'abilities');
+  assert.match(abilities,/data-school-decision="affinity"/);
+  for(let i=1;i<=4;i++)assert.match(abilities,new RegExp(`data-school-decision="spellElement${i}"`));
+  assert.match(abilities,/Select four distinct starting spell elements/);
+  assert.doesNotMatch(abilities,/data-school-decision="deficiency"|data-school-decision="secondDeficiency"/);
+  assert.doesNotMatch(sectionHtml(c,'identity'),/data-school-decision="affinity"|Select four distinct/);
+  c.change({schoolDecision:'affinity'},'Fire');
+  ['Air','Earth','Fire','Water'].forEach((value,index)=>c.change({schoolDecision:'spellElement'+(index+1)},value));
+  assert.doesNotMatch(sectionHtml(c,'abilities'),/Select four distinct starting spell elements|Choose the school’s elemental affinity/);
+});
+
+test('fixed-affinity schools show only the choices they actually need',async()=>{
+  const c=await character();c.school('Crab','Kuni Shugenja');
+  assert.doesNotMatch(sectionHtml(c,'abilities'),/data-school-decision="affinity"|data-school-decision="deficiency"|data-school-decision="spellElement/);
+  assert.match(sectionHtml(c,'abilities'),/starting .* spells/);
+});
+
+test('advantage and disadvantage cost steppers use displayed costs and persist XP changes',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  c.inputs['#advantage-select']={value:'Large'};c.click({action:'add-advantage'});
+  assert.equal((await c.data()).derived.advantages[0].cost,3);
+  assert.match(sectionHtml(c,'options'),/<output[^>]*aria-label="Large point cost">3<\/output>/);
+  c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
+  assert.equal((await c.data()).derived.advantages[0].cost,4);
+  c.click({action:'option-cost',kind:'advantage',index:'0',delta:'-1'});
+  assert.equal((await c.data()).derived.advantages[0].cost,3);
+  c.inputs['#disadvantage-select']={value:'Doubt'};c.click({action:'add-disadvantage'});
+  const before=(await c.data()).derived;
+  c.click({action:'option-cost',kind:'disadvantage',index:'0',delta:'1'});
+  const after=(await c.data()).derived;
+  assert.equal(after.disadvantages[0].cost,before.disadvantages[0].cost+1);
+  assert.equal(after.xpRemaining,before.xpRemaining+1);
+  const loaded=await c.reload();assert.equal((await loaded.data()).derived.disadvantages[0].cost,after.disadvantages[0].cost);
+  for(let i=0;i<40;i++)c.click({action:'option-cost',kind:'advantage',index:'0',delta:'-1'});
+  assert.equal((await c.data()).derived.advantages[0].cost,0);
+  for(let i=0;i<40;i++)c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
+  assert.equal((await c.data()).derived.advantages[0].cost,30);
+});
+
+test('cost corrections during advancement still require an explanation',async()=>{
+  const c=await character({phase:'advancement',advantages:[{id:'large',name:'Large',baseCost:4,cost:4}]});
+  c.window.prompt=()=>'';
+  c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
+  assert.equal((await c.data()).derived.advantages[0].cost,4);
+  c.window.prompt=()=> 'GM approved correction';
+  c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
+  const {character:s,derived:d}=await c.data();
+  assert.equal(d.advantages[0].cost,5);
+  assert.ok(s.progression.history.some(e=>e.explanation==='GM approved correction'));
+});
+
+test('numeric steppers preserve decimal precision, bounds and saved values',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  const initial=(await c.data()).derived.honor;
+  c.click({action:'number-step',field:'honor',delta:'1'});
+  assert.equal((await c.data()).derived.honor,Number((initial+0.1).toFixed(1)));
+  c.click({action:'number-step',field:'honor',delta:'-1'});
+  assert.equal((await c.data()).derived.honor,initial);
+  c.click({action:'number-step',field:'woundsTaken',delta:'-1'});
+  assert.equal((await c.data()).character.woundsTaken,0);
+  c.click({action:'number-step',field:'woundsTaken',delta:'1'});
+  assert.equal((await (await c.reload()).data()).character.woundsTaken,1);
+  c.change({field:'honor'},'10');c.click({action:'number-step',field:'honor',delta:'1'});
+  assert.equal((await c.data()).derived.honor,10);
+});
+
+test('legacy approvals remain saved and Imperial family approval lives in Identity',async()=>{
+  const c=await character({exceptions:[{id:'legacy',code:'rank:skill:Defense',explanation:'Existing approval'}]});
+  c.change({field:'clan'},'Imperial');
+  assert.match(sectionHtml(c,'identity'),/data-imperial-approval/);
+  c.change({imperialApproval:''},'GM approves this Imperial family');
+  const saved=(await (await c.reload()).data()).character;
+  assert.equal(saved.exceptions.find(e=>e.id==='legacy').explanation,'Existing approval');
+  assert.equal(saved.exceptions.find(e=>e.code==='imperial').explanation,'GM approves this Imperial family');
 });
