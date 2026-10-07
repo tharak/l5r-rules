@@ -466,7 +466,8 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     try { sheet = R.normalize(input); return window.SheetSharing.sections(sheet,build()); }
     finally { sheet = previous; }
   }
-  window.CharacterBuilder = { mount, list, create, open, remove, sections, normalize:R.normalize };
+  const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
+  window.CharacterBuilder = { mount, list, create, open, remove, read:readRecord, sections, normalize:R.normalize };
   window.addEventListener?.('characters-remote-changed', () => {
     if (root?.isConnected && location.hash.startsWith('#/create-character')) {
       if (!roster().some(record => record.id === activeId)) { location.hash = '#/start'; return; }
