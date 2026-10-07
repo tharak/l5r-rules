@@ -52,7 +52,14 @@ For browser verification, sign in with a Google test account in the emulator wid
 
 `scripts/browser_plot_checks.js` creates isolated emulator accounts for a GM and two players. It verifies public/private plots, notes on all four target types, creator-only editing, GM access, live privacy revocation, reload/cache behavior, direct server denials, and mobile layout.
 
-Deploy after checks:
+Pushes to `main` run unit tests and build the site, then deploy Firebase Hosting using
+[Deploy Firebase Hosting](https://github.com/tharak/l5r-rules/actions/workflows/firebase-hosting.yml).
+The workflow also supports a manual run on `main`. Its deployment service account is stored
+in the repository secret `FIREBASE_SERVICE_ACCOUNT_L5R_RULES`; credentials are never committed.
+Hosting deployments do not publish Firestore rules. Google sign-in accepts both the Firebase
+Hosting addresses and `tharak.github.io` for the GitHub Pages copy.
+
+To deploy manually after checks (including Firestore rule changes):
 
 ```sh
 firebase deploy --only hosting,firestore:rules
