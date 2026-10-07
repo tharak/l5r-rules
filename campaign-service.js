@@ -15,13 +15,38 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     const encoded = await window.SheetSharing.encode(sheet,updatedAt);
     await commit([[`users/${owner}/characters/${id}`,encoded.full],[`users/${owner}/publicCharacters/${id}`,encoded.public]]);
   }
+  async function write(path,data) {
+    if (path.includes('/sheetEdits/')) return saveCharacter(data.ownerUid,data.characterId,data.sheet,data.updatedAt);
+    const target=path.match(/^campaigns\/([^/]+)\/(sessions|pcs|npcs|plots)\/([^/]+)$/);
+    if(data===null && target) {
+      // Delete attached bodies without reading them, before a parent ID could be reused.
+      const notes=(await records(`campaigns/${target[1]}/notes`)).filter(n=>n.targetKind===target[2]&&n.targetId===target[3]);
+      for(let offset=0;offset<notes.length;offset+=200)await commit(notes.slice(offset,offset+200).flatMap(n=>[
+        [`campaigns/${target[1]}/notes/${n.id}/content/body`,null],[`campaigns/${target[1]}/notes/${n.id}`,null]
+      ]));
+    }
+    const entry = path.match(/^campaigns\/([^/]+)\/(plots|notes)\/([^/]+)$/);
+    if (!entry) return data === null ? sdk.deleteDoc(ref(path)) : sdk.setDoc(ref(path),data);
+    const bodyPath = `${path}/content/body`;
+    if (data === null) return commit([[bodyPath,null],[path,null]]);
+    const {creatorUid,public:isPublic,createdAt,updatedAt,targetKind,targetId,targetCreatorUid} = data;
+    const revision = data.revision || crypto.randomUUID();
+    const metadata = {creatorUid,public:isPublic,createdAt,updatedAt,revision};
+    if (entry[2] === 'notes') {
+      Object.assign(metadata,{targetKind,targetId});
+      if(targetKind==='plots')metadata.targetCreatorUid=targetCreatorUid;
+    }
+    const body = {text:data.text,revision};
+    if (entry[2] === 'plots') body.title = data.title;
+    return commit([[path,metadata],[bodyPath,body]]);
+  }
   return {
     get,commit,saveCharacter,
     async syncPlayerName(c) {
       const membership=await get(memberPath(c));
       if(membership && membership.displayName!==playerName())await sdk.updateDoc(ref(memberPath(c)),{displayName:playerName()});
     },
-    write:(path,data)=> path.includes('/sheetEdits/') ? saveCharacter(data.ownerUid,data.characterId,data.sheet,data.updatedAt) : data === null ? sdk.deleteDoc(ref(path)) : sdk.setDoc(ref(path),data),
+    write,
     subscribe(events) {
       const subscriptions = new Map();
       const cancel = id => { subscriptions.get(id)?.forEach(stop=>stop()); subscriptions.delete(id); events.revoked(id); };
@@ -31,18 +56,68 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
         for (const id of subscriptions.keys()) if (!ids.includes(id)) cancel(id);
         for (const id of ids) if (!subscriptions.has(id)) {
           const stops = []; subscriptions.set(id,stops);
+          const catalogs = {sessions:new Map(),pcs:new Map(),npcs:new Map(),plots:new Map(),notes:new Map()};
+          const contentStops = new Map();
+          const isGM = snapshot.docs.find(d=>d.id===id).data().gmUid === uid;
+          stops.push(()=>{for(const item of contentStops.values())item.stop();contentStops.clear();});
+          const canRead = data => data.public || data.creatorUid === uid || isGM;
+          const targetVisible = data => {
+            const target=catalogs[data.targetKind]?.get(data.targetId);
+            return !!target && (data.targetKind!=='npcs'||isGM) && (data.targetKind!=='plots'||(target.creatorUid===data.targetCreatorUid&&canRead(target)));
+          };
+          const refreshContent = () => {
+            for (const kind of ['plots','notes']) {
+              for(const [entryId,metadata] of catalogs[kind]) {
+                const path=`campaigns/${id}/${kind}/${entryId}`, previous=contentStops.get(path);
+                const allowed=canRead(metadata) && (kind==='plots'||targetVisible(metadata));
+                if(previous && (!allowed || previous.revision!==metadata.revision)) {
+                  previous.stop();contentStops.delete(path);if(!allowed)events.receive(path,null);
+                }
+                if(!allowed || contentStops.has(path))continue;
+                const item={revision:metadata.revision,stop:()=>{}};
+                contentStops.set(path,item);
+                item.stop=sdk.onSnapshot(ref(`${path}/content/body`),body=>{
+                  if(contentStops.get(path)!==item)return;
+                  const data=body.exists()?body.data():null;
+                  if(data?.revision===metadata.revision)events.receive(path,{...metadata,...data});
+                },error=>{
+                  if(contentStops.get(path)!==item)return;
+                  events.receive(path,null);
+                  if(error.code!=='permission-denied')events.error(error);
+                });
+              }
+            }
+          };
           let profileSynced=false;
           const fail = error => { if (error.code === 'permission-denied') cancel(id); else events.error(error); };
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
           watch(`campaigns/${id}`);
           const collections = ['members','sessions','pcs'];
           // The immutable GM identifier is available on the private membership index.
-          if (snapshot.docs.find(d=>d.id===id).data().gmUid === uid) { collections.push('npcs'); watch(`campaigns/${id}/private/invitation`); }
+          if (isGM) { collections.push('npcs'); watch(`campaigns/${id}/private/invitation`); }
+          collections.push('plots','notes');
           for (const collection of collections) {
             const path = `campaigns/${id}/${collection}`;
-            stops.push(sdk.onSnapshot(sdk.collection(db,path),s=>{
-              for (const d of s.docChanges()) {
-                events.receive(`${path}/${d.doc.id}`,d.type==='removed'?null:d.doc.data());
+            stops.push(sdk.onSnapshot(sdk.collection(db,path),{includeMetadataChanges:true},s=>{
+              // Confirm privacy against the server before restoring another member's text.
+              if(['plots','notes'].includes(collection) && (s.metadata.fromCache || s.metadata.hasPendingWrites))return;
+              const entries=['plots','notes'].includes(collection);
+              const ids=new Set(s.docs.map(doc=>doc.id));
+              const changes=entries ? [
+                ...[...catalogs[collection].keys()].filter(key=>!ids.has(key)).map(key=>({type:'removed',doc:{id:key}})),
+                ...s.docs.map(doc=>({type:'modified',doc}))
+              ] : s.docChanges();
+              for (const d of changes) {
+                const entryPath=`${path}/${d.doc.id}`;
+                if(catalogs[collection]) {
+                  if(d.type==='removed')catalogs[collection].delete(d.doc.id);
+                  else catalogs[collection].set(d.doc.id,d.doc.data());
+                }
+                if(['plots','notes'].includes(collection)) {
+                  if(d.type==='removed') {
+                    contentStops.get(entryPath)?.stop();contentStops.delete(entryPath);events.receive(entryPath,null);
+                  }
+                } else events.receive(entryPath,d.type==='removed'?null:d.doc.data());
                 // Existing memberships acquire their owner's Google display name on sign-in.
                 if(collection==='members' && d.doc.id===uid && d.type!=='removed' && !profileSynced) {
                   // Sync once per sign-in so an older tab cannot undo a newer profile name.
@@ -50,6 +125,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
                   if(d.doc.data().displayName!==playerName())sdk.updateDoc(ref(`${path}/${uid}`),{displayName:playerName()}).catch(events.error);
                 }
               }
+              refreshContent();
             },fail));
           }
         }
@@ -106,10 +182,15 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     },
     async removeMember(c,target) {
       const pcs = (await records(`campaigns/${c}/pcs`)).filter(pc=>pc.ownerUid===target);
-      for (let offset=0;offset<pcs.length;offset+=400) await commit(pcs.slice(offset,offset+400).map(pc=>[`campaigns/${c}/pcs/${pc.id}`,null]));
+      for (const pc of pcs) await write(`campaigns/${c}/pcs/${pc.id}`,null);
       await commit([[memberPath(c,target),null],[indexPath(c,target),null]]);
     },
     async deleteCampaign(c) {
+      // Metadata contains no secret text, so the GM can clean up every body without reading it.
+      for (const kind of ['notes','plots']) {
+        const items=await records(`campaigns/${c}/${kind}`);
+        for(let offset=0;offset<items.length;offset+=200)await commit(items.slice(offset,offset+200).flatMap(d=>[[`campaigns/${c}/${kind}/${d.id}/content/body`,null],[`campaigns/${c}/${kind}/${d.id}`,null]]));
+      }
       for (const collection of ['sessions','npcs','pcs']) {
         const items = await records(`campaigns/${c}/${collection}`);
         for (let offset=0;offset<items.length;offset+=400) await commit(items.slice(offset,offset+400).map(d=>[`campaigns/${c}/${collection}/${d.id}`,null]));

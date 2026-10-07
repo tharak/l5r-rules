@@ -98,6 +98,64 @@ test('members publish only their own display names without changing membership a
  await assertFails(updateDoc(own,{displayName:'Alice',inviteToken:'forged'}));
  await assertFails(updateDoc(own,{displayName:'Alice',email:'private@example.test'}));
 });
+test('plots and attached notes protect text, creator controls, target access and revocation',async()=>{
+ const metadata=(creatorUid,isPublic,revision,extra={})=>({creatorUid,public:isPublic,revision,createdAt:'now',updatedAt:'now',...extra});
+ const writeEntry=(u,kind,id,m,text='SECRET',title='Secret plot')=>batch(db(u),[
+  [`campaigns/c/${kind}/${id}`,m],
+  [`campaigns/c/${kind}/${id}/content/body`,{text,revision:m.revision,...(kind==='plots'?{title}:{})}]
+ ]);
+ const plotPath='campaigns/c/plots/private_plot',bodyPath=plotPath+'/content/body';
+ const m=metadata('alice',false,'p1');
+ await assertSucceeds(writeEntry('alice','plots','private_plot',m));
+ for(const u of ['alice','gm'])await assertSucceeds(getDoc(r(db(u),bodyPath)));
+ for(const u of ['bob','outsider',null])await assertFails(getDoc(r(db(u),bodyPath)));
+ const catalog=(await getDocs(collection(db('bob'),'campaigns/c/plots'))).docs.map(d=>d.data());
+ assert.ok(!JSON.stringify(catalog).includes('SECRET'));assert.ok(!JSON.stringify(catalog).includes('Secret plot'));
+ await assertFails(getDocs(collection(db('bob'),plotPath+'/content')));
+ await assertFails(writeEntry('bob','plots','private_plot',{...m,public:true,revision:'forged'}));
+ await assertFails(writeEntry('gm','plots','private_plot',{...m,creatorUid:'gm',public:true,revision:'forged'}));
+ await assertFails(writeEntry('alice','plots','forged_owner',{...m,creatorUid:'bob'}));
+ await assertFails(setDoc(r(db('alice'),plotPath),{...m,title:'Leaked title'}));
+ await assertFails(setDoc(r(db('alice'),plotPath),{...m,revision:'not-atomic'}));
+ await assertSucceeds(writeEntry('alice','plots','private_plot',{...m,public:true,revision:'p2'},'PUBLIC','Public plot'));
+ await assertSucceeds(getDoc(r(db('bob'),bodyPath)));
+ const target={targetKind:'plots',targetId:'private_plot',targetCreatorUid:'alice'};
+ await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',false,'n1',target)));
+ const notePath='campaigns/c/notes/bob_plot_note/content/body';
+ for(const u of ['bob','gm'])await assertSucceeds(getDoc(r(db(u),notePath)));
+ await assertFails(getDoc(r(db('alice'),notePath)));
+ await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n2',target),'PUBLIC NOTE'));
+ await assertSucceeds(getDoc(r(db('alice'),notePath)));
+ await assertFails(writeEntry('alice','notes','bob_plot_note',metadata('bob',false,'n3',target)));
+ await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n3',{targetKind:'sessions',targetId:'s'})));
+ await assertSucceeds(writeEntry('alice','plots','private_plot',{...m,revision:'p3'}));
+ // Even the note's creator loses access if the parent plot becomes private to someone else.
+ await assertFails(getDoc(r(db('bob'),notePath)));
+ await assertSucceeds(getDoc(r(db('gm'),notePath)));
+ await assertFails(writeEntry('bob','notes','private_target',metadata('bob',true,'n1',target)));
+ for(const [targetKind,targetId] of [['sessions','s'],['pcs','alice_pc']]) {
+  const id='note_'+targetKind,extra={targetKind,targetId};
+  await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',false,'n1',extra)));
+  await assertFails(getDoc(r(db('bob'),`campaigns/c/notes/${id}/content/body`)));
+  await assertSucceeds(getDoc(r(db('gm'),`campaigns/c/notes/${id}/content/body`)));
+  await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',true,'n2',extra),'PUBLIC'));
+  await assertSucceeds(getDoc(r(db('bob'),`campaigns/c/notes/${id}/content/body`)));
+ }
+ await assertSucceeds(writeEntry('gm','notes','npc_note',metadata('gm',true,'n1',{targetKind:'npcs',targetId:'n'})));
+ await assertFails(getDoc(r(db('alice'),'campaigns/c/notes/npc_note/content/body')));
+ await assertFails(writeEntry('alice','notes','npc_attack',metadata('alice',false,'n1',{targetKind:'npcs',targetId:'n'})));
+ await assertFails(writeEntry('alice','notes','missing_target',metadata('alice',false,'n1',{targetKind:'sessions',targetId:'missing'})));
+ await assertFails(writeEntry('outsider','plots','outside',metadata('outsider',true,'p1')));
+ await assertFails(deleteDoc(r(db('alice'),plotPath)));
+ await assertSucceeds(batch(db('alice'),[[bodyPath,null],[plotPath,null]]));
+ await assertFails(getDoc(r(db('gm'),notePath)));
+ // A different member cannot revive attached public notes by reusing a deleted private plot ID.
+ await assertSucceeds(writeEntry('bob','plots','private_plot',metadata('bob',true,'replacement')));
+ await assertFails(getDoc(r(db('bob'),notePath)));
+ await env.withSecurityRulesDisabled(c=>deleteDoc(r(c.firestore(),'campaigns/c/members/alice')));
+ await assertFails(getDoc(r(db('alice'),'campaigns/c/notes/note_sessions/content/body')));
+ await env.withSecurityRulesDisabled(c=>setDoc(r(c.firestore(),'campaigns/c/members/alice'),{gmUid:'gm',membershipId:'alice-membership',inviteToken:''}));
+});
 test('invitations require explicit joining, expire after seven days, and revoke immediately',async()=>{
  const d=db('gm'),now=Timestamp.now();
  const invitation={campaignId:'c',gmUid:'gm',createdAt:Timestamp.fromMillis(now.toMillis()-1000),expiresAt:Timestamp.fromMillis(now.toMillis()+7*86400000-1000)};

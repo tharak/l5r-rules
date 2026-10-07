@@ -61,6 +61,21 @@ test('membership loss and sign-out clear shared caches; denied writes stop retri
  d.receive('campaigns/c',{title:'Campaign'});d.revoke('c');assert.equal(d.api.get('campaigns/c'),undefined);
  d.receive('campaigns/c',{title:'Campaign'});d.api.connect(null,null);assert.equal(d.api.get('campaigns/c'),undefined);assert.equal(d.storage.get('l5r-rules-account-gm-campaign-cache-v1'),undefined);
 });
+test('reload withholds cached text from other authors until privacy is confirmed',()=>{
+ const storage=new Map([['l5r-rules-account-bob-campaign-cache-v1',JSON.stringify({
+  'campaigns/c':{title:'Campaign'},
+  'campaigns/c/plots/p':{creatorUid:'alice',public:true,text:'formerly public'},
+  'campaigns/c/notes/n':{creatorUid:'alice',public:true,text:'formerly public note'},
+  'campaigns/c/notes/own':{creatorUid:'bob',public:false,text:'own draft'}
+ })]]);
+ const d=campaigns(storage);d.connect('bob');
+ assert.equal(d.api.get('campaigns/c/plots/p'),undefined);
+ assert.equal(d.api.get('campaigns/c/notes/n'),undefined);
+ assert.equal(d.api.get('campaigns/c/notes/own').text,'own draft');
+ d.index(['c']);d.receive('campaigns/c/plots/p',{creatorUid:'alice',public:true,text:'confirmed public'});
+ assert.equal(d.api.get('campaigns/c/plots/p').text,'confirmed public');
+ d.receive('campaigns/c/plots/p',null);assert.equal(d.api.get('campaigns/c/plots/p'),undefined);
+});
 test('built web content has no source branding or source links and omits repository attribution',()=>{
  const data=JSON.parse(fs.readFileSync('public/wiki.json','utf8'));
  assert.equal(data.site,'l5r-rules');

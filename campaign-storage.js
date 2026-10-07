@@ -59,6 +59,8 @@
     // Shared data is only cached while this account is active.
     if (uid && uid !== accountId) localStorage.removeItem(key('cache'));
     uid = accountId; adapter = backend; running = false; ready = false; cache = uid ? read(key('cache'),{}) : {};
+    // A previously public entry may now be private. Restore other authors only after access is confirmed.
+    for (const [path,data] of Object.entries(cache)) if (/\/((plots)|(notes))\//.test(path) && data.creatorUid !== uid) delete cache[path];
     outbox = uid ? read(key('pending'),{}) : {};
     for (const [path,change] of Object.entries(outbox)) { if (change.data === null) delete cache[path]; else cache[path] = change.data; }
     status = uid ? 'Loading campaigns…' : 'Sign in with Google to use shared campaigns.';

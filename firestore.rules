@@ -146,6 +146,66 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/users/$(request.auth.uid)/characters/$(request.resource.data.characterId));
         allow delete: if gm(c) || (joined(c) && resource.data.ownerUid == request.auth.uid);
       }
+      match /{kind}/{id} {
+        function entryKind() { return kind in ['plots','notes']; }
+        function targetReadable(m) {
+          return kind == 'plots' || (m.targetKind in ['sessions','pcs','npcs','plots']
+            && exists(/databases/$(database)/documents/campaigns/$(c)/$(m.targetKind)/$(m.targetId))
+            && (m.targetKind != 'npcs' || gm(c))
+            && (m.targetKind != 'plots' || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == m.targetCreatorUid)
+            && (m.targetKind != 'plots'
+              || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.public
+              || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == request.auth.uid || gm(c)));
+        }
+        function validMetadata() {
+          let m = request.resource.data;
+          let body = getAfter(/databases/$(database)/documents/campaigns/$(c)/$(kind)/$(id)/content/body).data;
+          return m.keys().hasAll(['creatorUid','public','createdAt','updatedAt','revision'])
+            && m.keys().hasOnly(kind == 'plots'
+              ? ['creatorUid','public','createdAt','updatedAt','revision']
+              : ['creatorUid','public','createdAt','updatedAt','revision','targetKind','targetId','targetCreatorUid'])
+            && m.creatorUid == request.auth.uid && m.public is bool
+            && m.createdAt is string && m.createdAt.size() <= 40
+            && m.updatedAt is string && m.updatedAt.size() <= 40
+            && m.revision is string && m.revision.size() > 0 && m.revision.size() <= 80
+            && body.revision == m.revision
+            && (kind == 'plots' || (m.targetKind is string && m.targetId is string && m.targetId.size() > 0 && m.targetId.size() <= 80))
+            && (kind == 'plots' || (m.targetKind == 'plots'
+              ? (m.targetCreatorUid is string && m.targetCreatorUid.size() > 0 && m.targetCreatorUid.size() <= 128)
+              : !('targetCreatorUid' in m)))
+            && targetReadable(m);
+        }
+        function parentOwner(m) {
+          return kind == 'notes' && (
+            (m.targetKind == 'plots' && get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == request.auth.uid)
+            || (m.targetKind == 'pcs' && get(/databases/$(database)/documents/campaigns/$(c)/pcs/$(m.targetId)).data.ownerUid == request.auth.uid));
+        }
+        // Only ownership, visibility, and attachment metadata are shared. Text lives in protected bodies.
+        allow read: if entryKind() && joined(c);
+        allow create: if entryKind() && joined(c) && validMetadata();
+        allow update: if entryKind() && joined(c) && resource.data.creatorUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['public','updatedAt','revision']) && validMetadata();
+        allow delete: if entryKind() && joined(c) && (resource.data.creatorUid == request.auth.uid || gm(c) || parentOwner(resource.data))
+          && !existsAfter(/databases/$(database)/documents/campaigns/$(c)/$(kind)/$(id)/content/body);
+        match /content/{bodyId} {
+          function metadata() { return get(/databases/$(database)/documents/campaigns/$(c)/$(kind)/$(id)).data; }
+          function validBody() {
+            let m = getAfter(/databases/$(database)/documents/campaigns/$(c)/$(kind)/$(id)).data;
+            let b = request.resource.data;
+            return m.creatorUid == request.auth.uid && targetReadable(m)
+              && b.keys().hasAll(kind == 'plots' ? ['title','text','revision'] : ['text','revision'])
+              && b.keys().hasOnly(kind == 'plots' ? ['title','text','revision'] : ['text','revision'])
+              && b.text is string && b.text.size() > 0 && b.text.size() <= 400000
+              && b.revision == m.revision
+              && (kind != 'plots' || (b.title is string && b.title.size() > 0 && b.title.size() <= 200));
+          }
+          allow get: if entryKind() && bodyId == 'body' && joined(c) && targetReadable(metadata())
+            && (metadata().public || metadata().creatorUid == request.auth.uid || gm(c));
+          allow create, update: if entryKind() && bodyId == 'body' && joined(c) && validBody();
+          allow delete: if entryKind() && bodyId == 'body' && joined(c)
+            && (metadata().creatorUid == request.auth.uid || gm(c) || parentOwner(metadata()));
+        }
+      }
       match /private/{id} {
         allow read: if gm(c);
         allow create, update: if gm(c) && id == 'invitation' && request.resource.data.keys().hasOnly(['token'])

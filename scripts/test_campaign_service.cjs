@@ -66,3 +66,51 @@ test('campaign service CRUD, invitation replacement, linking, editing, leaving a
   assert.equal(await gm.get('users/gm/campaigns/'+c),null);
  } finally {stop?.();await env.cleanup();delete global.window;}
 });
+test('plot and note subscriptions revoke private content and campaign deletion removes every body',{timeout:20000},async()=>{
+ const env=await initializeTestEnvironment({projectId:'demo-l5r-rules-entry-service-tests',firestore:{host:'127.0.0.1',port:8080,rules:fs.readFileSync('firestore.rules','utf8')}});
+ const {createCampaignBackend}=await import('../campaign-service.js');
+ const backends=Object.fromEntries(['gm','alice','bob'].map(u=>[u,createCampaignBackend(env.authenticatedContext(u).firestore(),sdk,u,u)]));
+ const {gm,alice,bob}=backends;
+ const caches={gm:new Map(),bob:new Map()},errors=[],stops=[];
+ const until=async check=>{for(let i=0;i<150;i++){if(check())return;await new Promise(r=>setTimeout(r,20));}throw Error('Subscription did not reach expected state: '+JSON.stringify({gm:[...caches.gm.keys()],bob:[...caches.bob.keys()],errors:errors.map(e=>e.message)}));};
+ const entry=(creatorUid,isPublic,text,extra={})=>({creatorUid,public:isPublic,text,title:'A plot',createdAt:'now',updatedAt:'now',revision:randomUUID(),...extra});
+ try {
+  await env.clearFirestore();const c=await gm.create('Privacy lifecycle');const token=await gm.invite(c);await alice.join(token);await bob.join(token);
+  for(const u of ['gm','bob'])stops.push(backends[u].subscribe({index(){},receive(path,data){data===null?caches[u].delete(path):caches[u].set(path,data);},revoked(){caches[u].clear();},error(e){errors.push(e);}}));
+  const p=`campaigns/${c}/plots/p`,n=`campaigns/${c}/notes/n`;
+  const privatePlot=entry('alice',false,'PRIVATE PLOT');await alice.write(p,privatePlot);
+  assert.equal((await gm.get(p+'/content/body')).text,'PRIVATE PLOT');
+  await until(()=>caches.gm.get(p)?.text==='PRIVATE PLOT');assert.equal(caches.bob.has(p),false);
+  const publicPlot={...privatePlot,public:true,revision:randomUUID()};await alice.write(p,publicPlot);
+  await until(()=>caches.bob.get(p)?.text==='PRIVATE PLOT');
+  const note=entry('bob',true,'PUBLIC NOTE',{targetKind:'plots',targetId:'p',targetCreatorUid:'alice'});delete note.title;await bob.write(n,note);
+  assert.equal((await bob.get(n+'/content/body')).text,'PUBLIC NOTE');
+  await until(()=>caches.gm.get(n)?.text==='PUBLIC NOTE'&&caches.bob.has(n));
+  await alice.write(p,{...privatePlot,revision:randomUUID()});
+  await until(()=>!caches.bob.has(p)&&!caches.bob.has(n));
+  assert.equal(caches.gm.get(p).text,'PRIVATE PLOT');assert.equal(caches.gm.get(n).text,'PUBLIC NOTE');
+  await assertFails(bob.get(p+'/content/body'));
+  const privateNote=entry('alice',false,'PRIVATE SESSION NOTE',{targetKind:'sessions',targetId:'s'});delete privateNote.title;
+  await gm.write(`campaigns/${c}/sessions/s`,{title:'Session',text:'Public',updatedAt:'now'});
+  await alice.write(`campaigns/${c}/notes/private`,privateNote);
+  await until(()=>caches.gm.get(`campaigns/${c}/notes/private`)?.text==='PRIVATE SESSION NOTE');
+  assert.equal(caches.bob.has(`campaigns/${c}/notes/private`),false);
+  await alice.write(p,null);
+  await env.withSecurityRulesDisabled(async context=>{
+   for(const path of [n,n+'/content/body'])assert.equal((await sdk.getDoc(sdk.doc(context.firestore(),path))).exists(),false);
+  });
+  // Reusing a deleted parent ID must not resurrect another creator's previous notes.
+  await alice.write(p,{...privatePlot,revision:randomUUID()});
+  await until(()=>caches.gm.get(p)?.revision!==privatePlot.revision&&caches.gm.has(p)&&!caches.gm.has(n));
+  await gm.removeMember(c,'bob');await until(()=>caches.bob.size===0);
+  await gm.deleteCampaign(c);
+  await env.withSecurityRulesDisabled(async context=>{
+   const db=context.firestore();
+   for(const path of [p,n,`campaigns/${c}/notes/private`]) {
+    assert.equal((await sdk.getDoc(sdk.doc(db,path))).exists(),false);
+    assert.equal((await sdk.getDoc(sdk.doc(db,path+'/content/body'))).exists(),false);
+   }
+  });
+  assert.deepEqual(errors,[]);
+ } finally {stops.forEach(stop=>stop());await env.cleanup();}
+});
