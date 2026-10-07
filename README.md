@@ -8,6 +8,10 @@ Creating a campaign makes its creator the sole GM. Members link their own person
 
 **View** in the personal Characters list and campaign PC roster opens a read-only sheet with print and JSON export. Owners and the GM see the full sheet; other players see only public sections. Viewing leaves the saved sheet and active editor selection unchanged. **Edit** remains separate for owners and the GM.
 
+Campaign cards show each linked PC as **PC name - Player name**. Owners see their own PC names;
+other viewers see server-confirmed public identity or **Private PC**. Names update live, and
+accounts without a display name use **Player**. Empty campaigns show **No PCs linked yet**.
+
 **Plots** lets every campaign member add plot points. Sessions, linked PCs, NPCs, and plots also support separate attached notes. New plots and notes default to **Private**, visible to their creator and the GM; **Public** makes them readable by campaign members who can access the parent. NPCs and their notes remain GM-only. Only the creator edits the text or changes visibility. Use **Save plot** or **Save note** to save the draft; **Cancel** discards unsaved entry edits. Making a plot private also revokes other players' access to its attached notes. Removing a parent removes its attached notes; the parent owner can delete those bodies without reading another creator's private text. Protected title/text documents are separate from shared metadata; private text never enters an unauthorized player's subscription. Campaign deletion removes all plot/note bodies, including other members' private entries, without reading them.
 
 The GM’s **Invite link** button beside **+PC** creates or reuses a valid invitation and copies it to the clipboard, with a copyable popup when clipboard access is unavailable. Expired links are renewed automatically. **Invite settings** below the PC roster keeps replacement and revocation available. Invite links last seven days; signing in and pressing **Join campaign** is required. Invitations are stored separately from member-readable campaign data.

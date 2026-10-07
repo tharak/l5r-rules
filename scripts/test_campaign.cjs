@@ -82,3 +82,56 @@ test('built web content has no source branding or source links and omits reposit
  for(const page of Object.values(data.pages))assert.doesNotMatch(page.html,/Last Haiku|(?:href|src)=["'][^"']*lasthaiku/i);
  assert.ok(fs.readFileSync('ATTRIBUTION.md','utf8').includes('CC BY-SA 3.0'));
 });
+
+function campaignCards() {
+ const data=new Map(),watches=[],listeners={};let characters=[];
+ const store={uid:'gm',status:'Connected',get:path=>data.get(path),drafts:()=>({}),
+  list:prefix=>[...data].filter(([path])=>path.startsWith(prefix)&&!path.slice(prefix.length).includes('/')).map(([path,value])=>({id:path.slice(prefix.length),...value}))};
+ store.backend={watchSheet:async(campaignId,pcId,full,receive,fail)=>{
+  const item={campaignId,pcId,full,receive,fail,stopped:false};watches.push(item);
+  return ()=>{item.stopped=true;};
+ }};
+ const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
+ const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
+ vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener(){}},location,Event,console,setTimeout});
+ const render=()=>window.CampaignUI.render('campaigns');
+ return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value};
+}
+test('campaign cards display PC - player, escape names, and handle empty and private identities',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/empty',{title:'Empty',gmUid:'gm'});
+ d.data.set('campaigns/c/pcs/own',{ownerUid:'gm',characterId:'own'});
+ d.data.set('campaigns/c/pcs/other',{ownerUid:'alice',characterId:'pc'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});d.data.set('campaigns/c/members/alice',{displayName:'Alice & Bob'});
+ d.setCharacters([{id:'own',name:'Hida <Kenta>'}]);
+ let html=d.render();
+ assert.match(html,/Hida &lt;Kenta&gt; - Game Master/);assert.match(html,/Private PC - Alice &amp; Bob/);assert.match(html,/No PCs linked yet/);
+ assert.equal(d.watches.length,1);assert.equal(d.watches[0].full,false);
+ d.watches[0].receive({sections:{identity:{name:'Doji Rei'}}},null,{fromCache:false});
+ assert.match(d.render(),/Doji Rei - Alice &amp; Bob/);
+ d.data.delete('campaigns/c/members/alice');assert.match(d.render(),/Doji Rei - Player/);
+ d.setCharacters([{id:'own',name:'Hida Renamed'}]);assert.match(d.render(),/Hida Renamed - Game Master/);
+});
+test('campaign card names require server-confirmed public identity and disappear when access is revoked',async()=>{
+ const d=campaignCards();d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'pc'});d.render();
+ const watch=d.watches[0];
+ watch.receive({sections:{identity:{name:'Cached private name'}}},null,{fromCache:true});assert.doesNotMatch(d.render(),/Cached private name/);
+ watch.receive({sections:{identity:{name:'Public name'}}},null,{fromCache:false});assert.match(d.render(),/Public name - Player/);
+ watch.receive({sections:{}},null,{fromCache:false});assert.doesNotMatch(d.render(),/Public name/);
+ watch.receive({sections:{identity:{name:'Pending name'}}},null,{fromCache:false,hasPendingWrites:true});assert.doesNotMatch(d.render(),/Pending name/);
+ watch.receive({sections:{identity:{name:'Public name'}}},null,{fromCache:false});watch.fail({code:'permission-denied'});assert.doesNotMatch(d.render(),/Public name/);
+ assert.equal(d.watches.length,1);
+});
+test('campaign cards share subscriptions, move to surviving associations, and reject stale callbacks after account changes',async()=>{
+ const d=campaignCards();
+ for(const c of ['one','two']){d.data.set('campaigns/'+c,{title:c,gmUid:'gm'});d.data.set('campaigns/'+c+'/pcs/p',{ownerUid:'alice',characterId:'pc'});}
+ d.render();await Promise.resolve();assert.equal(d.watches.length,1);
+ const first=d.watches[0];first.receive({sections:{identity:{name:'Shared'}}},null,{fromCache:false});assert.equal((d.render().match(/Shared - Player/g)||[]).length,2);
+ d.data.delete('campaigns/one');d.data.delete('campaigns/one/pcs/p');d.render();await Promise.resolve();assert.equal(first.stopped,true);assert.equal(d.watches.length,2);assert.equal(d.watches[1].campaignId,'two');
+ first.receive({sections:{identity:{name:'Stale first campaign'}}},null,{fromCache:false});assert.doesNotMatch(d.render(),/Stale first campaign/);
+ const second=d.watches[1];second.receive({sections:{identity:{name:'Surviving'}}},null,{fromCache:false});assert.match(d.render(),/Surviving/);
+ d.store.uid='bob';d.render();await Promise.resolve();assert.equal(second.stopped,true);assert.doesNotMatch(d.render(),/Surviving/);
+ second.receive({sections:{identity:{name:'Old account secret'}}},null,{fromCache:false});assert.doesNotMatch(d.render(),/Old account secret/);
+ d.location.hash='#/characters';d.listeners.hashchange();await Promise.resolve();assert.equal(d.watches[2].stopped,true);
+ d.store.uid=null;d.store.backend=null;assert.doesNotMatch(d.render(),/campaign-card-pcs/);
+});

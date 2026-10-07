@@ -296,9 +296,9 @@ $('#app').addEventListener('click', async event => {
   }
 });
 window.addEventListener('characters-changed', () => { if (state.data && (currentSlug() === 'characters'||currentSlug().startsWith('characters/'))) render();
-  else if (state.data && (currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
+  else if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('campaigns-changed', () => { if (state.data && /^(campaigns|invite\/)/.test(currentSlug())) window.CampaignUI.refresh(render); });
-window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
+window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('hashchange', () => {if(rulesDialog?.open)rulesDialog.close();render();});
 document.addEventListener('keydown', event => {
   if(rulesDialog?.open)return;

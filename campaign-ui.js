@@ -5,6 +5,7 @@
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
   const sheets = new Map(), stops = new Map();
   const views = new Map();
+  const cardSheets = new Map();
   let sheetMode = 'view';
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
   const button = (action,text,id='',disabled=false) => `<button type="button" data-campaign="${action}" data-id="${e(id)}" ${busy||disabled?'disabled':''}>${text}</button>`;
@@ -14,6 +15,49 @@
   const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
+  const cardKey = pc => `${pc.ownerUid}/${pc.characterId}`;
+  function clearCardSheets() {
+    for (const item of cardSheets.values()) item.stop?.();
+    cardSheets.clear();
+  }
+  function watchCardSheets(campaigns) {
+    const backend = store().backend, uid = store().uid, wanted = new Map();
+    for (const campaign of campaigns) for (const pc of store().list(`campaigns/${campaign.id}/pcs/`)) {
+      if (!own(pc) && !wanted.has(cardKey(pc))) wanted.set(cardKey(pc), {campaignId:campaign.id,pcId:pc.id});
+    }
+    for (const [key,item] of cardSheets) {
+      const reference = wanted.get(key);
+      if (!reference || reference.campaignId !== item.campaignId || reference.pcId !== item.pcId || item.backend !== backend) {
+        item.stop?.(); cardSheets.delete(key);
+      }
+    }
+    if (!backend) return;
+    for (const [key,reference] of wanted) {
+      if (cardSheets.has(key)) continue;
+      const item = {...reference,backend,name:'',stop:null};
+      cardSheets.set(key,item);
+      const current = () => cardSheets.get(key) === item && store().uid === uid && store().backend === backend;
+      // Share one public subscription across cards and keep only the name in memory.
+      const receive = (data,pc,metadata) => {
+        if (!current()) return;
+        const name = metadata?.fromCache || metadata?.hasPendingWrites ? '' : data?.sections?.identity?.name || '';
+        if (item.name !== name) {item.name=name;changed();}
+      };
+      const fail = () => {if (current()) {item.name='';changed();}};
+      backend.watchSheet(item.campaignId,item.pcId,false,receive,fail).then(stop=>{
+        if (current()) item.stop=stop; else stop();
+      }).catch(fail);
+    }
+  }
+  function campaignCard(campaign) {
+    const pcs = store().list(`campaigns/${campaign.id}/pcs/`);
+    const names = pcs.map(pc=>{
+      const name = own(pc) ? window.CharacterBuilder.list().find(c=>c.id===pc.characterId)?.name : cardSheets.get(cardKey(pc))?.name;
+      const player = store().get(`campaigns/${campaign.id}/members/${pc.ownerUid}`)?.displayName || 'Player';
+      return `<li>${e(name || 'Private PC')} - ${e(player)}</li>`;
+    }).join('');
+    return `<a class="panel campaign-card" href="#/campaigns/${e(campaign.id)}"><h2>${e(campaign.title)}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:'<p class="campaign-card-empty">No PCs linked yet.</p>'}</a>`;
+  }
   function reset(next) {
     if (next === active) return;
     watchGeneration++;
@@ -86,7 +130,8 @@
   }
   function render(slug) {
     renderAgain ||= () => {};
-    if (accountUid !== store().uid) { active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
+    if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
+    if (slug !== 'campaigns') clearCardSheets();
     if (!store().uid) { reset(''); return `<div class="workspace"><h1>Campaigns</h1><p>Use Account in the top right to sign in and create or join shared campaigns.</p><p><a href="#/characters">Open device characters</a></p></div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
@@ -99,7 +144,9 @@
     }
     if (slug === 'campaigns') {
       reset('');
-      return `<div class="workspace"><div class="workspace-head"><h1>Campaigns</h1>${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${store().list('campaigns/').map(c=>`<a class="panel" href="#/campaigns/${e(c.id)}"><h2>${e(c.title)}</h2><p>${c.gmUid===store().uid?'GM':'Player'}</p></a>`).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? `<details><summary>Retained drafts</summary>${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}</details>` : ''}</div>`;
+      const campaigns = store().list('campaigns/');
+      watchCardSheets(campaigns);
+      return `<div class="workspace"><div class="workspace-head"><h1>Campaigns</h1>${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? `<details><summary>Retained drafts</summary>${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}</details>` : ''}</div>`;
     }
     reset(slug.slice('campaigns/'.length));
     const c = store().get(`campaigns/${active}`);
@@ -293,6 +340,6 @@ ${e(n.notes)}</textarea></label>${button('npc-save','Save NPC','',!n.name.trim()
     if (event.relatedTarget?.closest('[data-campaign]') || (event.target.dataset.campaignField?.startsWith('npc-') && npcDraft)) return;
     if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
   });
-  window.addEventListener('hashchange',()=>{if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/campaigns/'+creatorCampaign))creatorCampaign=null;});
+  window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/campaigns/'+creatorCampaign))creatorCampaign=null;});
   window.CampaignUI={render,refresh,mountEditor,creatorReturn:()=>creatorCampaign?'#/campaigns/'+creatorCampaign:null};
 })();

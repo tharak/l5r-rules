@@ -207,7 +207,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       const member = await get(memberPath(c));
       if (pc.ownerUid !== uid) await commit([[`users/${pc.ownerUid}/characters/${pc.characterId}/grants/${full?'full_':'public_'}${uid}`,{campaignId:c,pcId,membershipId:member.membershipId}]]);
       const path = `users/${pc.ownerUid}/${full?'characters':'publicCharacters'}/${pc.characterId}`;
-      return sdk.onSnapshot(ref(path),s=>receive(s.exists()?s.data():null,pc),fail);
+      return sdk.onSnapshot(ref(path),{includeMetadataChanges:true},s=>receive(s.exists()?s.data():null,pc,s.metadata),fail);
     }
   };
 }
