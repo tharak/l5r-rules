@@ -250,7 +250,7 @@ for slug, group in (("high-skills", "High"), ("bugei-skills", "Bugei"),
 
 
 def point_choices(label):
-    match = re.search(r"\((\d+(?:\s*/\s*\d+)*)\s+Points?\)", label, re.I)
+    match = re.search(r"[\[(][^\d\])]*(\d+(?:\s*/\s*\d+)*)\s+Points?\b", label, re.I)
     return [int(number) for number in re.findall(r"\d+", match.group(1))] if match else []
 
 

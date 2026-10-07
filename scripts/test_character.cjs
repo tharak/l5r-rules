@@ -378,3 +378,18 @@ test('specific outfit dropdowns restrict armor and weapon categories and retain 
   const restored=await c.reload();
   assert.match(equipmentSelect(restored,weaponIndex),/<option value="Family heirloom weapon" selected>/);
 });
+
+test('the options menu and added Greedy show the Mantis price without a false price blocker',async()=>{
+ const c=await character();c.school('Mantis','Yoritomo Courtier');
+ assert.match(sectionHtml(c,'options'),/<option value="Greedy"[^>]*>Greedy · 4 XP<\/option>/);
+ c.inputs['#disadvantage-select']={value:'Greedy'};c.click({action:'add-disadvantage'});
+ let d=(await c.data()).derived;assert.equal(d.disadvantages[0].cost,4);
+ assert.match(sectionHtml(c,'options'),/<output[^>]*aria-label="Greedy point cost">4<\/output>/);
+ c.change({kind:'disadvantage',index:'0'},'4');d=(await c.data()).derived;
+ assert.ok(!d.blockers.some(v=>v.code.startsWith('cost:disadvantage:')));
+ c.inputs['#disadvantage-select']={value:'Consumed'};c.click({action:'add-disadvantage'});
+ assert.match(sectionHtml(c,'options'),/<select data-option-detail="disadvantage" data-index="1"/);
+ c.change({optionDetail:'disadvantage',index:'1'},'Determination');
+ assert.equal((await c.data()).derived.disadvantages[1].cost,6);
+ const result=await c.data();assert.ok(!result.derived.blockers.some(v=>v.code==='option-choice:disadvantage:'+result.character.disadvantages[1].id));
+});

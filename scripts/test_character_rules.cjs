@@ -220,3 +220,136 @@ test('explicit price corrections use amounts paid rather than a later quoted dis
  p=change(p,s=>s.clan='Crane');assert.equal(calc(p).advantages[0].cost,3);
  p=change(p,s=>s.advantages[0].customCost=5,'Table corrected the purchase price');assert.equal(calc(p).advantages[0].cost,5);assert.equal(p.progression.history.at(-1).amount,2);
 });
+
+// Price facts cross-checked against the old Swift Resources/Advantages.json and
+// Resources/Disadvantages.json in tharak/LegendOfTheFiveRings. Consumed's Crane
+// price belongs specifically to Perfection, rather than every Shourido variant.
+test('clan, family and discipline prices agree with the old Swift rules data',()=>{
+ const cases=[
+  ["advantages", "Allies", "Crane", 4, 3],
+  ["advantages", "Blackmail", "Scorpion", 4, 3],
+  ["advantages", "Blood of Osano-Wo", "Crab", 4, 3],
+  ["advantages", "Blood of Osano-Wo", "Mantis", 4, 3],
+  ["advantages", "Clear Thinker", "Dragon", 3, 2],
+  ["advantages", "Crab Hands", "Crab", 3, 2],
+  ["advantages", "Crab Hands", "bushi", 3, 2],
+  ["advantages", "Crafty", "Scorpion", 3, 2],
+  ["advantages", "Crafty", "Spider", 3, 2],
+  ["advantages", "Crafty", "ninja", 3, 2],
+  ["advantages", "Dangerous Beauty", "Scorpion", 3, 2],
+  ["advantages", "Daredevil", "Mantis", 3, 2],
+  ["advantages", "Dark Paragon", "Spider", 5, 4],
+  ["advantages", "Darling of the Court", "Courtier", 2, 1],
+  ["advantages", "Elemental Blessing", "Phoenix", 4, 3],
+  ["advantages", "Enlightened", "Dragon", 6, 5],
+  ["advantages", "Enlightened", "monk", 6, 5],
+  ["advantages", "Friend of the Brotherhood", "Dragon", 5, 4],
+  ["advantages", "Friend of the Elements", "Shugenja", 4, 3],
+  ["advantages", "Gaijin Gear", "Mantis", 5, 4],
+  ["advantages", "Gaijin Gear", "Unicorn", 5, 4],
+  ["advantages", "Hands of Stone", "Monk", 6, 5],
+  ["advantages", "Heart of Vengeance", "Spider", 5, 4],
+  ["advantages", "Irreproachable", "Imperial", 2, 1],
+  ["advantages", "Ishiken-Do", "Phoenix", 8, 6],
+  ["advantages", "Large", "Crab", 4, 3],
+  ["advantages", "Leadership", "Lion", 6, 5],
+  ["advantages", "Paragon", "Lion", 7, 6],
+  ["advantages", "Quick", "Ninja", 6, 5],
+  ["advantages", "Read Lips", "Courtier", 4, 3],
+  ["advantages", "Sacrosanct", "Imperial", 4, 3],
+  ["advantages", "Sage", "Phoenix", 4, 3],
+  ["advantages", "Sage", "shugenja", 4, 3],
+  ["advantages", "Silent", "Ninja", 3, 2],
+  ["advantages", "Soul of Artistry", "Crane", 4, 3],
+  ["advantages", "Soul of Artistry", "courtier", 4, 3],
+  ["advantages", "Strength of the Earth", "Bushi", 3, 2],
+  ["advantages", "Tactician", "Lion", 4, 3],
+  ["advantages", "Tactician", "bushi", 4, 3],
+  ["advantages", "Touch of the Spirit Realms", "Shugenja", 5, 4],
+  ["advantages", "Way of the Land", "Unicorn", 2, 1],
+  ["advantages", "Wealthy", "Crane", 1, 1],
+  ["advantages", "Wealthy", "Unicorn", 1, 1],
+  ["advantages", "Wealthy", "Imperial", 1, 1],
+  ["advantages", "Spy Network", "Daidoji", 8, 7],
+  ["advantages", "Spy Network", "Scorpion", 8, 6],
+  ["advantages", "Spy Network", "and Kolat", 8, 5],
+  ["disadvantages", "Antisocial", "Crab", 2, 3],
+  ["disadvantages", "Ascetic", "Dragon", 2, 3],
+  ["disadvantages", "Ascetic", "monk", 2, 3],
+  ["disadvantages", "Bitter Betrothal", "Imperial", 2, 3],
+  ["disadvantages", "Brash", "Lion", 3, 4],
+  ["disadvantages", "Consumed", "Spider", 4, 5],
+  ["disadvantages", "Consumed", "Crane", 5, 6, "Perfection"],
+  ["disadvantages", "Contrary", "Imperial", 3, 4],
+  ["disadvantages", "Contrary", "courtier", 3, 4],
+  ["disadvantages", "Cursed by the Realm", "shugenja", 4, 5],
+  ["disadvantages", "Dark Secret", "ninja", 4, 5],
+  ["disadvantages", "Disturbing Countenance", "Spider", 3, 4],
+  ["disadvantages", "Epilepsy", "Crane", 4, 5],
+  ["disadvantages", "Failure of Bushido", "ninja", 4, 5],
+  ["disadvantages", "Forced Retirement", "monk", 4, 5],
+  ["disadvantages", "Gaijin Name", "Unicorn", 1, 2],
+  ["disadvantages", "Greedy", "Mantis", 3, 4],
+  ["disadvantages", "Idealistic", "Lion", 2, 3],
+  ["disadvantages", "Insensitive", "Scorpion", 2, 3],
+  ["disadvantages", "Obtuse", "Crab", 3, 4],
+  ["disadvantages", "Obtuse", "bushi", 3, 4],
+  ["disadvantages", "Overconfident", "Lion", 3, 4],
+  ["disadvantages", "Overconfident", "Mantis", 3, 4],
+  ["disadvantages", "Permanent Wound", "bushi", 4, 5],
+  ["disadvantages", "Rumormonger", "courtier", 4, 5],
+  ["disadvantages", "Soft-Hearted", "Phoenix", 2, 3],
+  ["disadvantages", "Touch of the Void", "Phoenix", 3, 4],
+  ["disadvantages", "Wrath of the Kami", "shugenja", 3, 4],
+ ];
+ for(const [kind,name,who,baseCost,expected,selection] of cases){
+  const discipline=['Bushi','Courtier','Monk','Ninja','Shugenja'].find(d=>d.toLowerCase()===who.toLowerCase()) || '';
+  const sheet=R.normalize({clan:discipline?'Ronin':who,family:who});
+  assert.equal(R.optionCost({name,baseCost,selection},sheet,{discipline},catalog,kind==='disadvantages'),expected,`${name}: ${who}`);
+ }
+});
+
+test('one adjustment applies once when both clan and discipline qualify, including compound schools',()=>{
+ const s=R.normalize({clan:'Crane'});
+ assert.equal(R.optionCost({name:'Allies',baseCost:4},s,{discipline:'Courtier'},catalog),3);
+ assert.equal(R.optionCost({name:'Soul of Artistry',baseCost:4},s,{discipline:'Courtier'},catalog),3);
+ s.clan='Spider';assert.equal(R.optionCost({name:'Crafty',baseCost:3},s,{discipline:'Ninja'},catalog),2);
+ s.clan='Crab';assert.equal(R.optionCost({name:'Antisocial',baseCost:4},s,{discipline:'Bushi'},catalog,true),5);
+ s.clan='Crane';assert.equal(R.optionCost({name:'Crab Hands',baseCost:3},s,{discipline:'Artisan, Bushi'},catalog),2);
+});
+
+test('supplemental label prices, per-rank discounts, and monk affiliations use the printed context',()=>{
+ const s=R.normalize({clan:'Spider'});
+ assert.equal(R.optionCost({name:'Stolen Identity',baseCost:6},s,null,catalog),5);
+ assert.equal(R.optionCost({name:'Student of Shourido',baseCost:9},s,null,catalog),6);
+ s.clan='Crane';assert.equal(R.optionCost({name:'Stolen Identity',baseCost:6},s,null,catalog),6);
+ assert.equal(R.optionCost({name:'Wealthy',baseCost:5},s,null,catalog),4);
+ assert.equal(R.optionCost({name:'Wealthy',baseCost:1},s,null,catalog),1);
+ assert.equal(R.optionCost({name:'Well-Connected',baseCost:6},s,{discipline:'Courtier'},catalog),5);
+ assert.equal(R.optionCost({name:'Sage of the Sword and Fan',baseCost:7},s,{discipline:'Courtier'},catalog),6);
+ assert.equal(R.optionCost({name:'Debt',baseCost:4},s,{discipline:'Courtier'},catalog,true),5);
+ assert.equal(R.optionCost({name:'Uncentered',baseCost:2},s,{discipline:'Monk',brotherhood:false},catalog,true),2);
+ s.clan='Brotherhood of Shinsei';assert.equal(R.optionCost({name:'Uncentered',baseCost:2},s,{discipline:'Monk',brotherhood:true},catalog,true),4);
+});
+
+test('Consumed has variant prices and the Crane bonus applies only to Perfection',()=>{
+ const s=R.normalize({clan:'Crane'});
+ assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Control'},s,null,catalog,true),4);
+ assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Perfection'},s,null,catalog,true),6);
+ s.clan='Spider';assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Perfection'},s,null,catalog,true),6);
+ assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Determination'},s,null,catalog,true),7);
+ s.clan='Crab';assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Perfection'},s,null,catalog,true),5);
+});
+
+test('a legitimate Greedy Mantis price has no price blocker and advancement retains paid amounts',()=>{
+ const s=starting('Mantis','Yoritomo Courtier');s.disadvantages=[{id:'greedy',name:'Greedy',baseCost:3,customCost:4}];
+ let d=calc(s);assert.equal(d.disadvantages[0].cost,4);assert.equal(d.xpEarned,4);
+ assert.ok(!d.blockers.some(v=>v.code==='cost:disadvantage:greedy'));
+ delete s.disadvantages[0].customCost;const p=play(s);
+ const changed=change(p,next=>next.clan='Crab');d=calc(changed);
+ assert.equal(changed.progression.baseline.disadvantageCosts.greedy,4);
+ assert.equal(d.xpEarned,4);
+ const bought=R.buyOff(changed,0,catalog,'GM approved buyoff');assert.equal(bought.progression.history.at(-1).amount,4);
+ const legacy=R.normalize({clan:'Mantis',disadvantages:[{name:'Greedy',cost:3}]});
+ assert.equal(calc(legacy).disadvantages[0].cost,3);
+});

@@ -22,7 +22,9 @@ Each PC has seven **Public** checkboxes. Identity starts public; the other secti
 
 New and legacy sheets start in **Creation** with 40 XP by default; **Starting XP** in the compact totals bar changes the budget. Free family/school benefits, skills, emphases, outfit, and ability choices recalculate while creating a character. Required school choices appear directly in Skills or Abilities, with missing choices and eligibility messages in the relevant section. Incomplete drafts remain saveable; **Begin play** requires completing the highlighted choices. Previously saved table approvals remain attached to their sheets. Character rule links open in a popup, including its internal references, without navigating away from the editor.
 
-Skill rows use a light Ring tint matching their selected roll trait. Rank and advantage/disadvantage cost controls use large **− / value / +** buttons with a read-only value; **Starting XP** stays directly editable.
+Skill rows use a light Ring tint matching their selected roll trait. Advantage and disadvantage prices use printed clan, family, and school-discipline adjustments; the selection list and XP totals show the applicable price. Consumed has a variant dropdown, including the Crane Perfection adjustment.
+
+Rank and advantage/disadvantage cost controls use large **− / value / +** buttons with a read-only value; **Starting XP** stays directly editable.
 
 Each section has a **Reset** button beside its title during Creation. It clears that section’s inputs and associated exceptions, recalculates school grants, and preserves the character ID and privacy settings. This helps clear previous purchases and selections after changing clan or school. The confirmation lists the fields that will be reset; Advancement hides these buttons to preserve paid-cost history.
 

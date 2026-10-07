@@ -33,6 +33,7 @@
   const has = (s,name) => s.advantages.some(a => a.name.toLowerCase() === name.toLowerCase());
   const flaw = (s,name) => s.disadvantages.some(a => a.name.toLowerCase() === name.toLowerCase());
   const waived = (s,code) => s.exceptions.some(e => (e.code === code || e.code === '*') && String(e.explanation || '').trim());
+  const optionVariants={Consumed:{Control:4,Determination:6,Insight:4,Knowledge:4,Perfection:5,Strength:5,Will:4}};
   function optionCost(entry, s, school, catalog, disadvantage = false) {
     if (entry.free) return 0;
     if (entry.customCost != null) return positive(entry.customCost);
@@ -41,14 +42,34 @@
     const list = disadvantage ? catalog.disadvantages : catalog.advantages;
     const rule = list.find(a => a.name === entry.name), text = rule?.description || '';
     let cost = positive(entry.baseCost);
-    const context = [s.clan,school?.discipline].filter(Boolean);
-    for (const who of context) {
-      const specific = text.match(new RegExp(`\\b${who} (?:characters|samurai|bushi|shugenja)[^.]*?(?:purchase|gain|worth)[^.]*?(?:for |additional |extra )(\\d+) (?:points?|point)`, 'i'));
-      if (specific && !/additional|extra/i.test(specific[0]) && !/points? less/i.test(text.slice(specific.index,specific.index+specific[0].length+12))) cost = Math.min(cost,number(specific[1]));
-      const reduction = text.match(new RegExp(`\\b${who} (?:characters|samurai|bushi|shugenja)[^.]*?(\\d+) points? less`, 'i'));
-      if (reduction) cost = Math.max(1,cost-number(reduction[1]));
-      if (disadvantage && new RegExp(`\\b${who}[^.]*?(?:additional|extra) point`, 'i').test(text)) cost += 1;
+    const variant=Object.keys(optionVariants[entry.name] || {}).find(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase());
+    if(variant)cost=optionVariants[entry.name][variant];
+    if(entry.name==='Consumed' && variant==='Perfection' && s.clan==='Crane')cost=6;
+    const context = [s.clan,s.family,...(school?.discipline || '').split(/,\s*/)].filter(Boolean);
+    if(school?.discipline==='Monk')context.push(school.brotherhood?'Brotherhood Monks':'Clan Monks');
+    if(/Henshin/i.test(school?.name || ''))context.push('Henshin');
+    if(s.ancestors?.length)context.push('Characters With Ancestors');
+    const applies=subject=>context.some(who=>(who!=='Monk' || !/\b(?:Clan|Brotherhood) Monks?\b/i.test(subject)) && new RegExp(`\\b${who.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}s?\\b`,'i').test(subject));
+    const points=value=>value.toLowerCase()==='one'?1:number(value);
+    // The Swift resources and local rules use both subject-first discounts and
+    // price-first disadvantage grants. Match a whole clause once so clan and
+    // discipline eligibility do not stack the same adjustment.
+    const fixed=[], reductions=[], bonuses=[];
+    if(disadvantage) {
+      for(const m of text.matchAll(/worth (\d+|one)\s+(?:(additional|extra)\s+)?points?\s+(?:to|for)\s+([^.;]+)/gi))if(applies(m[3])) {
+        (m[2]?bonuses:fixed).push(points(m[1]));
+      }
+    } else {
+      for(const m of text.matchAll(/([a-z][a-z ,]*?)\s+may purchase (?:this Advantage|it) for (\d+|one) points?(\s+less)?/gi))if(applies(m[1])) {
+        (m[3]?reductions:fixed).push(points(m[2]));
+      }
+      for(const m of text.matchAll(/costs (\d+|one) less points? for ([^.;]+)/gi))if(applies(m[2]))reductions.push(points(m[1]));
     }
+    // Some supplemental entries put contextual prices directly in their label.
+    for(const m of (rule?.label || '').matchAll(/(\d+)\s+(?:points?\s+)?for ([^,;)]+)/gi))if(applies(m[2]))fixed.push(number(m[1]));
+    if(fixed.length)cost=disadvantage?Math.max(...fixed):Math.min(...fixed);
+    if(reductions.length)cost=Math.max(1,cost-Math.max(...reductions));
+    if(bonuses.length)cost+=Math.max(...bonuses);
     return cost;
   }
   function trainingState(s, school, rank, catalog) {
@@ -365,13 +386,14 @@
       const rule=catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name);
       if(entry.baseCost!=null && entry.customCost!=null && rule?.costs.length===1 && !/rank|varies|variable/i.test(rule.label)) {
         const expected=optionCost({...entry,customCost:null},s,d.school,catalog,kind==='disadvantage');
-        if(s.phase==='creation' && entry.customCost!==expected)issue(`cost:${kind}:${entry.id}`,`${entry.name} costs ${expected} XP here; explain a different table price.`);
+        if(s.phase==='creation' && entry.customCost!==expected)issue(`cost:${kind}:${entry.id}`,`${entry.name} ${kind==='disadvantage'?'grants':'costs'} ${expected} XP for this character.`);
       }
       if(s.phase==='advancement' && !s.progression.baseline?.costItems?.[`${kind}:${entry.id}`] && kind==='advantage') {
         const payment=s.progression.history.find(e=>e.key===`${kind}:${entry.id}` && e.kind==='purchase');
         if(payment && !payment.explanation)issue(`advancement:${kind}:${entry.id}`,`${entry.name}: record table approval for gaining this ${rule?.label.match(/\[([^]]+)\]/)?.[1] || ''} advantage during play.`);
       }
-      if(entry.baseCost!=null && rule?.costs.length===0 && !entry.customCost && !entry.baseCost)issue(`option-choice:${kind}:${entry.id}`,`Set the variable cost and specific choice for ${entry.name}.`);
+      if(optionVariants[entry.name] && !Object.keys(optionVariants[entry.name]).some(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase()))issue(`option-choice:${kind}:${entry.id}`,`Choose the ${entry.name} variant.`);
+      if(entry.baseCost!=null && rule?.costs.length===0 && !optionVariants[entry.name] && !entry.customCost && !entry.baseCost)issue(`option-choice:${kind}:${entry.id}`,`Set the variable cost and specific choice for ${entry.name}.`);
       if(entry.baseCost!=null && /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) && !String(entry.selection || '').trim())issue(`option-choice:${kind}:${entry.id}`,`Record the skill, rank, person, or specific choice required by ${entry.name}.`);
     }
     for(const a of s.ancestors) {
@@ -481,5 +503,5 @@
     s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
     return s;
   }
-  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems,resetSection};
+  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems,resetSection};
 })();
