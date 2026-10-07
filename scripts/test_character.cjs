@@ -340,3 +340,41 @@ test('legacy approvals remain saved and Imperial family approval lives in Identi
   assert.equal(saved.exceptions.find(e=>e.id==='legacy').explanation,'Existing approval');
   assert.equal(saved.exceptions.find(e=>e.code==='imperial').explanation,'GM approves this Imperial family');
 });
+
+function equipmentSelect(c,index) {
+  const select=sectionHtml(c,'story').match(new RegExp(`<select data-equipment-choice="${index}">([\\s\\S]*?)</select>`));
+  assert.ok(select,`Equipment choice ${index} must be a dropdown`);
+  return select[1];
+}
+
+test('any one weapon outfit choices list catalog weapons and stay free and equippable',async()=>{
+  const c=await character();c.school('Crab','Toritaka Bushi');
+  const choices=equipmentSelect(c,3);
+  assert.match(choices,/<option value="Katana"/);
+  assert.match(choices,/<option value="Tetsubo"/);
+  assert.match(choices,/<option value="Yumi"/);
+  assert.doesNotMatch(choices,/value="Light Armor"|value="Willow Leaf"/);
+  const before=(await c.data()).derived.xpRemaining;
+  c.change({equipmentChoice:'3'},'Tetsubo');
+  const restored=await c.reload(),{derived:d}=await restored.data();
+  const weapon=d.equipment.find(e=>e.key==='school:3');
+  assert.equal(weapon.name,'Tetsubo');assert.equal(weapon.pending,false);
+  assert.equal(weapon.item.kind,'weapon');assert.equal(weapon.source,'school');
+  assert.equal(d.xpRemaining,before);
+  assert.match(equipmentSelect(restored,3),/<option value="Tetsubo" selected>/);
+});
+
+test('specific outfit dropdowns restrict armor and weapon categories and retain legacy choices',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  const {derived:d}=await c.data();
+  const armorIndex=d.school.equipment.findIndex(e=>e.name==='Light or Heavy Armor');
+  const weaponIndex=d.school.equipment.findIndex(e=>e.name==='Heavy Weapon or Polearm');
+  const armor=equipmentSelect(c,armorIndex),weapons=equipmentSelect(c,weaponIndex);
+  assert.match(armor,/value="Light Armor"/);assert.match(armor,/value="Heavy Armor"/);
+  assert.doesNotMatch(armor,/value="Ashigaru Armor"|value="Katana"/);
+  assert.match(weapons,/value="Tetsubo"/);assert.match(weapons,/value="Naginata"/);
+  assert.doesNotMatch(weapons,/value="Katana"|value="Yumi"|value="Light Armor"/);
+  c.change({equipmentChoice:String(weaponIndex)},'Family heirloom weapon');
+  const restored=await c.reload();
+  assert.match(equipmentSelect(restored,weaponIndex),/<option value="Family heirloom weapon" selected>/);
+});

@@ -31,8 +31,8 @@
 .creator-equipment-row strong{display:block;font-size:12px;color:#2e3c31;overflow-wrap:anywhere}
 .creator-equipment-row small{display:block;font-size:10px;color:#687566;margin-top:4px}
 .creator-equipment-row label{display:flex;flex-direction:column;gap:5px;flex:1;color:#526556;font-size:10px;min-width:0}
-.creator-equipment-row input{width:100%;padding:9px 10px;border:1px solid #a4ae9b;background:#f9f8ec;color:#29352d;font-size:12px}
-.creator-equipment-row input:focus{outline:2px solid #81967e;outline-offset:1px}
+.creator-equipment-row input,.creator-equipment-row select{width:100%;padding:9px 10px;border:1px solid #a4ae9b;background:#f9f8ec;color:#29352d;font-size:12px}
+.creator-equipment-row input:focus,.creator-equipment-row select:focus{outline:2px solid #81967e;outline-offset:1px}
 .creator-equipment-row button{border:0;background:transparent;color:#975f4a;font-size:20px;padding:4px 8px}
 .creator-starting-money{padding:10px 13px;background:#dce5d2;border-left:3px solid #7d8b65}
 .creator-training-entry{margin-top:15px}

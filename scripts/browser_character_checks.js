@@ -43,7 +43,7 @@ async page => {
     const school=await p.evaluate(async()=>{const c=await(await fetch('public/character-data.json')).json();return c.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');});
     await p.locator('[data-field="school"]').selectOption(school.slug+'#'+school.anchor);
     await p.locator('[data-choice-index="0"]').fill('Battle');await p.locator('[data-choice-index="0"]').blur();
-    for(const [i,e]of school.equipment.entries())if(e.choice){await p.locator('[data-equipment-choice="'+i+'"]').fill(/armor/i.test(e.name)?'Light Armor':'Tetsubo');await p.locator('[data-equipment-choice="'+i+'"]').blur();}
+    for(const [i,e]of school.equipment.entries())if(e.choice){await p.locator('[data-equipment-choice="'+i+'"]').selectOption(/armor/i.test(e.name)?'Light Armor':'Tetsubo');await p.locator('[data-equipment-choice="'+i+'"]').blur();}
     await p.getByRole('button',{name:'Increase Strength for 16 XP',exact:true}).click();
     await p.locator('[data-action="reset-section"][data-section="traits"]').click();
     check(await p.getByRole('button',{name:'Increase Strength for 16 XP',exact:true}).count()===1,'Traits reset did not retain school/family benefits');

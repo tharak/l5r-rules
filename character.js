@@ -137,8 +137,40 @@
     return Object.entries(data.money).map(([currency, amount]) => `${amount} ${currency}`).join(' · ');
   }
 
+  function schoolEquipmentOptions(prompt) {
+    if(/any\s+2\s+weapons/i.test(prompt))return null;
+    if(/armou?r/i.test(prompt))return catalog.armors.filter(item=>
+      /light/i.test(prompt) && /Light/i.test(item.name) ||
+      /heavy/i.test(prompt) && /Heavy/i.test(item.name) ||
+      /ashigaru/i.test(prompt) && /Ashigaru/i.test(item.name) ||
+      /riding|cavalry/i.test(prompt) && /Riding/i.test(item.name)
+    ).map(item=>item.name);
+    const anyWeapon=/any\s+(?:1|one)\s+(?:other\s+)?weapon/i.test(prompt);
+    const types=[];
+    if(/heavy/i.test(prompt))types.push('Heavy');
+    if(/polearm/i.test(prompt))types.push('Polearm');
+    if(/spear/i.test(prompt))types.push('Spear');
+    if(/war fan/i.test(prompt))types.push('War Fan');
+    if(/bow/i.test(prompt))types.push('Bow');
+    if(/knife|knives/i.test(prompt))types.push('Knives');
+    let names=catalog.weapons.filter(item=>item.type!=='Arrow' && (anyWeapon || types.includes(item.type) || prompt.toLowerCase().includes(item.name.toLowerCase()))).map(item=>item.name);
+    if(/yumi and any 20 arrows/i.test(prompt))names=catalog.weapons.filter(item=>item.type==='Arrow').map(item=>`Yumi with 20 ${item.name} arrows`);
+    else if(/6 Shuriken or Tsubute/i.test(prompt))names=['6 Shuriken','6 Tsubute'];
+    if(/or 2 Knives/i.test(prompt))names.push('2 Knives');
+    return [...new Set(names)].sort((a,b)=>a.localeCompare(b));
+  }
+  function renderEquipmentChoice(data,entry) {
+    const prompt=data.school.equipment[entry.index].name;
+    const selected=sheet.equipmentChoices[entry.index] || '';
+    const choices=schoolEquipmentOptions(prompt);
+    if(!choices?.length)return `<label>${escapeHtml(prompt)}<input data-equipment-choice="${entry.index}" type="text" value="${escapeHtml(selected)}" placeholder="Choose your equipment"></label>`;
+    // Retain older custom choices while offering the catalog for new selections.
+    if(selected && !choices.includes(selected))choices.push(selected);
+    return `<label>${escapeHtml(prompt)}<select data-equipment-choice="${entry.index}">${option('', 'Choose an item', !selected)}${choices.map(name=>option(name,name,name===selected)).join('')}</select></label>`;
+  }
+
   function renderEquipment(data) {
-    const rows = data.equipment.map(entry => `<div class="creator-equipment-row"><div><strong>${escapeHtml(entry.name)}</strong>${entry.item ? `<label class="creator-check"><input type="checkbox" data-equipped="${escapeHtml(entry.key)}" ${entry.equipped ? 'checked' : ''}>Equipped · ${escapeHtml(entry.item.kind)}</label>` : ''}<small>${entry.source === 'school' ? 'School outfit · Free' : 'Personal equipment'}${entry.pending ? ' · Choose an item' : ''}</small></div>${entry.source === 'school' && entry.choice && sheet.phase==='creation' ? `<label>${escapeHtml(data.school.equipment[entry.index].name)}<input data-equipment-choice="${entry.index}" type="text" value="${escapeHtml(sheet.equipmentChoices[entry.index] || '')}" placeholder="Choose your equipment"></label>` : ''}${entry.source === 'personal' ? `<button type="button" data-action="remove-equipment" data-index="${entry.index}" aria-label="Remove ${escapeHtml(entry.name)}">×</button>` : ''}</div>`).join('');
+    const rows = data.equipment.map(entry => `<div class="creator-equipment-row"><div><strong>${escapeHtml(entry.name)}</strong>${entry.item ? `<label class="creator-check"><input type="checkbox" data-equipped="${escapeHtml(entry.key)}" ${entry.equipped ? 'checked' : ''}>Equipped · ${escapeHtml(entry.item.kind)}</label>` : ''}<small>${entry.source === 'school' ? 'School outfit · Free' : 'Personal equipment'}${entry.pending ? ' · Choose an item' : ''}</small></div>${entry.source === 'school' && entry.choice && sheet.phase==='creation' ? renderEquipmentChoice(data,entry) : ''}${entry.source === 'personal' ? `<button type="button" data-action="remove-equipment" data-index="${entry.index}" aria-label="Remove ${escapeHtml(entry.name)}">×</button>` : ''}</div>`).join('');
     return `<div class="creator-purchases creator-equipment" id="creator-equipment"><h3>Equipment</h3><p>Your school outfit is added automatically. Complete any equipment choices and add personal items below.</p>${startingMoney(data) ? `<p class="creator-starting-money"><strong>Starting money:</strong> ${escapeHtml(startingMoney(data))}</p>` : ''}<div class="creator-fields">${['koku','bu','zeni'].map(k=>`<label>${k}<input type="number" min="0" step="1" data-money="${k}" value="${Number(data.money[k]) || 0}"></label>`).join('')}<label>Arrow type<select data-arrow>${catalog.weapons.filter(w=>w.type==='Arrow').map(a=>option(a.id,a.name,sheet.equipped.arrow===a.id)).join('')}</select></label></div>${rows ? `<div class="creator-equipment-list">${rows}</div>` : '<div class="creator-empty">Choose a school to receive your starting outfit.</div>'}<div class="creator-add-row"><input id="new-equipment" list="equipment-suggestions" type="text" placeholder="Equipment name" aria-label="Equipment name"><datalist id="equipment-suggestions">${[...catalog.weapons,...catalog.armors].map(e=>`<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist><button type="button" data-action="add-equipment">Add equipment</button></div></div>`;
   }
 
