@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10191c">
+  <meta name="theme-color" content="#252622">
   <meta name="description" content="Campaigns, characters, and books for Legend of the Five Rings.">
   <title>l5r-rules</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" type="image/svg+xml" href="public/assets/five-rings.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="dashboard.css">
   <link rel="stylesheet" href="account.css">
   <link rel="stylesheet" href="campaign.css">
+  <link rel="stylesheet" href="rokugan-theme.css">
   <script src="character-catalog.js" defer></script>
   <script src="character-rules.js" defer></script>
   <script src="sheet-sharing.js" defer></script>
@@ -31,13 +32,16 @@
   <div class="app-shell">
     <div class="main-column">
       <header class="topbar">
-        <a class="site-brand" href="#/campaigns">l5r-rules</a>
+        <a class="site-brand" href="#/campaigns"><img src="public/assets/five-rings.svg" width="40" height="40" alt=""><span>l5r-rules<small>THE ROKUGAN ARCHIVE</small></span></a>
         <nav id="navigation" aria-label="Site"><a href="#/campaigns">Campaigns</a><a href="#/characters">Characters</a><a href="#/books">Books</a></nav>
         <div class="topbar-actions"><button id="search-button" type="button" aria-label="Search">Search</button><details class="account-menu"><summary>Account</summary><section class="account-panel" aria-label="Account"><p id="account-name">Device characters</p><p id="account-status" role="status">Saved on this device</p><button id="account-sign-in" type="button" disabled>Sign in with Google</button><button id="account-import" type="button" hidden>Copy device characters</button><button id="account-sign-out" type="button" hidden>Sign out</button></section></details></div>
       </header>
+      <section class="setting-banner" aria-label="The Rokugan archive">
+        <div class="setting-banner-copy"><p class="setting-kicker">LEGEND OF THE FIVE RINGS · FOURTH EDITION</p><h2>Chronicles of <em>Rokugan</em></h2><p class="setting-motto">Honor. Duty. Destiny.</p></div>
+      </section>
       <div id="breadcrumb" class="breadcrumb"></div>
       <main id="app" tabindex="-1"><div class="loading">Opening the archive…</div></main>
-      <footer class="site-footer">l5r-rules</footer>
+      <footer class="site-footer"><span>l5r-rules <span aria-hidden="true">·</span> The Rokugan archive</span><span>Air · Earth · Fire · Water · Void</span></footer>
     </div>
   </div>
   <div class="search-overlay" id="search-overlay" hidden>

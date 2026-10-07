@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 320" fill="none">
+  <defs>
+    <linearGradient id="mist" x2="0" y2="1"><stop stop-color="#c9c3ae" stop-opacity="0"/><stop offset="1" stop-color="#e8dcc3" stop-opacity=".65"/></linearGradient>
+  </defs>
+  <circle cx="725" cy="99" r="64" fill="#a84837" opacity=".75"/>
+  <path d="m140 282 166-139 71 56L540 42l114 110 45-35 202 165Z" fill="#7b8072" opacity=".24"/>
+  <path d="m237 291 194-125 47 24 140-102 65 67 54-23 188 159Z" fill="#626c5e" opacity=".35"/>
+  <path d="m449 307 91-84 26 7 45-36 98 61 44-24 135 76Z" fill="#4d5b4d" opacity=".4"/>
+  <path d="M0 294c158-19 304 31 458 5s350-15 542-51v72H0Z" fill="#3d4b3f" opacity=".24"/>
+  <path d="M0 214h1000v106H0Z" fill="url(#mist)"/>
+  <g stroke="#41483a" stroke-linecap="round">
+    <path d="M902 320c-10-72-2-137 24-211m-20 113-49-58m53 30 57-50m-51 14-29-52" stroke-width="9"/>
+    <path d="m876 186-25-29m89 4 35-18m-59 0 2-32" stroke-width="4"/>
+  </g>
+  <g fill="#41483a" opacity=".85">
+    <path d="M837 160c13-27 54-30 67-13-22 6-39 17-67 13Zm50-48c-7-23 13-43 39-37 1 25-19 34-39 37Zm24 20c10-33 55-42 76-21-24 4-44 26-76 21Zm15 21c26-31 60-24 73-8-25 1-36 15-73 8Zm-82 8c-25 1-47-12-48-25 20-10 51 3 48 25Z"/>
+  </g>
+  <g stroke="#4d5346" stroke-width="2" stroke-linecap="round" opacity=".75">
+    <path d="m618 45 8-3 7 3m32 13 6-3 6 3m-94 17 6-2 5 2"/>
+  </g>
+</svg>
