@@ -248,15 +248,18 @@
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
   #creator-traits .rank-control button { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 20px; }
   #creator-traits .rank-control output { min-width: 32px; min-height: 32px; padding-inline: 6px; font-size: 14px; }
-  .creator-lab #creator-traits .creator-ring-grid { grid-template-columns: repeat(4,minmax(min(600px,200%),1fr)) minmax(min(300px,100%),.5fr); }
+  .creator-lab #creator-traits .creator-ring-grid { grid-template-columns: repeat(4,minmax(min(340px,200%),1fr)) minmax(min(170px,100%),.5fr); }
   .creator-lab .creator-ring-traits { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; }
   .creator-lab .creator-ring[data-ring="Void"] .creator-ring-traits { grid-template-columns: 1fr; }
   .creator-lab .creator-ring-trait-column { min-width: 0; }
   .creator-lab .creator-ring-trait-column + .creator-ring-trait-column { border-left: 1px solid var(--line); }
   .creator-lab .creator-ring-skill-list { list-style: none; margin: 0; padding: 0; border: 0; border-radius: 0; color: var(--ink); }
   .creator-lab .creator-ring-skill-list li { padding: 0; border-top: 1px solid var(--line); }
-  .creator-lab .creator-ring-skill-list .creator-skill-label { flex-direction: column; align-items: flex-start; gap: 4px; }
-  .creator-lab .creator-ring-skill-list .creator-skill-label > strong { max-width: 100%; }
+  .creator-lab .creator-skill-row.creator-skill-compact { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 4px 8px; padding: 7px 10px; }
+  .creator-lab .creator-skill-compact strong { font-size: 12px; line-height: 1.4; }
+  .creator-lab .creator-skill-compact .creator-skill-roll { min-width: 0; }
+  .creator-lab .creator-skill-compact .creator-skill-roll strong { font-size: 13px; white-space: nowrap; }
+  .creator-lab .creator-skill-compact .creator-skill-emphases { grid-column: 1/-1; margin: 0; padding: 0; border: 0; background: none; color: var(--jade); font-size: 11px; line-height: 1.4; }
   .creator-page .creator-skill-values { flex: 0 1 auto; min-width: 0; max-width: 100%; }
   .creator-page .creator-skill-fixed-trait { width: auto; min-width: 65px; flex: none; }
   .creator-page .creator-skill-trait-choice { width: auto; min-width: 0; max-width: none; flex: 1 1 180px; }

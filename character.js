@@ -142,7 +142,13 @@
     return experimental() ? `<div class="creator-lab-skill-rank"><small>Rank</small>${control}</div>` : control;
   }
 
+  function renderCompactSkillRow(name,skill) {
+    const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
+    return `<div class="creator-skill-row creator-skill-compact" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><strong class="creator-skill-name">${escapeHtml(name)}</strong><div class="creator-skill-roll" aria-label="${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></div>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${escapeHtml(skill.emphases.join(', '))}</span>` : ''}</div>`;
+  }
+
   function renderSkillRow(name,skill,view = 'skills') {
+    if (experimental() && view === 'rings') return renderCompactSkillRow(name,skill);
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
     return `<div class="creator-skill-row" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><div><div class="creator-skill-label"><strong>${escapeHtml(name)}</strong><small>${skill.base ? `School rank ${skill.base} · Free` : skill.rank ? 'Purchased skill' : 'Untrained · Rank 0'}${skill.cost ? ` · ${skill.cost} XP spent` : ''}${skill.notes ? ` · ${escapeHtml(skill.notes)}` : ''}</small></div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}<button type="button" class="creator-add-emphasis" data-action="open-emphases" data-skill-view="${view}" data-skill="${escapeHtml(name)}" aria-label="Add emphasis for ${escapeHtml(name)}" ${skill.rank?'':'disabled'}>+emphasis</button></div></div>`;
   }
