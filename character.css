@@ -252,6 +252,8 @@
   .creator-lab .creator-ring-traits { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; }
   .creator-lab .creator-ring[data-ring="Void"] .creator-ring-traits { grid-template-columns: 1fr; }
   .creator-lab .creator-ring-trait-column { min-width: 0; }
+  .creator-lab #creator-traits .creator-trait-display { flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; }
+  .creator-lab .creator-trait-display output { color: var(--ink); font: 600 13px var(--sans); }
   .creator-lab .creator-ring-trait-column + .creator-ring-trait-column { border-left: 1px solid var(--line); }
   .creator-lab .creator-ring-skill-list { list-style: none; margin: 0; padding: 0; border: 0; border-radius: 0; color: var(--ink); }
   .creator-lab .creator-ring-skill-list li { padding: 0; border-top: 1px solid var(--line); }
