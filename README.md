@@ -24,7 +24,7 @@ Characters use one editor with 40 starting XP by default. **Starting XP** change
 
 Family and school bonuses appear in their dropdown choices. Required school choices appear directly in Skills or Abilities. Incomplete drafts remain saveable, with missing choices and eligibility messages in the relevant section. Previously saved table approvals remain attached to their sheets. Character rule links open in a popup without navigating away from the editor.
 
-The experimental layout keeps editable Starting XP, XP remaining, Insight, Insight Rank, and School Rank together in the green XP card, with no separate totals bar.
+The experimental layout places the live character record heading, name, and clan/family/school line at the top of the green XP card. Editable Starting XP, XP remaining, Insight, Insight Rank, and School Rank stay together in this card, with no separate totals bar.
 
 The five Ring cards sit side by side and scroll horizontally on narrow screens. In the experimental layout, each Ring’s traits occupy parallel columns with an alphabetical list of skills below each trait, including untrained skills. Multi-trait skills follow their selected roll trait. Fixed skill traits are displayed as text; skills with multiple valid traits use segmented choices. Known specialties use their own fixed trait, while custom skills can choose a trait. **+emphasis** at the end of a trained skill row opens a popup of catalog choices and a custom-entry field. Purchases cost 2 XP and selected emphases use a more readable label.
 
