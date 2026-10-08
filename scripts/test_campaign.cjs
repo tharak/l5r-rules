@@ -84,7 +84,7 @@ test('built web content has no source branding or source links and omits reposit
 });
 
 function campaignCards() {
- const data=new Map(),watches=[],listeners={};let characters=[];
+ const data=new Map(),watches=[],listeners={},documentListeners={};let characters=[];
  const store={uid:'gm',status:'Connected',get:path=>data.get(path),drafts:()=>({}),
   list:prefix=>[...data].filter(([path])=>path.startsWith(prefix)&&!path.slice(prefix.length).includes('/')).map(([path,value])=>({id:path.slice(prefix.length),...value}))};
  store.backend={watchSheet:async(campaignId,pcId,full,receive,fail)=>{
@@ -93,10 +93,27 @@ function campaignCards() {
  }};
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
- vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener(){}},location,Event,console,setTimeout});
+ vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn},location,Event,console,setTimeout});
  const render=()=>window.CampaignUI.render('campaigns');
- return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value};
+ return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value,
+  click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
 }
+test('removing read-only sheets retains campaign editing only for owners and the GM',()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/pcs/alice',{ownerUid:'alice',characterId:'alice-pc'});
+ d.data.set('campaigns/c/pcs/bob',{ownerUid:'bob',characterId:'bob-pc'});
+ d.window.CampaignUI.render('campaigns/c');d.click('section','pcs');
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ assert.equal((render().match(/data-campaign="pc-open"/g)||[]).length,2);
+ assert.doesNotMatch(render(),/pc-view|readonly-sheet/);
+ d.store.uid='alice';
+ render();d.click('section','pcs');
+ assert.equal((render().match(/data-campaign="pc-open"/g)||[]).length,1);
+ d.click('pc-open','bob');assert.doesNotMatch(render(),/id="campaign-editor"/);
+ d.store.uid='other';render();d.click('section','pcs');
+ assert.doesNotMatch(render(),/data-campaign="pc-open"|pc-view|readonly-sheet/);
+});
 test('campaign cards display PC - player, escape names, and handle empty and private identities',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/empty',{title:'Empty',gmUid:'gm'});

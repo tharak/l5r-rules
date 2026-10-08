@@ -27,13 +27,8 @@ async page => {
     await player.evaluate(async({token})=>CampaignStorage.backend.join(token),setup);
     await player.goto('http://127.0.0.1:5000/?emulators#/campaigns/'+setup.c);
     await player.getByRole('button',{name:'PC',exact:true}).click();
-    await player.getByRole('button',{name:'View',exact:true}).click();await player.locator('.shared-sheet h2').waitFor();
+    check(await player.getByRole('button',{name:'View',exact:true}).count()===0,'Removed sheet view remains');
     await player.evaluate(async({c,pcId})=>{window.privacyDocument=null;window.stopPrivacyWatch=await CampaignStorage.backend.watchSheet(c,pcId,false,data=>window.privacyDocument=data,()=>{});},{c:setup.c,pcId});
-    await player.evaluate(()=>{
-      const original=URL.createObjectURL.bind(URL);
-      window.exportCount=0;
-      URL.createObjectURL=blob=>{blob.text().then(text=>{window.exportText=text;window.exportCount++;});return original(blob);};
-    });
     for(let mask=0;mask<128;mask++) {
       const revision=await owner.evaluate(async mask=>{
         maskSheet.visibility=Object.fromEntries(SheetSharing.keys.map((key,i)=>[key,!!(mask&(1<<i))]));
@@ -41,33 +36,15 @@ async page => {
         return (await CampaignStorage.backend.get('users/'+CampaignStorage.uid+'/publicCharacters/'+maskCharacterId)).revision;
       },mask);
       await player.waitForFunction(rev=>window.privacyDocument?.revision===rev,revision);
-      await player.waitForFunction(mask=>{
-        const root=document.querySelector('.shared-sheet');if(!root)return false;
-        return root.querySelectorAll(':scope > section').length===Array.from({length:7},(_,i)=>!!(mask&(1<<i))).filter(Boolean).length;
-      },mask);
-      const visible=await player.locator('.shared-sheet').innerText(),response=await player.evaluate(()=>JSON.stringify(privacyDocument));
+      const response=await player.evaluate(()=>JSON.stringify(privacyDocument));
       const abilities=!!(mask&64),story=!!(mask&16);
-      check(visible.includes('MASK ABILITY')===abilities,'Abilities leaked/absent in view for mask '+mask);
-      check(visible.includes('MASK NOTES')===story,'Notes leaked/absent in view for mask '+mask);
       check(response.includes('MASK ABILITY')===abilities,'Abilities leaked/absent in response for mask '+mask);
-      for(const text of ['PRIVATE APPROVAL EXPLANATION','PRIVATE XP HISTORY'])check(!visible.includes(text)&&!response.includes(text),'Private audit information leaked for mask '+mask);
-      await player.emulateMedia({media:'print'});
-      const print=await player.locator('.shared-sheet').innerText();check(print.includes('MASK ABILITY')===abilities,'Abilities leaked/absent in print for mask '+mask);
-      await player.emulateMedia({media:'screen'});
-      const downloadPromise=mask===0 ? player.waitForEvent('download') : null;
-      await player.getByRole('button',{name:'Export JSON',exact:true}).click();
-      await player.waitForFunction(count=>window.exportCount===count,mask+1);
-      const json=await player.evaluate(()=>window.exportText);
-      if(downloadPromise) {
-        const download=await downloadPromise,stream=await download.createReadStream();let downloaded='';for await(const chunk of stream)downloaded+=chunk;
-        check(downloaded===json,'Downloaded export differs from generated file');
-      }
-      check(json.includes('MASK ABILITY')===abilities,'Abilities leaked/absent in export for mask '+mask);
-      check(json.includes('MASK NOTES')===story,'Notes leaked/absent in export for mask '+mask);
-      check(!json.includes('PRIVATE APPROVAL EXPLANATION')&&!json.includes('PRIVATE XP HISTORY')&&!json.includes('sheetJson'),'Private audit information/full sheet leaked in export for mask '+mask);
+      check(response.includes('MASK NOTES')===story,'Notes leaked/absent in response for mask '+mask);
+      check(!response.includes('sheetJson'),'Full sheet leaked in response for mask '+mask);
+      for(const text of ['PRIVATE APPROVAL EXPLANATION','PRIVATE XP HISTORY'])check(!response.includes(text),'Private audit information leaked for mask '+mask);
     }
     await owner.evaluate(async uid=>CampaignStorage.backend.removeMember(maskCampaign,uid),await player.evaluate(()=>CampaignStorage.uid));
-    await player.waitForFunction(()=>!document.querySelector('.shared-sheet'));
+    await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('Campaign unavailable'));
     await player.evaluate(()=>window.stopPrivacyWatch());
     const denied=await player.evaluate(async({uid,id})=>{
       const sdk=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js');
@@ -83,6 +60,6 @@ async page => {
     },setup);
     check(denied,'Revoked player retained server access to Abilities: '+JSON.stringify(diagnostic));
     check(errors.length===0,'Privacy browser errors: '+errors.join('; '));
-    return 'All 128 privacy masks passed real player responses, live views, print and generated exports, plus downloaded file verification; private history/exceptions excluded and membership revocation enforced.';
+    return 'All 128 privacy masks passed live player responses; private history/exceptions excluded and membership revocation enforced.';
   } finally {await ownerContext.close();await playerContext.close();}
 }

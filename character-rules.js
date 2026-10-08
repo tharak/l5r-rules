@@ -74,7 +74,12 @@
   }
   function trainingState(s, school, rank, catalog) {
     const basic = {id:s.school,rank:1,kind:'basic'};
-    const state = s.phase === 'advancement' ? (s.training.length ? s.training : [basic]) : [basic,...s.training.filter(t=>C.school(t.school || t.id,catalog)?.kind==='path')];
+    let state;
+    if (s.phase === 'advancement') state = s.training.length ? s.training : [basic];
+    else if (s.continuousEditor) {
+      const includesStartingSchool = s.training.some(t=>(t.school || t.id)===s.school);
+      state = includesStartingSchool ? s.training : [basic,...s.training];
+    } else state = [basic,...s.training.filter(t=>C.school(t.school || t.id,catalog)?.kind==='path')];
     const result = [];
     for (const entry of state) {
       const source = C.school(entry.school || entry.id,catalog);
@@ -324,10 +329,10 @@
     if(!d.school)issue('school','Choose a starting school.');
     if(d.school?.nonhuman)issue('nonhuman-system','This legacy sheet uses a nonhuman system. Continue with custom entries and its book reference.');
     if(s.clan==='Imperial')issue('imperial','Imperial families require table approval.');
-    const limit=s.phase==='creation'?4:10;
-    for(const [name,t] of Object.entries(d.traits))if(t.rank>limit)issue(`rank:trait:${name}`,`${name} ${t.rank} exceeds the ${s.phase} limit of ${limit}.`);
+    const limit=s.phase==='creation' && !s.continuousEditor?4:10;
+    for(const [name,t] of Object.entries(d.traits))if(t.rank>limit)issue(`rank:trait:${name}`,`${name} ${t.rank} exceeds the ${s.continuousEditor?'rank':s.phase} limit of ${limit}.`);
     for(const [name,k] of Object.entries(d.skills)) {
-      if(k.rank>limit)issue(`rank:skill:${name}`,`${name} ${k.rank} exceeds the ${s.phase} limit of ${limit}.`);
+      if(k.rank>limit)issue(`rank:skill:${name}`,`${name} ${k.rank} exceeds the ${s.continuousEditor?'rank':s.phase} limit of ${limit}.`);
       const max=Math.min(5,Math.ceil(k.rank/2));
       if(k.emphases.length>max)issue(`emphases:${name}`,`${name} permits ${max} emphasis${max===1?'':'es'} at Rank ${k.rank}, including free emphases.`);
     }
@@ -481,7 +486,7 @@
   }
   function award(input,amount,explanation) {
     const s=normalize(input);
-    if(s.phase!=='advancement' || String(amount).trim()==='' || !Number.isInteger(number(amount)) || !String(explanation).trim())throw new Error('Advancement XP awards or corrections need an integer amount and explanation.');
+    if(String(amount).trim()==='' || !Number.isInteger(number(amount)) || !String(explanation).trim())throw new Error('XP awards or corrections need an integer amount and explanation.');
     s.progression.history.push({id:`award-${Date.now()}-${s.progression.history.length}`,at:new Date().toISOString(),kind:'award',amount:number(amount),label:'XP award / correction',explanation:String(explanation).trim()});
     return s;
   }

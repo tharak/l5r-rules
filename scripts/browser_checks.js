@@ -129,17 +129,9 @@ async page => {
   check(await player.locator('[data-campaign-field="session-text"]').getAttribute('readonly')!==null,'Player can edit sessions');
   await player.getByRole('button',{name:'PC',exact:true}).click();
   check(await player.getByRole('button',{name:'Invite link',exact:true}).count()===0,'Player can create invitations');
-  await player.getByRole('button',{name:'View',exact:true}).click();
-  await player.locator('.shared-sheet h2').waitFor();
-  check(!(await player.locator('.shared-sheet').innerText()).includes('HIDDEN OWNER NOTES')&&!(await player.locator('.shared-sheet').innerText()).includes('HIDDEN OWNER ABILITY'),'Hidden notes or abilities leaked');
-  await player.emulateMedia({media:'print'});
-  check(!(await player.locator('.shared-sheet').innerText()).includes('HIDDEN OWNER NOTES')&&!(await player.locator('.shared-sheet').innerText()).includes('HIDDEN OWNER ABILITY'),'Hidden notes or abilities in print');
-  await player.emulateMedia({media:'screen'});
-  const downloadPromise=player.waitForEvent('download');
-  await player.getByRole('button',{name:'Export JSON',exact:true}).click();
-  const download=await downloadPromise;const stream=await download.createReadStream();let exported='';for await(const b of stream)exported+=b;
-  check(!exported.includes('HIDDEN OWNER NOTES')&&!exported.includes('HIDDEN OWNER ABILITY')&&!exported.includes('sheetJson'),'Full fields leaked in player export');
-  await player.getByRole('button',{name:'Close',exact:true}).click();
+  check(await player.getByRole('button',{name:'View',exact:true}).count()===0,'Removed read-only View action remains');
+  check(await player.getByRole('button',{name:'Edit',exact:true}).count()===0,'Player can edit another owner’s PC');
+  check(!(await player.locator('#app').innerText()).includes('HIDDEN OWNER NOTES')&&!(await player.locator('#app').innerText()).includes('HIDDEN OWNER ABILITY'),'Hidden notes or abilities leaked');
   const ownerPC = await page.evaluate(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').find(pc=>pc.ownerUid===CampaignStorage.uid));
   await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
   await page.locator('[data-public="identity"]').uncheck();
@@ -147,9 +139,6 @@ async page => {
   await page.getByRole('button',{name:'Save PC',exact:true}).click();
   await page.getByRole('heading',{name:'PC roster',exact:true}).waitFor();
   await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('Private PC')&&!document.querySelector('#app').textContent.includes('GM Personal PC'));
-  await player.getByRole('button',{name:'View',exact:true}).click();
-  await player.getByText('This PC has no public sections.',{exact:true}).waitFor();
-  await player.getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
   await page.locator('[data-public="identity"]').check();
   await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
@@ -210,5 +199,5 @@ async page => {
   await page.waitForURL(/#\/campaigns$/);
   check(errors.length===0,'Browser errors: '+errors.join('; '));
   await playerContext.close();
-  return 'Browser checks passed: navigation, books, old articles, mobile, autosave, invites, linking, privacy, print/export, NPCs, GM editing, live updates and leaving.';
+  return 'Browser checks passed: navigation, books, old articles, mobile, autosave, invites, linking, privacy, removed read-only views, NPCs, GM editing, live updates and leaving.';
 }

@@ -8,7 +8,7 @@ async page => {
     await p.locator('[data-field="name"]').waitFor();
     check(await p.locator('[data-public]').count()===7,'Seven section privacy controls missing');
     check(!await p.locator('[data-public="abilities"]').isChecked(),'Abilities default public');
-    check((await p.locator('.creator-overview').innerText()).includes('Creation'),'New character not in Creation');
+    check(await p.getByRole('button',{name:'Begin play',exact:true}).count()===0,'Removed phase switch remains');
     check(await p.getByRole('heading',{name:'Creation review',exact:true}).count()===0,'Creation review card remains');
     check(await p.locator('#creator-summary').count()===1,'Character summary removed');
     check(await p.locator('[data-action="reset-section"]').count()===7,'Creation section reset controls missing');
@@ -31,8 +31,6 @@ async page => {
     await p.locator('[data-action="reset-section"][data-section="story"]').click();
     check(await p.locator('[data-field="notes"]').inputValue()==='','Story reset did not clear inputs');
     check(await p.locator('[data-field="name"]').inputValue()==='Character browser test','Story reset affected Identity');
-    await p.getByRole('button',{name:'Begin play',exact:true}).click();
-    await p.getByRole('alert').waitFor();
     check((await p.locator('#creator-identity .creator-validation').innerText()).includes('Choose a starting school'),'Missing school guidance is not in Identity');
     check(await p.locator('.creator-exceptions,.creator-creation-options').count()===0,'Generic exceptions menu remains');
     await p.getByRole('button',{name:'Save PC',exact:true}).click();
@@ -66,18 +64,24 @@ async page => {
     check(await p.locator('output[data-kind="advantage"]').innerText()==='4','Advantage plus button did not update cost');
     await p.getByRole('button',{name:'Decrease Large cost',exact:true}).click();
     check(await p.locator('output[data-kind="advantage"]').innerText()==='3','Advantage minus button did not restore cost');
-    const skillRow=p.locator('.creator-skill-row').filter({has:p.getByRole('combobox',{name:'Roll trait for Heavy Weapons',exact:true})});
-    check(await skillRow.getAttribute('data-ring')==='Water','Strength skill does not use Water tint');
-    await p.getByRole('combobox',{name:'Roll trait for Heavy Weapons',exact:true}).selectOption('Agility');
-    check(await skillRow.getAttribute('data-ring')==='Fire','Skill tint did not follow selected trait');
-    await p.getByRole('combobox',{name:'Roll trait for Heavy Weapons',exact:true}).selectOption('Strength');
+    const skillRow=p.locator('.creator-skill-row').filter({has:p.getByRole('button',{name:'Add emphasis for Heavy Weapons',exact:true})});
+    check(await skillRow.getAttribute('data-ring')==='Fire','Agility skill does not use Fire tint');
+    check(await skillRow.locator('select').count()===0,'Fixed trait still has a dropdown');
+    await p.locator('#new-skill').fill('Sailing');await p.getByRole('button',{name:'Add skill',exact:true}).click();
+    const sailing=p.getByRole('radiogroup',{name:'Roll trait for Sailing',exact:true});
+    check(await sailing.getByRole('radio').count()===2,'Sailing has incorrect trait options');
+    await sailing.getByRole('radio',{name:'Intelligence',exact:true}).check();
+    check(await sailing.getByRole('radio',{name:'Intelligence',exact:true}).isChecked(),'Segment did not retain trait');
+    await p.getByRole('button',{name:'Decrease Sailing',exact:true}).click();
     await p.getByRole('button',{name:'Increase Reflexes for 12 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Heavy Weapons for 2 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Heavy Weapons for 3 XP',exact:true}).click();
     const heavy=p.locator('.creator-skill-row').filter({has:p.locator('strong').filter({hasText:/^Heavy Weapons$/})});
-    await heavy.locator('summary').click();
-    await p.locator('[data-emphasis-name="Heavy Weapons"]').fill('Tetsubo');
-    await heavy.getByRole('button',{name:'Buy emphasis · 2 XP',exact:true}).click();
+    await heavy.getByRole('button',{name:'Add emphasis for Heavy Weapons',exact:true}).click();
+    await p.getByRole('dialog',{name:'Heavy Weapons · Emphases',exact:true}).waitFor();
+    await p.getByRole('button',{name:'Buy Masakari emphasis for Heavy Weapons',exact:true}).click();
+    await p.keyboard.press('Escape');
+    check((await heavy.locator('.creator-skill-emphases').innerText()).includes('Masakari'),'Purchased emphasis missing from row');
     check(!await p.locator('.creator-validation').count(),'Valid sheet has unresolved creation violations');
     await p.locator('[data-equipped="school:0"]').check();
     const weaponIndex=school.equipment.findIndex(e=>/Heavy Weapon/i.test(e.name));
@@ -107,7 +111,7 @@ async page => {
     await p.getByRole('button',{name:'Add custom ability',exact:true}).click();
     for(const width of [1440,390]) {
       await p.setViewportSize({width,height:900});
-      check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Character editor overflows at '+width);
+      check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Character editor overflows at '+width+': '+JSON.stringify(await p.evaluate(()=>({scroll:document.documentElement.scrollWidth,nodes:[...document.querySelectorAll('main div,main section')].filter(e=>!e.closest('.creator-ring-grid,.creator-nav')&&e.getBoundingClientRect().right>innerWidth+1).slice(0,15).map(e=>({cls:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right}))}))));
       check(await p.locator('[data-action="section"][data-section="abilities"]').isVisible(),'Abilities navigation missing');
       await p.screenshot({path:'output/playwright/character-'+width+'.png',fullPage:true});
       await p.getByRole('link',{name:'Creation rules ↗',exact:true}).click();
@@ -115,15 +119,16 @@ async page => {
       check(await p.evaluate(()=>document.querySelector('.rules-popup').getBoundingClientRect().right<=innerWidth),'Rules popup overflows at '+width);
       await p.getByRole('button',{name:'Close rules',exact:true}).click();
     }
-    await p.getByRole('button',{name:'Begin play',exact:true}).click();
-    check((await p.locator('.creator-overview').innerText()).includes('Advancement'),'Begin play did not transition');
-    check(await p.locator('[data-action="reset-section"]').count()===0,'Section reset controls shown during Advancement');
+    check(await p.locator('#creator-progression').count()===0,'Removed advancement panel remains');
+    if(!await p.locator('#training-school').isVisible())await p.locator('.creator-later-training > summary').click();
+    await p.locator('#training-school').fill('Hida Bushi · basic');
+    await p.getByRole('button',{name:'Add training',exact:true}).click();
     await p.getByRole('button',{name:'Advance Hida Bushi school rank',exact:true}).click();
     check((await p.locator('.creator-overview').innerText()).includes('School Rank 2'),'School rank did not advance');
     await p.getByRole('button',{name:'Decrease Hida Bushi school rank',exact:true}).click();
     check((await p.locator('.creator-overview').innerText()).includes('School Rank 1'),'School rank correction failed');
     await p.locator('#xp-award').fill('100');await p.locator('#xp-reason').fill('PRIVATE HISTORY EXPLANATION');
-    await p.getByRole('button',{name:'Record XP',exact:true}).click();
+    await p.getByRole('button',{name:'Add XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Reflexes for 16 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Reflexes for 20 XP',exact:true}).click();
     check(await p.getByRole('button',{name:'Increase Reflexes for 24 XP',exact:true}).isEnabled(),'Advancement rank still capped at 4');
@@ -131,9 +136,9 @@ async page => {
     const downloadPromise=p.waitForEvent('download');await p.getByRole('button',{name:'Export JSON ↗',exact:true}).click();
     const downloaded=await downloadPromise;const stream=await downloaded.createReadStream();let json='';for await(const part of stream)json+=part;
     const exported=JSON.parse(json);
-    check(exported.character.phase==='advancement','Export phase missing');
+    check(exported.character.continuousEditor===true,'Continuous editor state missing');
     check(exported.character.startingXP===40,'Starting XP not exported');
-    check(exported.character.progression.history.some(e=>e.kind==='refund'&&e.amount===-20),'Refund not recorded at paid cost');
+    check(exported.derived.traits.Reflexes.rank===4,'Trait decrease did not restore Rank 4');
     check(exported.character.progression.history.some(e=>e.explanation==='PRIVATE HISTORY EXPLANATION'),'XP award not retained');
     check(exported.derived.combat.armorTN===30,'Equipped armor not calculated');
     await p.emulateMedia({media:'print'});
@@ -142,9 +147,10 @@ async page => {
     await p.emulateMedia({media:'screen'});
     await p.getByRole('button',{name:'Save PC',exact:true}).click();await p.waitForURL(/#\/characters$/);
     await p.reload();await p.getByRole('button',{name:'Edit',exact:true}).click();
-    check((await p.locator('.creator-overview').innerText()).includes('Advancement'),'Offline phase/history lost on reload');
+    await p.locator('.creator-xp-history > summary').click();
+    check((await p.locator('.creator-xp-history').innerText()).includes('PRIVATE HISTORY EXPLANATION'),'Offline XP history lost on reload');
     check(await p.locator('[data-field="notes"]').inputValue()==='OWNER PRIVATE NOTES\nSecond line','Offline notes lost');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    return 'Character browser checks passed: editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, Begin play, payments/refunds, desktop/mobile, privacy, print/export and reload.';
+    return 'Character browser checks passed: editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, sidebar XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
   } finally {await context.close();}
 }

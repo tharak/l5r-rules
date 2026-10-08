@@ -71,10 +71,17 @@
     const specialtyTrait = Object.entries(entry?.specialtyTraits || {}).find(([name]) => name.toLowerCase() === specialty?.toLowerCase())?.[1];
     return specialtyTrait || entry?.traits?.[0] || '';
   }
+  function skillTraitOptions(name, catalog) {
+    const [category, specialty] = name.split(': ');
+    const entry = catalog.skills.find(skill => skill.name === category);
+    const specialtyTrait = Object.entries(entry?.specialtyTraits || {}).find(([name]) => name.toLowerCase() === specialty?.toLowerCase())?.[1];
+    if (specialtyTrait) return [specialtyTrait];
+    return entry?.traits?.length ? [...entry.traits] : [...TRAIT_NAMES];
+  }
   const schools = catalog => catalog.clans.flatMap(clan => clan.schools);
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WOUND_LEVELS, purchasedRankCost, skillIdentity, allowedSchoolSkill, schoolGrants, skillTrait, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WOUND_LEVELS, purchasedRankCost, skillIdentity, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

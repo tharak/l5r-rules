@@ -60,6 +60,48 @@ test('Save PC preserves personal edits and closes the sheet to Characters',async
   assert.equal(data.character.notes,'Personal notes');
 });
 
+test('the continuous editor adds XP before a school is chosen, persists awards, and permits ranks through 10',async()=>{
+  const c=await character();
+  c.inputs['#xp-award']={value:'500'};
+  c.click({action:'award-xp'});
+  assert.equal((await c.data()).derived.xpRemaining,540);
+  for(let i=0;i<9;i++)c.click({action:'trait',trait:'Strength',delta:'1'});
+  const data=await c.data();
+  assert.equal(data.derived.traits.Strength.rank,10);
+  assert.ok(!data.derived.blockers.some(v=>v.code==='rank:trait:Strength'));
+  const restored=await c.reload(),saved=await restored.data();
+  assert.equal(saved.derived.xpAwards,500);
+  assert.equal(saved.derived.traits.Strength.rank,10);
+  assert.equal(saved.character.progression.history[0].explanation,'XP added from character editor.');
+  restored.inputs['#xp-award']={value:'1.5'};
+  restored.click({action:'award-xp'});
+  assert.equal((await restored.data()).derived.xpAwards,500);
+});
+
+test('catalog emphasis choices charge once, persist, and refund when removed',async()=>{
+  const c=await character();
+  c.inputs['#new-skill']={value:'Heavy Weapons'};c.click({action:'add-skill'});
+  const before=(await c.data()).derived.xpRemaining;
+  c.click({action:'add-emphasis',skill:'Heavy Weapons',emphasis:'Tetsubo'});
+  c.click({action:'add-emphasis',skill:'Heavy Weapons',emphasis:'Tetsubo'});
+  assert.equal((await c.data()).derived.xpRemaining,before-2);
+  const restored=await c.reload();
+  assert.deepEqual((await restored.data()).derived.skills['Heavy Weapons'].emphases,['Tetsubo']);
+  restored.click({action:'remove-emphasis',skill:'Heavy Weapons',index:'0'});
+  assert.equal((await restored.data()).derived.xpRemaining,before);
+});
+
+test('trait choices respect fixed catalog traits and specialties, with choices for varying and custom skills',async()=>{
+  const c=await character(),options=name=>Array.from(c.window.CharacterCatalog.skillTraitOptions(name,catalog));
+  assert.deepEqual(options('Heavy Weapons'),['Agility']);
+  assert.deepEqual(options('Sailing'),['Agility','Intelligence']);
+  assert.deepEqual(options('Ninjutsu'),['Agility','Reflexes']);
+  assert.deepEqual(options('Games: Go'),['Intelligence']);
+  assert.deepEqual(options('Perform: Dance'),['Agility']);
+  assert.equal(options('Craft: Carpentry').length,9);
+  assert.equal(options('Custom skill').length,9);
+});
+
 test('school skill ranks, emphases, trait, honor, outfit and training are free grants', async () => {
   const c = await character(); c.school('Crab','Hida Pragmatist');
   const {derived:d} = await c.data();

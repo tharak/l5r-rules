@@ -126,18 +126,7 @@ function iconFor(title) {
 
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
-  return `<div class="workspace"><div class="workspace-head"><h1>Characters</h1><button data-dashboard="new">Create PC</button></div><div class="character-list">${characters.map(c => `<article class="character-tile"><div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div><div class="character-actions"><button data-dashboard="view" data-id="${esc(c.id)}">View</button><button data-dashboard="open" data-id="${esc(c.id)}">Edit</button><button data-dashboard="remove" data-id="${esc(c.id)}">Delete</button></div></article>`).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
-}
-
-function renderCharacterView(id) {
-  const sheet=window.CharacterBuilder.read(id),target=$('#app'),account=window.CharacterStorage.accountId;
-  const back='<a href="#/characters">← Characters</a>';
-  if(!sheet){target.innerHTML=`<div class="workspace"><h1>Character unavailable</h1>${back}</div>`;return;}
-  target.innerHTML=`<div class="workspace personal-sheet">${back}<div class="loading">Loading character sheet…</div></div>`;
-  window.CharacterSheetView.fromSheet(sheet).then(data=>{
-    if(currentSlug()!=='characters/'+id||account!==window.CharacterStorage.accountId)return;
-    target.innerHTML=`<div class="workspace personal-sheet"><section class="panel shared-sheet readonly-sheet" aria-label="Read-only character sheet"><div class="workspace-head"><h2>${esc(sheet.name||'Unnamed PC')}</h2><div class="sheet-actions"><a href="#/characters">Close</a><button data-dashboard="print-view">Print</button><button data-dashboard="export-view" data-id="${esc(id)}">Export JSON</button></div></div><p class="sheet-mode">Read-only character sheet</p>${window.CharacterSheetView.render(data.sections)}</section></div>`;
-  }).catch(()=>{if(currentSlug()==='characters/'+id&&account===window.CharacterStorage.accountId)target.innerHTML=`<div class="workspace"><h1>Character sheet unavailable</h1>${back}</div>`;});
+  return `<div class="workspace"><div class="workspace-head"><h1>Characters</h1><button data-dashboard="new">Create PC</button></div><div class="character-list">${characters.map(c => `<article class="character-tile"><div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div><div class="character-actions"><button data-dashboard="open" data-id="${esc(c.id)}">Edit</button><button data-dashboard="remove" data-id="${esc(c.id)}">Delete</button></div></article>`).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
 }
 
 function renderArticle(page) {
@@ -223,20 +212,19 @@ function renderDirectory() {
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
+  if (slug.startsWith('characters/')) { location.replace('#/characters'); return; }
   if (slug === 'start') { location.replace('#/campaigns'); return; }
   const page = state.data.pages[slug];
   const campaignRoute = slug === 'campaigns' || slug.startsWith('campaigns/') || slug.startsWith('invite/');
-  const characterView = slug.startsWith('characters/');
   const characterEditor = ['create-character','create-character-lab'].includes(slug);
   document.body.dataset.overview = ['campaigns', 'characters', 'books'].includes(slug);
-  const title = campaignRoute ? 'Campaigns' : characterView ? 'Character sheet' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   $('#app').innerHTML = campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (characterEditor) window.CharacterBuilder.mount($('#app'),null,{layout:slug === 'create-character-lab' ? 'lab' : 'current'});
-  if (characterView) renderCharacterView(slug.slice('characters/'.length));
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
   const fragment = location.hash.split('#').slice(2).join('#');
@@ -282,13 +270,6 @@ $('#app').addEventListener('click', async event => {
   const action = button.dataset.dashboard;
   if (action === 'new') { window.CharacterBuilder.create(); location.hash = pageHref('create-character'); }
   if (action === 'open' && window.CharacterBuilder.open(button.dataset.id)) location.hash = pageHref('create-character');
-  if (action === 'view') location.hash = '#/characters/'+encodeURIComponent(button.dataset.id);
-  if (action === 'print-view') window.print();
-  if (action === 'export-view') {
-    const sheet=window.CharacterBuilder.read(button.dataset.id);if(!sheet)return;
-    const url=URL.createObjectURL(new Blob([JSON.stringify(await window.CharacterSheetView.exportSheet(sheet),null,2)],{type:'application/json'}));
-    const a=document.createElement('a');a.href=url;a.download='l5r-rules-character.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }
   if (action === 'remove') {
     const character = window.CharacterBuilder.list().find(item => item.id === button.dataset.id);
     if (character && window.confirm(`Delete ${character.name || 'this character'}${window.CharacterStorage?.accountId ? ' from your account and synced devices' : ' from this browser'}?`)) {
@@ -296,7 +277,7 @@ $('#app').addEventListener('click', async event => {
     }
   }
 });
-window.addEventListener('characters-changed', () => { if (state.data && (currentSlug() === 'characters'||currentSlug().startsWith('characters/'))) render();
+window.addEventListener('characters-changed', () => { if (state.data && currentSlug() === 'characters') render();
   else if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('campaigns-changed', () => { if (state.data && /^(campaigns|invite\/)/.test(currentSlug())) window.CampaignUI.refresh(render); });
 window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
