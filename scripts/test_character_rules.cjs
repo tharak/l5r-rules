@@ -27,6 +27,21 @@ test('Insight boundaries include 250 and all later ranks; Courtier and Etiquette
  for(const [insight,rank] of [[149,1],[150,2],[174,2],[175,3],[199,3],[200,4],[224,4],[225,5],[249,5],[250,6],[274,6],[275,7],[300,8],[325,9]])assert.equal(R.insightRank(insight),rank);
  const s=R.normalize({skills:{Courtier:3,Etiquette:7}}),d=calc(s);assert.equal(d.insight,123);assert.equal(d.masteryInsight,13);
 });
+test('optional untrained skill display preserves purchases, totals and normal calculations',()=>{
+ const s=starting();s.skills.Defense=3;s.ancestors=[{id:'ancestor-shiba',name:'Shiba',cost:0}];
+ const original=JSON.stringify(s),normal=calc(s);
+ const display=R.calculate(s,catalog,{untrainedSkills:['Defense','Calligraphy','Games: Go','Unknown skill']});
+ assert.equal(normal.skills.Calligraphy,undefined);
+ assert.equal(display.skills.Calligraphy.rank,0);assert.equal(display.skills.Calligraphy.cost,0);
+ assert.equal(display.skills.Calligraphy.roll.notation,'3k3'); // Intelligence 2 plus Shiba's 1k1.
+ assert.equal(display.skills['Games: Go'].trait,'Intelligence');
+ assert.equal(display.skills['Unknown skill'].roll,null);
+ assert.deepEqual(plain(display.skills.Defense),plain(normal.skills.Defense));
+ for(const key of ['insight','insightRank','schoolRank','xpRemaining','xpSpent','creationCost'])assert.equal(display[key],normal[key],key);
+ for(const key of ['costItems','combat','blockers'])assert.deepEqual(plain(display[key]),plain(normal[key]),key);
+ assert.equal(JSON.stringify(s),original,'Untrained display mutated the saved character');
+ assert.equal(calc(s).skills.Calligraphy,undefined);
+});
 test('editable starting XP defaults to 40 and survives advancement without repricing purchases',()=>{
  const legacy=starting();assert.equal(calc(legacy).startingXP,40);
  const s=starting();s.startingXP=75;s.skills.Defense=3;let d=calc(s);assert.equal(d.xpRemaining,70);

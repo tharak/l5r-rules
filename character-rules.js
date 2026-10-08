@@ -173,7 +173,7 @@
     const spellRoll=a.kind==='spell' && castRing ? dicePool(castingRank+castRing+number(d.skills.Spellcraft?.rank>=5),castRing) : null;
     return {...a,spellRoll,selectionId:entry.id,memorized:!!entry.memorized,grant:!!entry.grant,cost,reasons};
   }
-  function calculate(input, catalog) {
+  function calculate(input, catalog, {untrainedSkills = []} = {}) {
     const s = normalize(input);
     const clan = catalog.clans.find(c => c.name === s.clan), family = clan?.families.find(f => f.name === s.family), school=C.school(s.school,catalog);
     const baseline = s.phase==='advancement' ? s.progression.baseline : null;
@@ -193,9 +193,10 @@
       const {name,emphases}=C.skillIdentity(value,catalog);purchased[name]=Math.max(purchased[name] || 0,integer(rank));
       if(emphases.length)legacyEmphases[name]=[...new Set([...(legacyEmphases[name] || []),...emphases])];
     }
-    for(const name of new Set([...Object.keys(starting),...Object.keys(purchased)])) {
+    const untrained = new Set(untrainedSkills);
+    for(const name of new Set([...Object.keys(starting),...Object.keys(purchased),...untrained])) {
       const base=starting[name]?.base || 0,rank=Math.max(base,purchased[name] || 0);
-      if(!rank)continue;
+      if(!rank && !untrained.has(name))continue;
       const trait=C.skillTrait(name,s,catalog),traitRank=traits[trait]?.rank;
       const emphases=[...new Set([...(starting[name]?.emphases || []),...(legacyEmphases[name] || []),...(s.emphases[name] || [])])];
       const entry=catalog.skills.find(e=>e.name===name.split(':')[0]);

@@ -175,13 +175,16 @@
   .creator-lab .creator-lab-combat .creator-lab-stats { margin-top: 0; grid-template-columns: repeat(auto-fit,minmax(85px,1fr)); }
   .creator-lab .creator-lab-attack-table > div { display: grid; grid-template-columns: minmax(0,1fr) repeat(2,minmax(70px,auto)); gap: 12px; padding: 10px; border-bottom: 1px solid var(--line); font-size: 12px; overflow-wrap: anywhere; }
   .creator-lab .creator-lab-attack-head { background: var(--wash); color: var(--muted); }
-  .creator-lab .creator-ring-grid { gap: 12px; }
+  .creator-lab .creator-ring-grid { grid-template-columns: 1fr; gap: 12px; }
+  .creator-lab .creator-ring:nth-child(n) { grid-column: 1; grid-row: auto; width: 100%; }
   .creator-lab .creator-rank-row { flex-wrap: wrap; }
   .creator-lab .rank-control button { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 20px; }
   .creator-lab .rank-control output { min-width: 32px; min-height: 32px; padding-inline: 6px; font-size: 14px; }
   .creator-lab .creator-skill-row { display: block; padding: 14px; }
   .creator-lab .creator-skill-row strong { white-space: normal; overflow-wrap: anywhere; font-size: 15px; }
   .creator-lab .creator-skill-table-head { display: none; }
+  .creator-lab .creator-skill-filter { margin: 16px 0 0; color: var(--muted); }
+  .creator-lab .creator-skill-trait-heading { margin: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--wash); font: 17px var(--serif); color: var(--ink); }
   .creator-lab .creator-skill-values { display: flex; width: 100%; margin-top: 12px; justify-content: space-between; gap: 12px; }
   .creator-lab .creator-skill-trait { flex: 1; width: auto; min-width: 100px; max-width: 170px; font-size: 11px; }
   .creator-lab .creator-skill-trait select { font-size: 13px; padding: 6px; }

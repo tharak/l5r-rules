@@ -12,6 +12,8 @@
   let uiError = '';
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let layout = 'current';
+  let hideRankZeroSkills = true;
+  const SKILL_FILTER_KEY = 'l5r-rules-character-lab-hide-rank-zero';
   const experimental = () => layout === 'lab';
   const editorRoute = () => ['#/create-character','#/create-character-lab'].includes(location.hash.split('#').slice(0,2).join('#'));
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
@@ -125,20 +127,23 @@
   }
 
   function renderSkills(data) {
-    const names = Object.keys(data.skills).sort((a,b) => {
+    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Artisan: Painting', 'Artisan: Gardening', 'Artisan: Poetry', 'Craft: Carpentry', 'Lore: Gaijin', 'Perform: Dance', 'Perform: Song'])].sort((a,b) => a.localeCompare(b));
+    const untrainedSkills = [...new Set([
+      ...suggestions.filter(name=>!['Artisan','Craft','Games','Lore','Perform','Weapons'].includes(name)),
+      ...catalog.skills.flatMap(skill=>Object.keys(skill.specialtyTraits || {}).map(specialty=>`${skill.name}: ${specialty}`)),
+      ...Object.keys(sheet.skills),...Object.keys(sheet.skillTraits)
+    ])];
+    const skills = experimental() && !hideRankZeroSkills ? R.calculate(sheet,catalog,{untrainedSkills}).skills : data.skills;
+    const traitOrder = trait => { const index = TRAIT_NAMES.indexOf(trait); return index < 0 ? TRAIT_NAMES.length : index; };
+    const names = Object.keys(skills).sort((a,b) => {
       if (experimental()) {
-        const first = data.skills[a].roll, second = data.skills[b].roll;
-        if (!!first !== !!second) return first ? -1 : 1;
-        if (first && second) {
-          const difference = second.kept-first.kept || second.rolled-first.rolled || second.bonus-first.bonus;
-          if (difference) return difference;
-        }
+        const difference = traitOrder(skills[a].trait)-traitOrder(skills[b].trait);
+        if (difference) return difference;
       }
       return a.localeCompare(b);
     });
-    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Artisan: Painting', 'Artisan: Gardening', 'Artisan: Poetry', 'Craft: Carpentry', 'Lore: Gaijin', 'Perform: Dance', 'Perform: Song'])].sort((a,b) => a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
-    return `<section class="creator-panel creator-skills" id="creator-skills"><div class="creator-panel-head"><span class="creator-step">03</span><div><h2>Skills</h2><p>Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.</p></div></div><p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. ${sheet.phase === 'creation' ? 'Creation ranks cannot exceed 4.' : 'Advancement ranks can reach 10.'}</p>${renderSchoolDecisions(data,'skills')}${choices.length ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}<div class="creator-add-row"><input id="new-skill" type="text" list="skill-suggestions" placeholder="Add a skill, e.g. Courtier or Lore: History"><datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist><button type="button" data-action="add-skill">Add skill</button></div>${names.length ? `<div class="creator-skill-list"><div class="creator-skill-table-head"><span>Skill name</span><span>Trait · Roll · Rank</span></div>${names.map(name => { const skill = data.skills[name], ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || ''; return `<div class="creator-skill-row" data-ring="${ring}"><div><div class="creator-skill-label"><strong>${escapeHtml(name)}</strong><small>${skill.base ? `School rank ${skill.base} · Free` : 'Purchased skill'}${skill.emphases.length ? ` · Emphasis: ${escapeHtml(skill.emphases.join(', '))}` : ''}${skill.cost ? ` · ${skill.cost} XP spent` : ''}${skill.notes ? ` · ${escapeHtml(skill.notes)}` : ''}</small></div>${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}${renderEmphases(name,skill)}</div><div class="creator-skill-values">${renderSkillRoll(name,skill)}${renderSkillRank(name,skill)}</div></div>`; }).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}</section>`;
+    return `<section class="creator-panel creator-skills" id="creator-skills"><div class="creator-panel-head"><span class="creator-step">03</span><div><h2>Skills</h2><p>Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.</p></div></div><p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. ${sheet.phase === 'creation' ? 'Creation ranks cannot exceed 4.' : 'Advancement ranks can reach 10.'}</p>${renderSchoolDecisions(data,'skills')}${choices.length ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}<div class="creator-add-row"><input id="new-skill" type="text" list="skill-suggestions" placeholder="Add a skill, e.g. Courtier or Lore: History"><datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist><button type="button" data-action="add-skill">Add skill</button></div>${experimental()?`<label class="creator-check creator-skill-filter"><input type="checkbox" data-hide-zero-skills ${hideRankZeroSkills?'checked':''}>Hide rank 0 skills</label>`:''}${names.length ? `<div class="creator-skill-list"><div class="creator-skill-table-head"><span>Skill name</span><span>Trait · Roll · Rank</span></div>${names.map((name,index) => { const skill = skills[name], ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || ''; const heading = experimental() && (index===0 || skills[names[index-1]].trait!==skill.trait) ? `<h3 class="creator-skill-trait-heading" data-ring="${ring}">${escapeHtml(skill.trait || 'Choose trait')}</h3>` : ''; return `${heading}<div class="creator-skill-row" data-ring="${ring}"><div><div class="creator-skill-label"><strong>${escapeHtml(name)}</strong><small>${skill.base ? `School rank ${skill.base} · Free` : skill.rank ? 'Purchased skill' : 'Untrained · Rank 0'}${skill.emphases.length ? ` · Emphasis: ${escapeHtml(skill.emphases.join(', '))}` : ''}${skill.cost ? ` · ${skill.cost} XP spent` : ''}${skill.notes ? ` · ${escapeHtml(skill.notes)}` : ''}</small></div>${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}${skill.rank?renderEmphases(name,skill):''}</div><div class="creator-skill-values">${renderSkillRoll(name,skill)}${renderSkillRank(name,skill)}</div></div>`; }).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}</section>`;
   }
 
   function renderOptionChoice(kind,entry,index) {
@@ -508,7 +513,8 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
       if (Number(button.dataset.delta) > 0 && current.rank < rankLimit()) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) sheet.traitBuys[trait] = Math.max(0,(Number(sheet.traitBuys[trait]) || 0) - 1);
     } else if (action === 'skill') {
-      const name = button.dataset.skill, current = build().skills[name];
+      const name = button.dataset.skill, current = build().skills[name] || (experimental() ? {rank:0,base:0} : null);
+      if (!current) return;
       if (Number(button.dataset.delta) > 0 && current.rank < rankLimit()) sheet.skills[name] = current.rank + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) {
         if (current.rank - 1) sheet.skills[name] = current.rank - 1; else delete sheet.skills[name];
@@ -560,6 +566,11 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   }
 
   function onChange(event) {
+    if (experimental() && event.target.dataset.hideZeroSkills !== undefined) {
+      hideRankZeroSkills = event.target.checked;
+      try { localStorage.setItem(SKILL_FILTER_KEY,String(hideRankZeroSkills)); } catch {}
+      render(); return;
+    }
     uiError = '';
     const before = R.normalize(JSON.parse(JSON.stringify(sheet)));
     if (handleExtendedChange(event,before)) return;
@@ -603,6 +614,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
 
   async function mount(element, shared = null, settings = {}) {
     layout = settings.layout === 'lab' ? 'lab' : 'current';
+    try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
     external = shared;
     root = element;
     root.onclick = onClick;
