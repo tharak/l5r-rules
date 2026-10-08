@@ -245,6 +245,13 @@
   #creator-traits .creator-ring-mark { width: 28px; height: 28px; flex: none; font-size: 18px; }
   #creator-traits .creator-ring-head strong { font-size: 14px; }
   #creator-traits .creator-ring-head > b { width: 28px; height: 28px; flex: none; }
+  /* Element symbols from the supplied reference, displayed as one local image sprite. */
+  .creator-lab #creator-traits .creator-ring-symbol { width: 32px; height: 32px; background: transparent url('public/assets/ring-symbols.jpg') no-repeat; background-size: 436.2px 180px; background-position: var(--ring-symbol-x) var(--ring-symbol-y); }
+  .creator-ring-symbol[data-ring="Earth"] { --ring-symbol-x: -304.2px; --ring-symbol-y: -29.4px; }
+  .creator-ring-symbol[data-ring="Air"] { --ring-symbol-x: -338.4px; --ring-symbol-y: -29.4px; }
+  .creator-ring-symbol[data-ring="Water"] { --ring-symbol-x: -293.4px; --ring-symbol-y: -61.8px; }
+  .creator-ring-symbol[data-ring="Fire"] { --ring-symbol-x: -349.2px; --ring-symbol-y: -61.2px; }
+  .creator-ring-symbol[data-ring="Void"] { --ring-symbol-x: -322.2px; --ring-symbol-y: -82.2px; }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
   #creator-traits .rank-control button { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 20px; }
   #creator-traits .rank-control output { min-width: 32px; min-height: 32px; padding-inline: 6px; font-size: 14px; }
