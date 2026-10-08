@@ -19,11 +19,11 @@
 
   body {
     background-color: var(--paper);
-    background-image: url('public/assets/parchment.svg'),
-      radial-gradient(ellipse at 50% 20%, #fff8e8b3, transparent 75%),
-      linear-gradient(90deg, #a8793429, transparent 18%, transparent 82%, #a8793429);
-    background-size: 384px 384px, 100% 100%, 100% 100%;
-    background-repeat: repeat, no-repeat, no-repeat;
+    background-image: url('public/assets/parchment.jpg');
+    background-position: center top;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     color: var(--ink);
   }
   .main-column { min-height: 100vh; }
