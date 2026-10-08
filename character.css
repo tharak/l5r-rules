@@ -153,7 +153,6 @@
 /* Experimental creator: all layout overrides stay inside this page. */
 @media screen {
   .creator-lab .creator-header-row { align-items: start; flex-wrap: wrap; }
-  .creator-lab .creator-header h1 small { display: block; margin-top: 10px; font: 14px var(--sans); letter-spacing: normal; color: var(--muted); }
   .creator-lab .creator-header-actions { flex-wrap: wrap; }
   .creator-lab .creator-lab-layout { padding-top: 20px; }
   .creator-lab .creator-lab-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; align-items: start; }
@@ -197,7 +196,12 @@
   .creator-lab .creator-option-row label input, .creator-lab .creator-option-row label select { width: 100%; text-align: left; }
   .creator-lab .creator-option-effect { flex-basis: 100%; margin: 8px 0; padding: 10px; background: var(--wash); border-left: 3px solid var(--jade); color: var(--ink); font-size: 12px; line-height: 1.6; }
   .creator-lab .creator-option-effect strong { display: block; }
-  .creator-lab .creator-option-row > details { width: 100%; }
+  .creator-standing-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 13px; }
+  @media(max-width:700px) { .creator-standing-fields { grid-template-columns: 1fr; } }
+  .creator-option-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 12px; }
+  .creator-option-heading h3, .creator-option-heading .creator-source { margin: 0; }
+  .creator-option-rules { flex-basis: 100%; min-width: 0; font-size: 12px; line-height: 1.6; }
+  .creator-option-rules p { margin: 8px 0; }
   .creator-lab #creator-ancestors { margin-top: 24px; padding-top: 20px; }
   .creator-lab .creator-lab-ability { margin-top: 14px; padding: 14px; border: 1px solid var(--line); background: var(--surface); }
   .creator-lab .creator-lab-ability h3 { margin: 0; font: 17px var(--serif); color: var(--ink); overflow-wrap: anywhere; }

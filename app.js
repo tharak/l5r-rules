@@ -229,7 +229,7 @@ function render() {
   const characterView = slug.startsWith('characters/');
   const characterEditor = ['create-character','create-character-lab'].includes(slug);
   document.body.dataset.overview = ['campaigns', 'characters', 'books'].includes(slug);
-  const title = campaignRoute ? 'Campaigns' : characterView ? 'Character sheet' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? (slug === 'create-character-lab' ? 'Character · Experimental layout' : 'Character') : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = campaignRoute ? 'Campaigns' : characterView ? 'Character sheet' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.

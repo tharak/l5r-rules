@@ -84,10 +84,10 @@ async page => {
     await p.locator('[data-equipped="school:'+weaponIndex+'"]').check();
     await p.locator('[data-field="notes"]').fill('OWNER PRIVATE NOTES\nSecond line');
     const editorURL=p.url();
-    await p.getByRole('link',{name:'View family ↗',exact:true}).click();
+    await p.getByRole('link',{name:'View school rules ↗',exact:true}).click();
     await p.getByRole('dialog').waitFor();
     check(p.url()===editorURL,'Rule popup navigated away from editor');
-    check((await p.locator('.rules-popup-body').innerText()).includes('Hida'),'Family rule reference missing');
+    check((await p.locator('.rules-popup-body').innerText()).includes('Hida Bushi'),'School rule reference missing');
     await p.locator('.rules-popup .inline-contents > summary').click();
     await p.locator('.rules-popup .inline-contents a').first().click();
     check(p.url()===editorURL,'Popup contents link navigated away from editor');
