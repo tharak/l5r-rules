@@ -115,7 +115,15 @@
   }
 
   function renderTraits(data) {
-    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">02</span><div><h2>Rings & traits</h2><p>All Rings begin at 2. Family and school benefits are applied automatically.</p></div></div><p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p><div class="creator-ring-grid">${TRAIT_GROUPS.map(group => `<div class="creator-ring" data-ring="${group.ring}"><div class="creator-ring-head"><span class="creator-ring-mark">${group.mark}</span><div><strong>${group.ring}</strong></div><b>${data.rings[group.ring]}</b></div>${group.traits.map(trait => { const item = data.traits[trait], next = item.rank + 1, cost = next * (trait === 'Void' ? 6 : 4); return `<div class="creator-rank-row"><span><strong>${trait}</strong></span><div class="rank-control" role="group" aria-label="${trait} rank"><button type="button" data-action="trait" data-trait="${trait}" data-delta="-1" ${item.rank <= item.base ? 'disabled' : ''} aria-label="Decrease ${trait}">−</button><output aria-label="${trait} rank">${item.rank}</output><button type="button" data-action="trait" data-trait="${trait}" data-delta="1" ${item.rank >= rankLimit() ? 'disabled' : ''} aria-label="Increase ${trait} for ${cost} XP">+</button></div></div>`; }).join('')}</div>`).join('')}</div></section>`;
+    const skills = experimental() ? R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills : {};
+    const skillNames = Object.keys(skills).sort((a,b)=>a.localeCompare(b));
+    const renderTrait = trait => {
+      const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
+      const control = `<div class="creator-rank-row"><span><strong>${trait}</strong></span><div class="rank-control" role="group" aria-label="${trait} rank"><button type="button" data-action="trait" data-trait="${trait}" data-delta="-1" ${item.rank <= item.base ? 'disabled' : ''} aria-label="Decrease ${trait}">−</button><output aria-label="${trait} rank">${item.rank}</output><button type="button" data-action="trait" data-trait="${trait}" data-delta="1" ${item.rank >= rankLimit() ? 'disabled' : ''} aria-label="Increase ${trait} for ${cost} XP">+</button></div></div>`;
+      if (!experimental()) return control;
+      return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${escapeHtml(name)}</li>`).join('')}</ul></div>`;
+    };
+    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">02</span><div><h2>Rings & traits</h2><p>All Rings begin at 2. Family and school benefits are applied automatically.</p></div></div><p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p><div class="creator-ring-grid">${TRAIT_GROUPS.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}"><div class="creator-ring-head"><span class="creator-ring-mark">${group.mark}</span><div><strong>${group.ring}</strong></div><b>${data.rings[group.ring]}</b></div>${experimental()?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div></section>`;
   }
 
   function renderSkillRoll(name, skill) {
@@ -133,13 +141,18 @@
     return experimental() ? `<div class="creator-lab-skill-rank"><small>Rank</small>${control}</div>` : control;
   }
 
-  function renderSkills(data) {
+  function skillOptions() {
     const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Artisan: Painting', 'Artisan: Gardening', 'Artisan: Poetry', 'Craft: Carpentry', 'Lore: Gaijin', 'Perform: Dance', 'Perform: Song'])].sort((a,b) => a.localeCompare(b));
     const untrainedSkills = [...new Set([
       ...suggestions.filter(name=>!['Artisan','Craft','Games','Lore','Perform','Weapons'].includes(name)),
       ...catalog.skills.flatMap(skill=>Object.keys(skill.specialtyTraits || {}).map(specialty=>`${skill.name}: ${specialty}`)),
       ...Object.keys(sheet.skills),...Object.keys(sheet.skillTraits)
     ])];
+    return {suggestions,untrainedSkills};
+  }
+
+  function renderSkills(data) {
+    const {suggestions,untrainedSkills} = skillOptions();
     const skills = experimental() && !hideRankZeroSkills ? R.calculate(sheet,catalog,{untrainedSkills}).skills : data.skills;
     const traitOrder = trait => { const index = TRAIT_NAMES.indexOf(trait); return index < 0 ? TRAIT_NAMES.length : index; };
     const names = Object.keys(skills).sort((a,b) => {
@@ -253,8 +266,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   function renderLabSummary(data) {
     const combat = data.combat;
     const stats = entries => `<dl class="creator-lab-stats">${entries.map(([label,value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>`;
-    return `<aside class="creator-summary" id="creator-summary"><div class="creator-summary-inner"><div class="creator-lab-summary-head"><div><small class="creator-summary-kicker">LIVE CHARACTER RECORD</small><h2 id="summary-name">${escapeHtml(sheet.name || 'Unnamed samurai')}</h2><p>${escapeHtml([sheet.clan,sheet.family,data.school?.name].filter(Boolean).join(' · ') || 'Choose a clan to begin')}</p></div><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><span>XP REMAINING</span><strong>${data.xpRemaining}</strong><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small>${renderXPControls()}</div></div>${stats([
-      ['Insight',data.insight],['Insight Rank',data.insightRank],['School Rank',data.schoolRank],
+    return `<aside class="creator-summary" id="creator-summary"><div class="creator-summary-inner"><div class="creator-lab-summary-head"><div><small class="creator-summary-kicker">LIVE CHARACTER RECORD</small><h2 id="summary-name">${escapeHtml(sheet.name || 'Unnamed samurai')}</h2><p>${escapeHtml([sheet.clan,sheet.family,data.school?.name].filter(Boolean).join(' · ') || 'Choose a clan to begin')}</p></div><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><span>XP REMAINING</span><strong>${data.xpRemaining}</strong><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small><div class="creator-lab-xp-totals"><label class="creator-starting-xp">Starting XP<input type="number" min="0" step="1" data-field="startingXP" value="${data.startingXP}"></label><dl>${[['Insight',data.insight],['Insight Rank',data.insightRank],['School Rank',data.schoolRank]].map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('')}</dl></div>${renderXPControls()}</div></div>${stats([
       ['Initiative',combat.initiative.notation],['Armor TN · base',combat.baseArmorTN],['Armor TN · equipped',combat.armorTN],['Reduction',combat.reduction],
       ['Wounds taken',combat.wounds.current],['Wound level',combat.wounds.currentLevel],['Wound capacity',combat.wounds.maximum],['Healing / day',combat.healing],['Void Points',combat.voidPoints],
       ['Movement · effective Water',combat.movementWater],['Wound penalty reduction',combat.woundPenaltyReduction]
@@ -300,7 +312,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   function renderNavigation(d) {
     const sections=[['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Equipment']];
     if (experimental()) sections.splice(0,sections.length,['identity','Identity'],['summary','Summary'],['traits','Traits'],['options','Advantages'],['ancestors','Ancestors'],['skills','Skills'],['abilities','Spells & abilities'],['story','Equipment & story']);
-    return `<nav class="creator-nav" aria-label="Character sections">${sections.map(([key,label])=>`<button type="button" data-action="section" data-section="${key}">${label}</button>`).join('')}</nav><div class="creator-overview" aria-label="Character totals"><label class="creator-starting-xp">Starting XP<input type="number" min="0" step="1" data-field="startingXP" value="${d.startingXP}"></label><span>XP <b>${d.xpRemaining}</b></span><span>Insight <b>${d.insight}</b> · Rank <b>${d.insightRank}</b></span><span>School Rank <b>${d.schoolRank}</b></span></div>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections">${sections.map(([key,label])=>`<button type="button" data-action="section" data-section="${key}">${label}</button>`).join('')}</nav>${experimental() ? '' : `<div class="creator-overview" aria-label="Character totals"><label class="creator-starting-xp">Starting XP<input type="number" min="0" step="1" data-field="startingXP" value="${d.startingXP}"></label><span>XP <b>${d.xpRemaining}</b></span><span>Insight <b>${d.insight}</b> · Rank <b>${d.insightRank}</b></span><span>School Rank <b>${d.schoolRank}</b></span></div>`}${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
