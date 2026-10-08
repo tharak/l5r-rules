@@ -93,7 +93,7 @@ function expandActivePath(entries, slug, fragment) {
 function renderNavigation() {
   const slug = currentSlug();
   document.querySelectorAll('#navigation a').forEach(a => {
-    const selected = slug.startsWith('campaigns') || slug.startsWith('invite/') ? a.hash === '#/campaigns' : slug === 'characters' || slug.startsWith('characters/') || slug === 'create-character' ? a.hash === '#/characters' : a.hash === '#/books';
+    const selected = slug.startsWith('campaigns') || slug.startsWith('invite/') ? a.hash === '#/campaigns' : slug === 'characters' || slug.startsWith('characters/') || ['create-character','create-character-lab'].includes(slug) ? a.hash === '#/characters' : a.hash === '#/books';
     if (selected) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   });
 }
@@ -227,14 +227,15 @@ function render() {
   const page = state.data.pages[slug];
   const campaignRoute = slug === 'campaigns' || slug.startsWith('campaigns/') || slug.startsWith('invite/');
   const characterView = slug.startsWith('characters/');
+  const characterEditor = ['create-character','create-character-lab'].includes(slug);
   document.body.dataset.overview = ['campaigns', 'characters', 'books'].includes(slug);
-  const title = campaignRoute ? 'Campaigns' : characterView ? 'Character sheet' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : page?.title || (slug === 'all-pages' ? 'All pages' : slug === 'create-character' ? 'Character' : 'Page unavailable');
+  const title = campaignRoute ? 'Campaigns' : characterView ? 'Character sheet' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? (slug === 'create-character-lab' ? 'Character · Experimental layout' : 'Character') : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
-  $('#app').innerHTML = campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : slug === 'create-character' ? '<div class="loading">Opening character…</div>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
-  if (slug === 'create-character') window.CharacterBuilder.mount($('#app'));
+  $('#app').innerHTML = campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  if (characterEditor) window.CharacterBuilder.mount($('#app'),null,{layout:slug === 'create-character-lab' ? 'lab' : 'current'});
   if (characterView) renderCharacterView(slug.slice('characters/'.length));
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
