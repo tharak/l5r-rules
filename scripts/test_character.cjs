@@ -447,17 +447,17 @@ test('Wounds card follows wound thresholds and recalculates its status when Eart
     c.change({field:'woundsTaken'},String(value));
     const html=sectionHtml(c,'rolls');
     assert.match(html,new RegExp(`--wound-hue:${hue}"`));
-    assert.match(html,new RegExp(`role="status">${status}</span>`));
+    assert.match(html,new RegExp(`role="status">${status}(?: \\(\\+\\d+\\))?</span>`));
     assert.doesNotMatch(html,/Wounds taken/);
-    assert.equal((html.match(/aria-current="true"/g)||[]).length,status==='Dead'?0:1);
+    assert.equal((html.match(/aria-current="true"/g)||[]).length,1);
   }
   c.change({field:'woundsTaken'},'11');
   for(const trait of ['Stamina','Willpower'])c.click({action:'trait',trait,delta:'1'});
-  assert.match(sectionHtml(c,'rolls'),/role="status">Healthy<\/span>/);
-  assert.match(sectionHtml(c,'rolls'),/Wounds - <span class="creator-wound-status" role="status">Healthy<\/span>/);
-  assert.match(sectionHtml(c,'rolls'),/aria-current="true"><span>Healthy<\/span><\/div>/);
-  const track=sectionHtml(c,'rolls').match(/<div class="creator-wounds">([\s\S]*?)<\/div><\/div><div class="creator-roll-combat">/)[1];
-  assert.doesNotMatch(track,/<strong>|<small>|\(\+|Earth ×/);
+  assert.match(sectionHtml(c,'rolls'),/role="status">Healthy \(\+0\)<\/span>/);
+  const card=sectionHtml(c,'rolls').split('aria-label="Wound levels and current wounds">')[1].split('<div class="creator-roll-combat">')[0];
+  assert.doesNotMatch(card,/creator-ring-head|<span>Wounds<\/span>|<strong>|<small>|Earth ×/);
+  assert.match(card,/Nicked \(\+3\)/);
+  assert.match(card,/Down \(\+40\)/);
   const loaded=await c.reload();
   assert.equal((await loaded.data()).character.woundsTaken,11);
   assert.match(sectionHtml(loaded,'rolls'),/--wound-hue:120/);

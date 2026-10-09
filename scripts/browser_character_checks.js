@@ -30,13 +30,15 @@ async page => {
     check(await p.locator('#creator-identity #xp-award').count()===1,'XP controls did not move into section 01');
     check(await p.locator('#creator-summary .creator-standing-fields').count()===1,'Standing controls missing below XP');
     check((await p.locator('#creator-summary .creator-standing-fields .creator-number-field > span').allTextContents()).join(',')==='Honor,Glory,Status,Taint','Standing controls are out of order');
-    check(await p.locator('#creator-rolls > .creator-ring-grid + .creator-roll-wounds [data-field="woundsTaken"]').count()===2,'Wounds control must follow the last ring');
+    check(await p.locator('#creator-rolls > .creator-ring-grid + .creator-roll-details .creator-roll-wounds [data-field="woundsTaken"]').count()===2,'Wounds control must follow the last ring');
     check(await p.locator('#creator-summary [data-field="woundsTaken"]').count()===0,'Wounds stepper remains in Character Record');
     check(await p.locator('#creator-summary .creator-ledger-heading').count()===0,'Removed Character Record sections remain');
-    check(await p.locator('#creator-rolls > .creator-roll-wounds + .creator-roll-combat .creator-combat').count()===1,'Combat values must follow Wounds in section 00');
+    check(await p.locator('#creator-rolls > .creator-roll-details > .creator-roll-wounds + .creator-roll-combat .creator-combat').count()===1,'Combat values must follow Wounds in section 00');
     check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wounds > div').count()===8,'Eight wound statuses must appear below the stepper');
-    check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wound-status').innerText()==='Healthy','Wounds card must show the current status');
+    check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wound-status').innerText()==='Healthy (+0)','Wounds card must show the current status');
     check(await p.locator('#creator-rolls .creator-roll-wounds').evaluate(node=>getComputedStyle(node).getPropertyValue('--wound-hue').trim())==='120','Healthy wounds must use green');
+    check(await p.locator('#creator-rolls .creator-roll-wounds .creator-ring-head,#creator-rolls .creator-roll-wounds .creator-number-field > span').count()===0,'Removed Wounds labels remain');
+    check((await p.locator('#creator-rolls .creator-wounds > div').allTextContents()).join(',')==='Healthy (+0),Nicked (+3),Grazed (+5),Hurt (+10),Injured (+15),Crippled (+20),Down (+40),Out','Wound penalties are missing');
     check(await p.locator('#creator-story .creator-standing-fields,#creator-story #creator-equipment').count()===0,'Story still contains standing or equipment');
     check(await p.locator('#creator-story h2').innerText()==='Story','Story heading missing');
     check(await p.locator('#creator-equipment h2').innerText()==='Equipment','Equipment heading missing');
