@@ -144,7 +144,7 @@
 
   function renderCompactSkillRow(name,skill) {
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
-    return `<div class="creator-skill-row creator-skill-compact" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><strong class="creator-skill-name">${escapeHtml(name)}</strong><div class="creator-skill-roll" aria-label="${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></div>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${escapeHtml(skill.emphases.join(', '))}</span>` : ''}</div>`;
+    return `<div class="creator-skill-row creator-skill-compact" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><strong class="creator-skill-name">${escapeHtml(name)}</strong><div class="creator-skill-roll" aria-label="${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></div>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${skill.emphases.map(emphasis=>`<span>${escapeHtml(emphasis)}</span>`).join(' ')}</span>` : ''}</div>`;
   }
 
   function renderSkillRow(name,skill,view = 'skills') {
@@ -327,7 +327,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
 
   function renderNavigation(d) {
     const sections=[['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Equipment']];
-    if (experimental()) sections.splice(0,sections.length,['identity','Identity'],['summary','Summary'],['traits','Traits'],['options','Advantages'],['ancestors','Ancestors'],['skills','Skills'],['abilities','Spells & abilities'],['story','Equipment & story']);
+    if (experimental()) sections.splice(0,sections.length,['traits','Traits'],['identity','Identity'],['summary','Summary'],['options','Advantages'],['ancestors','Ancestors'],['skills','Skills'],['abilities','Spells & abilities'],['story','Equipment & story']);
     return `<nav class="creator-nav" aria-label="Character sections">${sections.map(([key,label])=>`<button type="button" data-action="section" data-section="${key}">${label}</button>`).join('')}</nav>${experimental() ? '' : `<div class="creator-overview" aria-label="Character totals"><label class="creator-starting-xp">Starting XP<input type="number" min="0" step="1" data-field="startingXP" value="${d.startingXP}"></label><span>XP <b>${d.xpRemaining}</b></span><span>Insight <b>${d.insight}</b> · Rank <b>${d.insightRank}</b></span><span>School Rank <b>${d.schoolRank}</b></span></div>`}${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
@@ -478,7 +478,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   }
 
   function renderLayout(data) {
-    if (experimental()) return `<div class="creator-lab-layout">${renderSection(renderIdentity(data),'identity',data)}${renderSection(renderSummary(data),'summary',data)}${renderSection(renderTraits(data),'traits',data)}<div class="creator-lab-columns"><div class="creator-lab-column">${renderSection(renderOptions(data),'options',data)}</div><div class="creator-lab-column">${renderSection(renderSkills(data),'skills',data)}${renderSection(renderAbilities(data),'abilities',data)}</div></div>${renderSection(renderStory(data),'story',data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>`;
+    if (experimental()) return `<div class="creator-lab-layout">${renderSection(renderTraits(data),'traits',data)}${renderSection(renderIdentity(data),'identity',data)}${renderSection(renderSummary(data),'summary',data)}<div class="creator-lab-columns"><div class="creator-lab-column">${renderSection(renderOptions(data),'options',data)}</div><div class="creator-lab-column">${renderSection(renderSkills(data),'skills',data)}${renderSection(renderAbilities(data),'abilities',data)}</div></div>${renderSection(renderStory(data),'story',data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>`;
     return `<div class="creator-layout"><div class="creator-main">${renderSection(renderIdentity(data),'identity',data)}${renderSection(renderTraits(data),'traits',data)}${renderSection(renderSkills(data),'skills',data)}${renderSection(renderOptions(data),'options',data)}${renderSection(renderAbilities(data),'abilities',data)}${renderSection(renderStory(data),'story',data)}<div class="creator-bottom"><span data-save-status>${escapeHtml((external ? window.CampaignStorage?.status : window.CharacterStorage?.status) || 'Saved on this device')}</span><button type="button" data-action="reset">Start over</button></div></div>${renderSection(renderSummary(data),'summary',data)}</div>`;
   }
 
