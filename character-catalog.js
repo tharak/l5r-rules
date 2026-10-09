@@ -28,16 +28,18 @@
   function allowedSchoolSkill(choice, value, catalog) {
     const {name} = skillIdentity(value, catalog), category = name.split(':')[0];
     const entry = catalog.skills.find(skill => skill.name === category);
+    const specialty = name.split(': ').slice(1).join(': ');
+    const group = Object.entries(entry?.specialtyGroups || {}).find(([name]) => name.toLowerCase() === specialty.toLowerCase())?.[1] || entry?.group;
     if (!entry || ['Weapons','Artisan','Craft','Games','Lore','Perform'].includes(name)) return false;
     const prompt = choice.prompt;
     if (/following list/i.test(prompt)) return category === 'Acting' || /^(Artisan|Perform): /.test(name);
     if (/Weapon Skill/i.test(prompt)) return WEAPON_SKILLS.includes(category);
     const types = ['Artisan','Craft','Lore','Perform'].filter(type => new RegExp(`\\b${type}\\b`, 'i').test(prompt));
     const groups = ['High','Bugei','Merchant','Low'].filter(group => new RegExp(`\\b${group}\\b`, 'i').test(prompt));
-    if (/non-High/i.test(prompt)) return entry.group !== 'High';
-    if (/non-Low|not.*Low/i.test(prompt)) return entry.group !== 'Low';
+    if (/non-High/i.test(prompt)) return group !== 'High';
+    if (/non-Low|not.*Low/i.test(prompt)) return group !== 'Low';
     if (/either Gaijin or Shadowlands/i.test(prompt)) return ['Lore: Gaijin','Lore: Shadowlands'].includes(name);
-    return !types.length && !groups.length || types.includes(category) || groups.includes(entry.group);
+    return !types.length && !groups.length || types.includes(category) || groups.includes(group);
   }
   function schoolGrants(school, sheet, catalog) {
     const skills = {}, choices = school?.skillChoices || [];

@@ -247,6 +247,39 @@ ronin_families = [{"name": m.group(1), "trait": m.group(2), "slug": "fronin", "a
 clans.append({"name": "Ronin", "group": "Other", "families": ronin_families,
               "schools": schools_for("scronin"), "familySource": "fronin", "schoolSource": "scronin"})
 
+def macro_specialties(text):
+    match = re.search(r"Macro-skills?\s*\((?:includes|including)\s*:?\s*", text, re.I)
+    if not match:
+        return [], {}
+    # Split only the outer list: notes and Trait names contain parentheses.
+    parts, current, depth = [], [], 0
+    for char in text[match.end():]:
+        if char == ')' and depth == 0:
+            parts.append(''.join(current))
+            break
+        if char == ',' and depth == 0:
+            parts.append(''.join(current))
+            current = []
+            continue
+        current.append(char)
+        depth += (char == '(') - (char == ')')
+    specialties, groups = [], {}
+    for part in parts:
+        part = re.sub(r"^\s*and\s+", "", part).strip()
+        if re.match(r"(?:etc\.?|among others|almost anything else)$", part, re.I):
+            continue
+        group = 'Low' if '*' in part else 'High' if '#' in part else None
+        name = re.sub(r"\s*\([^)]*\)", "", part).replace('*', '').replace('#', '').strip()
+        # The archive misspells this Artisan specialty; school grants use Tattooing.
+        if name == 'Tatooing':
+            name = 'Tattooing'
+        if name:
+            specialties.append(name)
+            if group:
+                groups[name] = group
+    return specialties, groups
+
+
 skills = []
 for slug, group in (("high-skills", "High"), ("bugei-skills", "Bugei"),
                     ("merchant-skills", "Merchant"), ("low-skills", "Low")):
@@ -256,20 +289,22 @@ for slug, group in (("high-skills", "High"), ("bugei-skills", "Bugei"),
             trait_match = re.search(r"\(([^)]+)\)$", title)
             skill_traits = re.findall(rf"\b({TRAITS})\b", trait_match.group(1)) if trait_match else []
             specialty_traits = {}
+            description = []
+            for sibling in h.next_siblings:
+                if getattr(sibling, "name", None) in ("h1", "h2"):
+                    break
+                if getattr(sibling, "get_text", None):
+                    description.append(sibling.get_text(" ", strip=True))
+            subtypes = " ".join(description).split("Emphases:", 1)[0]
+            specialties, specialty_groups = macro_specialties(subtypes)
             if not skill_traits:
-                description = []
-                for sibling in h.next_siblings:
-                    if getattr(sibling, "name", None) in ("h1", "h2"):
-                        break
-                    if getattr(sibling, "get_text", None):
-                        description.append(sibling.get_text(" ", strip=True))
-                subtypes = " ".join(description).split("Emphases:", 1)[0]
                 for match in re.finditer(rf"([A-Za-z][A-Za-z &\-]+?)\s*\(({TRAITS})\)", subtypes):
                     specialty = re.sub(r"^includes\s+", "", match.group(1)).strip()
                     specialty_traits[specialty] = match.group(2)
             skills.append({"name": re.sub(r"\s*\([^)]*\)$", "", title), "group": group,
                            "slug": slug, "anchor": h.get("id", ""),
-                           "traits": skill_traits, "specialtyTraits": specialty_traits})
+                           "traits": skill_traits, "specialtyTraits": specialty_traits,
+                           "specialties": specialties, "specialtyGroups": specialty_groups})
 
 
 def point_choices(label):

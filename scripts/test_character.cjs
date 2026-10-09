@@ -346,6 +346,27 @@ test('macro skills use specialty traits, varying skills ask for a trait and cust
   assert.equal((await c.data()).derived.skills['Custom skill'].roll.notation,'3k2');
 });
 
+test('all listed macro specialties appear in skill suggestions and eligible school choices',async()=>{
+  const c=await character();c.school('Crane','Kakita Artisan');
+  const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];
+  const schoolSuggestions=c.root.innerHTML.match(/<datalist id="school-suggestions-0">([\s\S]*?)<\/datalist>/)[1];
+  for(const [name,count] of [['Artisan',8],['Craft',18],['Games',6],['Lore',19],['Perform',9]]) {
+    const skill=catalog.skills.find(s=>s.name===name);
+    assert.equal(skill.specialties.length,count,name);
+    for(const specialty of skill.specialties) {
+      const value=`${name}: ${specialty}`.replaceAll('&','&amp;');
+      assert.ok(suggestions.includes(`value="${value}"`),value);
+      if(['Artisan','Perform'].includes(name))assert.ok(schoolSuggestions.includes(`value="${value}"`),value);
+    }
+  }
+  c.inputs['#new-skill']={value:'Artisan: Origami'};c.click({action:'add-skill'});
+  c.inputs['#new-skill']={value:'Lore: Bushido'};c.click({action:'add-skill'});
+  c.inputs['#new-skill']={value:'Perform: Biwa'};c.click({action:'add-skill'});
+  c.inputs['#new-skill']={value:'Games: Shogi'};c.click({action:'add-skill'});
+  const d=(await c.data()).derived;
+  for(const [name,trait] of [['Artisan: Origami','Awareness'],['Lore: Bushido','Intelligence'],['Perform: Biwa','Agility'],['Games: Shogi','Intelligence']])assert.equal(d.skills[name].trait,trait,name);
+});
+
 test('Insight Rank changes propagate to initiative and healing', async () => {
   const c = await character({traitBuys:{Stamina:1,Willpower:1,Reflexes:1,Awareness:1,Strength:1,Perception:1,Agility:1,Intelligence:1,Void:1}});
   let d = (await c.data()).derived;

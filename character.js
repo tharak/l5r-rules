@@ -174,10 +174,10 @@
   }
 
   function skillOptions() {
-    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Artisan: Painting', 'Artisan: Gardening', 'Artisan: Poetry', 'Craft: Carpentry', 'Lore: Gaijin', 'Perform: Dance', 'Perform: Song'])].sort((a,b) => a.localeCompare(b));
+    const specialties = catalog.skills.flatMap(skill => [...new Set([...(skill.specialties || []), ...Object.keys(skill.specialtyTraits || {})])].map(specialty => `${skill.name}: ${specialty}`));
+    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...specialties, ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Lore: Gaijin'])].sort((a,b) => a.localeCompare(b));
     const untrainedSkills = [...new Set([
       ...suggestions.filter(name=>!['Artisan','Craft','Games','Lore','Perform','Weapons'].includes(name)),
-      ...catalog.skills.flatMap(skill=>Object.keys(skill.specialtyTraits || {}).map(specialty=>`${skill.name}: ${specialty}`)),
       ...Object.keys(sheet.skills),...Object.keys(sheet.skillTraits)
     ])];
     return {suggestions,untrainedSkills};
