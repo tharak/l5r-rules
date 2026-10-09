@@ -26,11 +26,13 @@ async page => {
         pages:coverage.length,
         expectedPages:Object.keys(wiki.pages).length,
         unknownTags:[...usedTags].filter(tag=>!knownTags.includes(tag)),
-        queries:items.filter(i=>i.query).map(i=>({id:i.id,matches:i.uses.filter(([slug])=>wiki.pages[slug]).length})),
+        queries:items.flatMap(i=>i.examples).filter(i=>i.query).map(i=>({id:i.id,matches:i.uses.filter(([slug])=>wiki.pages[slug]).length})),
         duplicateIds:[...document.querySelectorAll('[id]')].map(node=>node.id).filter((id,index,array)=>array.indexOf(id)!==index),
       };
     });
-    check(audit.count===audit.unique,'Duplicate catalog IDs');
+    check(audit.count===36 && audit.count===audit.unique,'Expected 36 unique families');
+    check(await guide.locator('.dg-variant').count()===111,'An original example was lost');
+    check(await guide.locator('iframe').count()===0,'Previews must load only when opened');
     check(audit.duplicateIds.length===0,'Duplicate host DOM IDs');
     check(audit.pages===audit.expectedPages,'Stored reference page omitted from coverage');
     check(audit.unknownTags.length===0,'Uncataloged article tags: '+audit.unknownTags.join(', '));
@@ -52,16 +54,18 @@ async page => {
     for (const width of [390,1440]) {
       await guide.setViewportSize({width,height:1000});
       check(await guide.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Guide overflows at '+width);
-      await guide.locator('#UI-DICE-DIALOG .dg-id').click();
+      await guide.goto(origin+'#/design-guideline#UI-DICE-DIALOG');
       await guide.waitForURL(/#\/design-guideline#UI-DICE-DIALOG$/);
-      check(await guide.locator('#UI-DICE-DIALOG').isVisible(),'Component deep link failed');
+      check(await guide.locator('[data-dg-example="UI-DICE-DIALOG"][open]').isVisible(),'Variant deep link failed');
+      check(await guide.locator('iframe').count()===1,'Deep link loaded unrelated previews');
       await guide.reload();
       await guide.locator('#UI-DICE-DIALOG').waitFor();
       check(await guide.evaluate(()=>location.hash.endsWith('#UI-DICE-DIALOG')),'Deep link lost on reload');
     }
 
     // Load offscreen specimens as well, then check isolated styling and interactions.
-    await guide.evaluate(()=>document.querySelectorAll('iframe').forEach(frame=>frame.loading='eager'));
+    await guide.evaluate(()=>document.querySelectorAll('.dg-variant').forEach(details=>details.open=true));
+    await guide.waitForFunction(()=>document.querySelectorAll('iframe').length===111);
     await guide.waitForFunction(()=>[...document.querySelectorAll('iframe')].every(frame=>parseFloat(frame.style.height)>=100));
     const frames = await guide.evaluate(()=>[...document.querySelectorAll('iframe')].map(frame=>({
       id:frame.dataset.dgPreview,
@@ -73,11 +77,19 @@ async page => {
     check(frames.every(frame=>frame.sandbox==='allow-same-origin' && frame.scripts===0),'Preview allows executable application actions');
     check(frames.every(frame=>frame.palette==='#eee5d3'),'Preview does not use the active site theme');
     check(frames.every(frame=>frame.printVisible),'Print specimen is invisible');
+    const controls = await guide.evaluate(()=>{
+      const doc=id=>document.querySelector(`[data-dg-preview="${id}"]`).contentDocument;
+      const style=(id,selector)=>{const node=doc(id).querySelector(selector),s=node.ownerDocument.defaultView.getComputedStyle(node);return {background:s.backgroundColor,height:s.minHeight};};
+      return {primary:style('UI-BUTTON-PRIMARY','button'),disabled:doc('UI-BUTTON-PRIMARY').querySelector('button:disabled')!==null,readonly:doc('UI-FIELD-TEXT').querySelector('[readonly]').readOnly,compact:style('UI-DICE-DIALOG','.ui-stepper button'),regular:style('UI-RANK-STEPPER','.ui-stepper button')};
+    });
+    check(controls.primary.background==='rgb(148, 61, 50)' && controls.primary.height==='40px','Primary button drifted from shared styling');
+    check(controls.compact.height==='32px' && controls.regular.height==='44px','Stepper size variants drifted');
+    check(controls.disabled && controls.readonly,'Preview lost disabled or readonly semantics');
     const primary = guide.frameLocator('#UI-BUTTON-PRIMARY iframe');
     await primary.getByRole('button',{name:'Save session',exact:true}).first().click();
     const text = guide.frameLocator('#UI-FIELD-TEXT iframe');
     await text.getByLabel('Name',{exact:true}).fill('Preview only');
-    const link = guide.frameLocator('#UI-LINK iframe');
+    const link = guide.frameLocator('[data-dg-example="UI-LINK"] iframe');
     await link.getByRole('link',{name:'← Campaigns'}).click();
     check(await guide.evaluate(()=>JSON.stringify({...localStorage}))===before,'Guide interactions mutated stored data');
     check(await guide.locator('#dg-filter').count()===1,'Preview navigation escaped its frame');
@@ -100,6 +112,6 @@ async page => {
     await guide.getByRole('navigation',{name:'Site',exact:true}).getByRole('link',{name:'Campaigns',exact:true}).click();
     await guide.getByRole('heading',{name:'Campaigns',exact:true}).waitFor();
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    return `Design Guideline checks passed: ${audit.count} unique components, ${audit.pages} reference pages, filtering, deep links, mobile/desktop, all previews, print styles, safe interactions, and existing navigation/search/character editing.`;
+    return `Design Guideline checks passed: ${audit.count} families, 111 preserved variants, ${audit.pages} reference pages, filtering, deep links, mobile/desktop, all previews, print styles, safe interactions, and existing navigation/search/character editing.`;
   } finally { await context.close(); }
 }

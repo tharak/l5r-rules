@@ -24,7 +24,7 @@ async function character(saved,preferences = {}) {
     fetch:async () => ({ok:true, json:async () => catalog}),
     URL:{createObjectURL(blob){exported = blob; return 'blob:test';}, revokeObjectURL(){}},
     document:{createElement:() => ({click(){}})}, setTimeout(){}});
-  for (const file of ['character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
+  for (const file of ['ui-components.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
   const change = (dataset,value) => root.onchange({target:{dataset,value}});
@@ -89,7 +89,7 @@ test('all Rolls hide filters start checked; weapon filter hides only zero ranks 
  });
  const rows=instance=>instance.root.innerHTML.split('id="creator-rolls"')[1].split('</section>')[0];
  const toggle=(instance,dataset,checked)=>instance.root.onchange({target:{dataset,checked}});
- assert.match(rows(c),/data-hide-zero-skills checked/);
+ assert.match(rows(c),/data-hide-zero-skills="true" checked/);
  for(const category of ['artisan','games','perform','lore','weapons'])assert.match(rows(c),new RegExp(`data-hide-zero-category="${category}" checked`));
  assert.match(rows(c),/Hide Weapons 0/);
  const before=(await c.data()).derived;
@@ -101,8 +101,8 @@ test('all Rolls hide filters start checked; weapon filter hides only zero ranks 
  toggle(c,{hideZeroCategory:'weapons'},false);
  for(const name of [...c.window.CharacterCatalog.WEAPON_SKILLS,'Weapons: Custom'])assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
  const restored=await c.reload();
- assert.match(rows(restored),/data-hide-zero-skills >Hide 0 rank skills/);
- assert.match(rows(restored),/data-hide-zero-category="weapons" >Hide Weapons 0/);
+ assert.match(rows(restored),/data-hide-zero-skills="true">Hide 0 rank skills/);
+ assert.match(rows(restored),/data-hide-zero-category="weapons">Hide Weapons 0/);
  assert.ok(rows(restored).includes('data-ring-skill="War Fan"'));
  toggle(restored,{hideZeroCategory:'weapons'},true);
  assert.ok(!rows(restored).includes('data-ring-skill="War Fan"'));
@@ -437,7 +437,7 @@ test('legacy approvals remain saved and Imperial family approval lives in Identi
 });
 
 function equipmentSelect(c,index) {
-  const select=sectionHtml(c,'story').match(new RegExp(`<select data-equipment-choice="${index}">([\\s\\S]*?)</select>`));
+  const select=sectionHtml(c,'story').match(new RegExp(`<select[^>]*data-equipment-choice="${index}"[^>]*>([\\s\\S]*?)</select>`));
   assert.ok(select,`Equipment choice ${index} must be a dropdown`);
   return select[1];
 }

@@ -46,9 +46,17 @@ Character and campaign edits save locally immediately and retry connection error
 
 ## Development and validation
 
-**Design Guideline**, linked in the footer at `#/design-guideline`, catalogs the active UI with visual previews, permanent `UI-…` IDs, variants, selectors, and usage locations. Filter by ID, name, selector, or page; click an ID to share its direct link. Page coverage scans every stored reference article. The guide is available without signing in, and its script-free previews use fictional data without invoking app actions.
+**Design Guideline**, linked in the footer at `#/design-guideline`, groups the active UI into 36 families with 111 preserved variants and visual previews, permanent `UI-…` IDs, variants, selectors, and usage locations. Filter by ID, name, selector, or page; click an ID to share its direct link. Old variant IDs remain valid. Previews load only when opened. Page coverage scans every stored reference article. The guide is available without signing in, and its script-free previews use fictional data without invoking app actions.
 
-When changing a UI pattern, update its example and metadata in `design-guideline.js`. Preserve existing IDs when renaming or moving entries; assign a new semantic ID to a new pattern. Exclude retired templates and unused CSS. `npm test` checks inventory integrity and active template coverage. Run `playwright-cli run-code --filename scripts/browser_design_guideline_checks.js` from a static repository or `dist/` preview to verify filtering, deep links, responsive layout, print previews, safe interactions, and navigation regressions without signing in.
+Use the stateless `window.UI` renderers in `ui-components.js` for buttons, links, fields, checkboxes, choice groups, steppers, disclosures, panels, headings, action rows, cards, record rows, dialogs, feedback, and record editors. `ui-components.css` owns their shared screen appearance; domain CSS owns layout, ring tints, and print. Buttons have `primary`, `secondary`, and `quiet` variants and `regular` or `compact` sizes. Pass raw text through `text`, `label`, `value`, and `attrs`; only `*Html` slots (and button/link `html`) accept already composed trusted markup. Keep data attributes and event handling in the page controllers.
+
+```js
+UI.button({text:'Save session',attrs:{'data-campaign':'session-save',disabled:busy}});
+UI.field({label:'Title',value:session.title,attrs:{'data-campaign-field':'session-title'}});
+UI.stepper({value:rank,label:'Skill rank',decrease:{'data-delta':-1,disabled:rank===0},increase:{'data-delta':1}});
+```
+
+When changing a UI pattern, update its example and metadata in `design-guideline.js`. Preserve existing IDs when renaming or moving entries; add variants to an existing family when they share structure and assign a new semantic family ID only for a new pattern. Exclude retired templates and unused CSS. `npm test` checks inventory integrity and active template coverage. Run `playwright-cli run-code --filename scripts/browser_design_guideline_checks.js` from a static repository or `dist/` preview to verify filtering, deep links, responsive layout, print previews, safe interactions, and navigation regressions without signing in.
 
 Serve the repository root with `python3 -m http.server 8000`, or run `npm run build` and preview `dist/`. Production is https://l5r-rules.web.app.
 

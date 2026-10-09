@@ -37,3 +37,10 @@
 .design-guide [hidden] { display: none !important; }
 @media (max-width: 850px) { .design-guide .dg-grid { grid-template-columns: 1fr; } }
 @media (max-width: 500px) { .design-guide .dg-tools { grid-template-columns: 1fr; padding: 16px; } .design-guide .dg-entry-head { padding: 16px 16px 0; } .design-guide .dg-meta { padding: 0 16px 16px; } }
+
+.design-guide .dg-variant { margin: 12px; border: 1px solid var(--line); scroll-margin-top: 20px; }
+.design-guide .dg-variant > summary { padding: 12px; font-size: 12px; }
+.design-guide .dg-variant[open] > summary { border-bottom: 1px solid var(--line); background: var(--wash); }
+.design-guide .dg-variant:target { outline: 2px solid var(--red); outline-offset: 2px; }
+.design-guide .dg-variant-intro { margin: 12px; font-size: 12px; color: var(--muted); }
+.design-guide .dg-preview:empty { display: none; }

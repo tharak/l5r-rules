@@ -3,7 +3,8 @@
  * Update the relevant example when changing production markup or its CSS context.
  */
 (() => {
-  const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const UI = window.UI;
+  const escape = UI.escape;
   const groups = [
     ['foundations','Foundations','rokugan-theme.css',[],''],
     ['shell','Site shell','index.html',[['campaigns','All pages']],''],
@@ -15,23 +16,28 @@
     ['ledger-dice','Character ledger & dice','character.js',[['create-character','Character editor']],'creator-page'],
     ['print','Printable sheet','character.js',[['create-character','Character editor · Print sheet']],''],
   ].map(([id,name,source,uses,context]) => ({id,name,source,uses,context}));
-  const entries = [];
+  const examples = [];
   const add = (group, id, name, purpose, selectors, variants, preview, extra = {}) => {
     const defaults = groups.find(item => item.id === group);
-    entries.push({...defaults, group, id:`UI-${id}`, name, purpose, selectors, variants, preview, ...extra, uses:extra.uses ?? (extra.query ? [] : defaults.uses)});
+    examples.push({...defaults, group, id:`UI-${id}`, name, purpose, selectors, variants, preview, ...extra, uses:extra.uses ?? (extra.query ? [] : defaults.uses)});
   };
-  const button = (text, attrs = '') => `<button type="button" ${attrs}>${text}</button>`;
-  const input = (label, attrs = '') => `<label>${label}<input ${attrs}></label>`;
-  const select = (label, options = 'Choose…,Crane,Lion', attrs = '') => `<label>${label}<select ${attrs}>${options.split(',').map(o=>`<option>${o}</option>`).join('')}</select></label>`;
-  const textarea = (label, text = 'A quiet evening in the capital.', attrs = '') => `<label>${label}<textarea rows="3" ${attrs}>${text}</textarea></label>`;
-  const check = (text, attrs = '') => `<label class="creator-check"><input type="checkbox" ${attrs}>${text}</label>`;
-  const stepper = (value = 3, attrs = '') => `<div class="rank-control" role="group" aria-label="Example rank">${button('−',`aria-label="Decrease rank" ${attrs}`)}<output aria-label="Rank">${value}</output>${button('+','aria-label="Increase rank"')}</div>`;
-  const heading = (name, step = '01') => `<div class="creator-panel-head"><span class="creator-step">${step}</span><div><h2>${name}</h2><p>Choices and details for your character.</p></div></div>`;
-  const disclosure = (title, body, cls = '', open = '') => `<details class="${cls}" ${open}><summary>${title}</summary>${body}</details>`;
+  const fixtureAttrs = text => Object.fromEntries([...text.matchAll(/([\w:-]+)(?:="([^"]*)")?/g)].map(([,key,value])=>[key,value ?? true]));
+  const button = (html, attrs = '') => {
+    const props = fixtureAttrs(attrs);
+    const variant = /reset|remove/.test(props.class ?? '') || html === '×' ? 'quiet' : /Edit|Delete|Close|Cancel|Reset/.test(html) ? 'secondary' : 'primary';
+    return UI.button({html,attrs:props,variant});
+  };
+  const input = (label, attrs = '') => UI.field({label,attrs:fixtureAttrs(attrs)});
+  const select = (label, options = 'Choose…,Crane,Lion', attrs = '') => UI.field({label,kind:'select',options:options.split(',').map(label=>({label,value:label})),attrs:fixtureAttrs(attrs)});
+  const textarea = (label, value = 'A quiet evening in the capital.', attrs = '') => UI.field({label,kind:'textarea',value,attrs:{rows:3,...fixtureAttrs(attrs)}});
+  const check = (label, attrs = '') => UI.checkbox({label,attrs:fixtureAttrs(attrs),labelAttrs:{class:'creator-check'}});
+  const stepper = (value = 3, attrs = '', size = 'regular') => UI.stepper({value,size,label:'Example rank',outputLabel:'Rank',decrease:{'aria-label':'Decrease rank',...fixtureAttrs(attrs)},increase:{'aria-label':'Increase rank'}});
+  const heading = (title, step = '01') => UI.sectionHeading({title,step,description:'Choices and details for your character.'});
+  const disclosure = (title, bodyHtml, cls = '', open = '') => UI.disclosure({title,bodyHtml,attrs:{class:cls,open:Boolean(open)}});
   const article = html => `<div class="article-content">${html}</div>`;
   const list = (...labels) => `<ul>${labels.map(label=>`<li>${label}</li>`).join('')}</ul>`;
   const optionRow = `<div class="creator-option-row"><span>Ally</span><div class="creator-option-cost"><span>XP cost</span>${stepper(2)}</div>${button('×','aria-label="Remove Ally"')}</div>`;
-  const ring = (name, mark) => `<div class="creator-ring" data-ring="${name}"><div class="creator-ring-head"><span class="creator-ring-mark">${mark}</span><div><strong>${name}</strong></div><b>2</b></div><div class="creator-rank-row"><span><strong>${name === 'Void' ? 'Void' : 'Trait rank'}</strong></span>${stepper(2,'disabled')}</div></div>`;
+  const ring = (name, mark) => `<div class="creator-ring" data-ring="${name}"><div class="creator-ring-head"><span class="creator-ring-mark">${mark}</span><div><strong>${name}</strong></div><b>2</b></div><div class="creator-rank-row"><span><strong>${name === 'Void' ? 'Void' : 'Trait rank'}</strong></span>${stepper(2,'disabled','compact')}</div></div>`;
   const skill = `<div class="creator-skill-row" data-ring="Air"><div><div class="creator-skill-label"><strong>Courtier</strong><small>School rank 1 · Free</small></div><p class="creator-skill-emphases">Emphasis: Manipulation</p><p class="creator-mastery">Rank 3: A mastery benefit.</p></div><div class="creator-skill-values"><div class="creator-skill-roll"><small>Base roll</small><strong>4k3</strong></div>${stepper(1)}${button('+emphasis','class="creator-add-emphasis"')}</div></div>`;
   const compactSkill = `<div class="creator-skill-row creator-skill-compact" data-ring="Air"><button class="creator-skill-name creator-roll-skill" type="button"><strong>Courtier</strong></button><button class="creator-skill-roll creator-roll-skill" type="button"><strong>4k3</strong></button><span class="creator-skill-emphases"><button class="creator-roll-emphasis" type="button">Manipulation</button></span></div>`;
   const ability = disclosure('Example spell · spell · Air 1 · 0 XP · School grant', '<dl><dt>Range</dt><dd>Personal</dd><dt>Duration</dt><dd>One scene</dd></dl><p>A recorded ability description.</p><p>Spell Casting Roll: 4k3 · TN 10</p><div class="creator-header-actions"><a href="#/magic">Local rules ↗</a>'+button('Memorize · 1 XP')+button('Remove ability')+'</div>', '', 'open');
@@ -145,7 +151,7 @@
   add('ledger-dice','DERIVED-VALUES','Derived & combat values','Label/value rows for Insight, rank, and combat statistics.','.creator-derived, .creator-combat','Insight; initiative; armor TN; healing; damage; Void; reduction',`<div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>4k3</strong></div><div><span>Armor TN (equipped)</span><strong>20</strong></div><div><span>Healing / day</span><strong>5</strong></div></div>`);
   add('ledger-dice','WOUND-TRACK','Cumulative wound table','Wound level names, capacities, and rule explanation.','.creator-wounds','Healthy through Out; cumulative totals','<div class="creator-ledger-heading">Wounds · cumulative totals</div><div class="creator-wounds"><div><span>Healthy</span><strong>10</strong></div><div><span>Nicked</span><strong>14</strong></div><div><span>Grazed</span><strong>18</strong></div><small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div>');
   add('ledger-dice','EMPHASIS-DIALOG','Emphasis dialog','Owned emphases, purchase choices, and custom emphasis entry.','.creator-emphasis-dialog, .creator-emphasis-owned, .creator-emphasis-choices','School grant, purchased/removable, selected/disabled, validation',`<dialog class="creator-emphasis-dialog" open aria-label="Example emphasis choices"><header><h2>Courtier · Emphases</h2>${button('Close')}</header><div class="creator-emphasis-body"><p>Rank 3 · Emphases 1/2 · 2 XP each</p><div class="creator-emphasis-owned"><div><span>Manipulation</span><small>School / saved grant</small></div></div><div class="creator-emphasis-choices">${button('Manipulation <small>Selected</small>','disabled')}${button('Rhetoric <small>2 XP</small>')}</div><div class="creator-add-row"><input placeholder="Custom emphasis" aria-label="New emphasis">${button('Buy emphasis · 2 XP')}</div></div></dialog>`);
-  add('ledger-dice','DICE-DIALOG','Dice roll dialog','Dice pool adjustments, roll/reset actions, and result area.','.creator-roll-dialog, .creator-roll-fields, .creator-roll-actions','Ring, trait, skill, emphasis; before/after roll',`<dialog class="creator-roll-dialog" open aria-label="Example dice roll"><header><h2>Courtier</h2></header><div class="creator-roll-dialog-body"><div class="creator-roll-fields" role="group" aria-label="Dice pool">${stepper(4)}<span class="creator-roll-separator">k</span>${stepper(3)}<span class="creator-roll-separator">+</span>${stepper(0)}</div><div class="creator-roll-actions">${button('Roll','class="creator-primary"')}${button('Reset bonuses')}</div>${dice}</div><footer>${button('Close')}</footer></dialog>`);
+  add('ledger-dice','DICE-DIALOG','Dice roll dialog','Dice pool adjustments, roll/reset actions, and result area.','.creator-roll-dialog, .creator-roll-fields, .creator-roll-actions','Ring, trait, skill, emphasis; before/after roll',`<dialog class="creator-roll-dialog" open aria-label="Example dice roll"><header><h2>Courtier</h2></header><div class="creator-roll-dialog-body"><div class="creator-roll-fields" role="group" aria-label="Dice pool">${stepper(4,'','compact')}<span class="creator-roll-separator">k</span>${stepper(3,'','compact')}<span class="creator-roll-separator">+</span>${stepper(0,'','compact')}</div><div class="creator-roll-actions">${button('Roll','class="creator-primary"')}${button('Reset bonuses')}</div>${dice}</div><footer>${button('Close')}</footer></dialog>`);
   add('ledger-dice','DICE-RESULT','Dice result & total','Kept/discarded dice, explosions/rerolls, and total equation.','.creator-roll-result, .creator-roll-dice, .kept, .discarded, .creator-roll-total','Kept, discarded, exploding die, rerolled one',`<div class="creator-roll-dialog-body">${dice}</div>`);
 
   const printLine = (label,value='') => `<div class="print-line"><span>${label}</span><strong>${value}</strong></div>`;
@@ -163,52 +169,110 @@
   add('character-editor','OPTION-CHOICE','Option-specific choice','Additional details for an advantage or disadvantage.','.creator-option-choice, [data-option-detail]','Catalog variant dropdown; custom rank, skill, ally, or other choice',`<div class="creator-option-list"><div class="creator-option-row"><span>Consumed</span><label class="creator-option-choice">Specific choice<select><option>Choose a variant</option><option>Perfection</option><option>Knowledge</option></select></label></div><div class="creator-option-row"><span>Ally</span><label class="creator-option-choice">Specific choice<input placeholder="Rank, skill, ally, or other choice"></label></div></div>`);
   add('character-editor','STANDING-STEPPER','Standing & wounds controls','Grouped numeric steppers for narrative and combat standing.','.creator-standing-fields, .creator-number-field','Honor, Status, Wounds taken, Taint, Glory; decimal and integer steps',`<div class="creator-standing-fields">${['Honor','Status','Wounds taken','Taint','Glory'].map((label,i)=>`<div class="creator-number-field"><span>${label}</span>${stepper(i<2?'3.0':i===2?'0':'0.0',i>1?'disabled':'')}</div>`).join('')}</div>`);
 
+  // IDs are permanent. An old ID identifies a variant within its shared family.
+  const categories = [['foundations','Foundations'],['shell','Site shell'],['shared','Shared components'],['reference','Reference content'],['compositions','Compositions']];
+  const definitions = [
+    ['foundations','COLOR-PALETTE','Paper palette','COLOR-PALETTE'],
+    ['foundations','TYPOGRAPHY','Typography','TYPOGRAPHY'],
+    ['foundations','RING-SYMBOLS','Ring symbols & tints','RING-SYMBOLS'],
+    ['foundations','BOOK-ICONS','Book icons','BOOK-ICONS'],
+    ['shell','SITE-BRAND','Site brand','SITE-BRAND'],
+    ['shell','SITE-NAVIGATION','Site navigation','SITE-NAVIGATION'],
+    ['shell','SETTING-BANNER','Setting banner','SETTING-BANNER'],
+    ['shell','PAGE-HEADER','Page header','BREADCRUMB ARTICLE-TITLE'],
+    ['shell','SITE-FOOTER','Site footer','SITE-FOOTER'],
+    ['shell','WORKSPACE-LAYOUT','Workspace layout','CHARACTER-LAYOUT'],
+    ['shared','BUTTON','Button','BUTTON-PRIMARY BUTTON-SECONDARY BUTTON-RESET'],
+    ['shared','LINK','Link','LINK ARTICLE-LINKS'],
+    ['shared','FIELD','Field','FIELD-TEXT FIELD-SEARCH FIELD-NUMBER FIELD-SELECT FIELD-AUTOCOMPLETE FIELD-TEXTAREA OPTION-CHOICE'],
+    ['shared','CHECKBOX','Checkbox','CHECKBOX SECTION-PRIVACY SKILL-FILTER'],
+    ['shared','CHOICE-GROUP','Choice group','CAMPAIGN-SECTIONS CHARACTER-NAVIGATION TRAIT-CHOICE'],
+    ['shared','RANK-STEPPER','Rank stepper','RANK-STEPPER STANDING-STEPPER'],
+    ['shared','DISCLOSURE','Disclosure','DISCLOSURE ARTICLE-CONTENTS RETAINED-DRAFTS ANCESTOR ABILITY'],
+    ['shared','PANEL','Panel','PANEL BOOK-PANEL'],
+    ['shared','SECTION-HEADING','Section heading','WORKSPACE-HEADING CHARACTER-PANEL'],
+    ['shared','ACTION-ROW','Action row','ADD-ROW CHARACTER-TOOLBAR'],
+    ['shared','CARD','Card','CAMPAIGN-CARD CHARACTER-TILE REFERENCE-CARD TRAIT-RING ROLL-RING'],
+    ['shared','RECORD-ROW','Record row','PC-ROSTER SKILL-ROW SKILL-COMPACT OPTION-ROW EQUIPMENT SESSION-LIST NPC-LIST PLOT-LIST PC-PICKER NOTE PLOT-DETAIL'],
+    ['shared','DIALOG','Dialog','RULES-POPUP EMPHASIS-DIALOG DICE-DIALOG BROWSER-PROMPT'],
+    ['shared','FEEDBACK','Feedback','VALIDATION SAVE-STATUS EMPTY-STATE LOADING UNAVAILABLE SEARCH-EMPTY CAMPAIGN-SIGN-IN'],
+    ['reference','ARTICLE-CONTENT','Article content','ARTICLE-HEADINGS ARTICLE-TEXT ARTICLE-LISTS DIRECTORY'],
+    ['reference','ARTICLE-TABLE','Reference table','ARTICLE-TABLE'],
+    ['reference','ARTICLE-QUOTE','Reference quotation','ARTICLE-QUOTE'],
+    ['reference','ARTICLE-IMAGE','Reference image','ARTICLE-IMAGE'],
+    ['compositions','ACCOUNT-MENU','Account menu','ACCOUNT-MENU ACCOUNT-SIGN-IN'],
+    ['compositions','SEARCH','Search','SEARCH-DIALOG SEARCH-RESULT'],
+    ['compositions','RECORD-EDITOR','Record editor','SESSION-EDITOR NPC-EDITOR ENTRY-EDITOR CAMPAIGN-TITLE'],
+    ['compositions','INVITATION','Invitation','INVITATION INVITE-SETTINGS'],
+    ['compositions','CHARACTER-FORMS','Character forms','IDENTITY-FIELDS TRAINING-NOTE LATER-TRAINING SCHOOL-CHOICES CUSTOM-ABILITY OPTIONAL-TRAINING STORY-FIELDS MODIFIERS PURCHASE XP-AWARD'],
+    ['compositions','CHARACTER-LEDGER','Character ledger','CHARACTER-SUMMARY CHARACTER-TOTALS XP-BUDGET STANDING-TRACK SUMMARY-RINGS DERIVED-VALUES WOUND-TRACK'],
+    ['compositions','DICE-RESULT','Dice result','DICE-RESULT'],
+    ['compositions','PRINT-SHEET','Print sheet','PRINT-IDENTITY PRINT-RINGS PRINT-SKILLS PRINT-STANDING PRINT-COMBAT PRINT-WEAPONS PRINT-PERSONAL-RECORD'],
+  ];
+  const entries = definitions.map(([group,id,name,ids])=>({group,id:`UI-${id}`,name,exampleIds:ids.split(' ').map(id=>`UI-${id}`)}));
+  const exampleById = new Map(examples.map(item=>[item.id,item]));
   let cachedWiki, cachedInventory, cachedCoverage;
   function inventory(wiki) {
     if (cachedWiki === wiki) return cachedInventory;
     const documents = Object.values(wiki.pages).map(page => ({page, doc:new DOMParser().parseFromString(page.html,'text/html')}));
-    cachedCoverage = documents.map(({page,doc}) => ({slug:page.slug, title:page.title, ids:entries.filter(item=>item.query && doc.querySelector(item.query)).map(item=>item.id)}));
-    cachedInventory = entries.map(item => ({...item, uses:[...item.uses, ...documents.filter(({doc})=>item.query && doc.querySelector(item.query)).map(({page})=>[page.slug,page.title])]}));
+    cachedCoverage = documents.map(({page,doc}) => ({slug:page.slug, title:page.title, ids:examples.filter(item=>item.query && doc.querySelector(item.query)).map(item=>item.id)}));
+    const scanned = new Map(examples.map(item => [item.id,{...item, uses:[...item.uses, ...documents.filter(({doc})=>item.query && doc.querySelector(item.query)).map(({page})=>[page.slug,page.title])]}]));
+    cachedInventory = entries.map(item=>({...item,examples:item.exampleIds.map(id=>scanned.get(id))}));
     cachedWiki = wiki;
     return cachedInventory;
   }
   const href = id => `#/design-guideline#${id}`;
   function usageLinks(uses) {
     const links = uses.map(([slug,title])=>`<li><a href="#/${encodeURIComponent(slug)}">${escape(title)}</a></li>`).join('');
-    return uses.length > 4 ? `<details><summary>${uses.length} locations · show all</summary><ul>${links}</ul></details>` : `<ul>${links}</ul>`;
+    return uses.length > 4 ? UI.disclosure({title:`${uses.length} locations · show all`,bodyHtml:`<ul>${links}</ul>`}) : `<ul>${links}</ul>`;
+  }
+  function variant(item,family) {
+    const words = [family.id,family.name,item.id,item.name,item.purpose,item.variants,item.selectors,item.source,...item.uses.flat()].join(' ').toLocaleLowerCase();
+    return UI.disclosure({titleHtml:`<code>${item.id}</code> · ${escape(item.name)}`,attrs:{class:'dg-variant',id:item.id===family.id?`${item.id}--example`:item.id,'data-dg-example':item.id,'data-dg-words':words},bodyHtml:`<p class="dg-variant-intro">${escape(item.purpose)} <a href="${href(item.id)}" aria-label="Link to ${escape(item.name)}">Link to variant</a></p><div class="dg-preview" data-dg-specimen="${item.id}"></div><dl class="dg-meta"><dt>Variants & states</dt><dd>${escape(item.variants)}</dd><dt>Used in</dt><dd>${usageLinks(item.uses.length?item.uses:[['campaigns','Shared site theme']])}</dd><dt>Source & selectors</dt><dd>${escape(item.source)}<br><code>${escape(item.selectors)}</code></dd></dl>`});
   }
   function card(item) {
-    const words = [item.id,item.name,item.purpose,item.variants,item.selectors,item.source,...item.uses.flat()].join(' ').toLocaleLowerCase();
-    return `<article class="dg-component" id="${item.id}" data-dg-words="${escape(words)}"><div class="dg-entry-head"><a class="dg-id" href="${href(item.id)}" aria-label="Link to ${escape(item.name)}"><code>${item.id}</code></a><h3>${escape(item.name)}</h3><p>${escape(item.purpose)}</p></div><div class="dg-preview"><iframe title="${escape(item.name)} preview" loading="lazy" sandbox="allow-same-origin" data-dg-preview="${item.id}"></iframe></div><dl class="dg-meta"><dt>Variants & states</dt><dd>${escape(item.variants)}</dd><dt>Used in</dt><dd>${usageLinks(item.uses.length?item.uses:[['campaigns','Shared site theme']])}</dd><dt>Source & selectors</dt><dd>${escape(item.source)}<br><code>${escape(item.selectors)}</code></dd></dl></article>`;
+    return UI.card({attrs:{class:'dg-component',id:item.id},bodyHtml:`<div class="dg-entry-head"><a class="dg-id" href="${href(item.id)}" aria-label="Link to ${escape(item.name)}"><code>${item.id}</code></a><h3>${escape(item.name)}</h3><p>${item.examples.length} ${item.examples.length===1?'example':'variants'} · ${item.group==='shared'?'Shared renderer in ui-components.js':'Composed from shared components and domain styles'}</p></div>${item.examples.map(example=>variant(example,item)).join('')}`});
   }
   function render(wiki) {
     const items = inventory(wiki);
-    return `<div class="design-guide"><div class="eyebrow">THE ROKUGAN ARCHIVE · UI INVENTORY</div><h1>Design Guideline</h1><p class="dg-intro">${items.length} reusable UI patterns across campaigns, characters, books, and ${cachedCoverage.length} stored reference pages. Each example uses the current site styles and fictional content.</p><p class="dg-intro">Use the permanent ID when requesting a change, for example: “Make <code>UI-CAMPAIGN-CARD</code> more compact.” Click an ID for its shareable link. Repeated instances share an ID; variants and states are listed with each pattern.</p><div class="dg-tools"><label for="dg-filter">Find a component by name, ID, page, or selector<input id="dg-filter" type="search" placeholder="Try UI-RANK-STEPPER, dice, or Combat" autocomplete="off"></label><div class="dg-count" id="dg-count" role="status">${items.length} of ${items.length} components</div></div><nav class="dg-nav" aria-label="Component categories">${groups.map(g=>`<a href="${href(`dg-${g.id}`)}">${escape(g.name)}</a>`).join('')}</nav><p id="dg-empty" hidden>No components match. Try another name or ID.</p>${groups.map(g=>`<section class="dg-category" id="dg-${g.id}"><h2>${escape(g.name)}</h2><div class="dg-grid">${items.filter(i=>i.group===g.id).map(card).join('')}</div></section>`).join('')}<details class="dg-coverage"><summary>Page coverage · ${cachedCoverage.length} reference pages</summary><p>Every stored page was scanned for the article patterns above. App screens and conditional states are documented in the component usage lists.</p><ul>${cachedCoverage.map(p=>`<li><a href="#/${encodeURIComponent(p.slug)}">${escape(p.title)}</a> <small>(${escape(p.slug)})</small><div class="dg-page-patterns">${p.ids.map(id=>`<a href="${href(id)}"><code>${id}</code></a>`).join('') || 'Redirect page; uses the destination workspace.'}</div></li>`).join('')}</ul></details></div>`;
+    return `<div class="design-guide"><div class="eyebrow">THE ROKUGAN ARCHIVE · UI INVENTORY</div><h1>Design Guideline</h1><p class="dg-intro">${items.length} component families with ${examples.length} variants across campaigns, characters, books, and ${cachedCoverage.length} stored reference pages. Equivalent controls share one renderer and appearance.</p><p class="dg-intro">Refer to a family ID such as <code>UI-BUTTON</code>, or an existing variant ID such as <code>UI-CAMPAIGN-CARD</code>. Click an ID for its shareable link. Open a variant to load its preview.</p><div class="dg-tools">${UI.field({label:'Find a component by name, ID, page, or selector',attrs:{id:'dg-filter',type:'search',placeholder:'Try UI-RANK-STEPPER, dice, or Combat',autocomplete:'off'},labelAttrs:{for:'dg-filter'}})}<div class="dg-count" id="dg-count" role="status">${items.length} of ${items.length} families · ${examples.length} variants</div></div><nav class="dg-nav" aria-label="Component categories">${categories.map(([id,name])=>`<a href="${href(`dg-${id}`)}">${escape(name)}</a>`).join('')}</nav><p id="dg-empty" hidden>No components match. Try another name or ID.</p>${categories.map(([id,name])=>`<section class="dg-category" id="dg-${id}"><h2>${escape(name)}</h2><div class="dg-grid">${items.filter(i=>i.group===id).map(card).join('')}</div></section>`).join('')}<details class="dg-coverage"><summary>Page coverage · ${cachedCoverage.length} reference pages</summary><p>Every stored page was scanned for the article patterns above. App screens and conditional states are documented in the component usage lists.</p><ul>${cachedCoverage.map(p=>`<li><a href="#/${encodeURIComponent(p.slug)}">${escape(p.title)}</a> <small>(${escape(p.slug)})</small><div class="dg-page-patterns">${p.ids.map(id=>`<a href="${href(id)}"><code>${id}</code></a>`).join('') || 'Redirect page; uses the destination workspace.'}</div></li>`).join('')}</ul></details></div>`;
   }
 
-  const styles = ['styles.css','dark-theme.css','character.css','dashboard.css','account.css','campaign.css','rokugan-theme.css'];
+  const styles = ['styles.css','dark-theme.css','character.css','dashboard.css','account.css','campaign.css','rokugan-theme.css','ui-components.css'];
   function specimen(item) {
-    const preview = item.buildPreview ? item.buildPreview() : item.preview;
+    const doc = new DOMParser().parseFromString(item.buildPreview ? item.buildPreview() : item.preview,'text/html');
+    const props = node => Object.fromEntries([...node.attributes].map(attr=>[attr.name,['disabled','readonly','checked','selected','hidden','multiple','required','open'].includes(attr.name)?true:attr.value]));
+    // Complex compositions retain their domain layout while their controls use
+    // the same renderer as production. Specialized roll targets keep ring tints.
+    for (const node of doc.querySelectorAll('button:not(.ui-button)')) {
+      if (node.matches('.creator-roll-ring,.creator-roll-trait,.creator-roll-skill,.creator-roll-emphasis')) continue;
+      node.outerHTML = UI.button({html:node.innerHTML,variant:node.closest('.character-actions') || /^(Edit|Delete|Close|Cancel|Reset)/.test(node.textContent)?'secondary':node.textContent==='×'?'quiet':'primary',attrs:{...props(node),disabled:node.disabled}});
+    }
+    for (const node of doc.querySelectorAll('input:not(.ui-field),select:not(.ui-field),textarea:not(.ui-field)')) {
+      if (node.matches('[type="checkbox"],[type="radio"]')) {node.closest('label')?.classList.add('ui-checkbox');continue;}
+      node.closest('label')?.classList.add('ui-field-label');
+      node.outerHTML = UI.field({kind:node.localName,value:node.value,optionsHtml:node.innerHTML,attrs:props(node)});
+    }
+    const preview = doc.body.innerHTML;
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self'; font-src 'self' https://fonts.gstatic.com"><title>${escape(item.name)} preview</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap">${styles.map(file=>`<link rel="stylesheet" href="${file}">`).join('')}<style>html,body{min-height:0;margin:0}html{scroll-behavior:auto}body{background:var(--paper)}.dg-specimen{padding:16px;display:flow-root;min-width:0;overflow-wrap:anywhere}.dg-specimen>.workspace,.dg-specimen>.creator-page{padding:0;margin:0;max-width:none}.dg-specimen dialog[open]{position:relative;inset:auto;max-width:100%;margin:0 auto}.dg-specimen .creator-summary{position:static;max-width:100%}.dg-specimen .creator-summary-inner{position:static}.dg-specimen .account-panel{position:static;max-width:100%;width:280px}.dg-specimen .account-menu{max-width:100%;width:280px}.dg-specimen .article,.dg-specimen .directory{padding:12px}.dg-specimen .loading{padding:24px}.dg-specimen .not-found{padding:24px;min-height:0}.dg-specimen .search-dialog{width:100%}</style></head><body data-overview="${Boolean(item.overview)}"><div class="dg-specimen"><div class="${item.context}">${item.group==='print'?`<div class="creator-print-sheet">${preview}</div>`:preview}</div></div></body></html>`;
   }
   let cleanup = [];
   function unmount() { cleanup.forEach(fn=>fn()); cleanup = []; }
   function mount(root) {
+    unmount();
     const field = root.querySelector('#dg-filter');
     const cards = [...root.querySelectorAll('.dg-component')];
-    const categories = [...root.querySelectorAll('.dg-category')];
-    const filter = () => {
-      const terms = field.value.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-      let visible = 0;
-      for (const card of cards) {card.hidden = !terms.every(t=>card.dataset.dgWords.includes(t)); if(!card.hidden)visible++;}
-      for (const category of categories) category.hidden = !category.querySelector('.dg-component:not([hidden])');
-      root.querySelector('#dg-count').textContent = `${visible} of ${cards.length} components`;
-      root.querySelector('#dg-empty').hidden = visible !== 0;
-    };
-    field.addEventListener('input',filter);
-    cleanup.push(()=>field.removeEventListener('input',filter));
-    for (const frame of root.querySelectorAll('[data-dg-preview]')) {
-      const item = entries.find(i=>i.id===frame.dataset.dgPreview);
+    const variants = [...root.querySelectorAll('.dg-variant')];
+    const sections = [...root.querySelectorAll('.dg-category')];
+    function load(details) {
+      const holder = details.querySelector('[data-dg-specimen]');
+      if (!holder || holder.firstChild) return;
+      const item = exampleById.get(details.dataset.dgExample);
+      const frame = document.createElement('iframe');
+      frame.title = `${item.name} preview`;
+      frame.setAttribute('sandbox','allow-same-origin');
+      frame.dataset.dgPreview = item.id;
+      holder.append(frame);
       const loaded = () => {
         const doc = frame.contentDocument;
         if (!doc?.querySelector('.dg-specimen')) return;
@@ -236,6 +300,34 @@
       cleanup.push(()=>frame.removeEventListener('load',loaded));
       frame.srcdoc = specimen(item);
     }
+    const open = event => {if(event.target.matches('.dg-variant[open]'))load(event.target);};
+    root.addEventListener('toggle',open,true);
+    cleanup.push(()=>root.removeEventListener('toggle',open,true));
+    const filter = () => {
+      const terms = field.value.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+      for (const variant of variants) variant.hidden = !terms.every(t=>variant.dataset.dgWords.includes(t));
+      for (const card of cards) card.hidden = !card.querySelector('.dg-variant:not([hidden])');
+      for (const section of sections) section.hidden = !section.querySelector('.dg-component:not([hidden])');
+      const visible = cards.filter(card=>!card.hidden).length;
+      root.querySelector('#dg-count').textContent = `${visible} of ${cards.length} families · ${variants.filter(v=>!v.hidden).length} variants`;
+      root.querySelector('#dg-empty').hidden = visible !== 0;
+    };
+    field.addEventListener('input',filter);
+    cleanup.push(()=>field.removeEventListener('input',filter));
+    // Resolve both canonical family IDs and every original variant ID.
+    const reveal = () => {
+      const id = decodeURIComponent(location.hash.split('#').slice(2).join('#'));
+      const detail = variants.find(v=>v.dataset.dgExample===id);
+      const family = cards.find(card=>card.id===id);
+      const target = detail ?? family?.querySelector('.dg-variant');
+      if (target) {
+        field.value=''; filter(); target.open=true; load(target);
+        (family ?? target).scrollIntoView({block:'start'});
+      }
+    };
+    window.addEventListener('hashchange',reveal);
+    cleanup.push(()=>window.removeEventListener('hashchange',reveal));
+    reveal();
   }
-  window.DesignGuideline = {render,mount,unmount,inventory,entries};
+  window.DesignGuideline = {render,mount,unmount,inventory,entries,examples};
 })();

@@ -93,6 +93,7 @@ function campaignCards() {
  }};
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
+ vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});
  vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn},location,Event,console,setTimeout});
  const render=()=>window.CampaignUI.render('campaigns');
  return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value,

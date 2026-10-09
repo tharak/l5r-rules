@@ -1,6 +1,7 @@
+const UI = window.UI;
 const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set() };
 const $ = (selector) => document.querySelector(selector);
-const esc = (value) => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const esc = UI.escape;
 const pageHref = slug => `#/${encodeURIComponent(slug)}`;
 
 function currentSlug() {
@@ -98,8 +99,8 @@ function renderNavigation() {
   });
 }
 function renderBooks() {
-  const entries = items => `<ul>${items.map(item => `<li><a href="${navHref(item)}">${esc(item.title)}</a>${item.children?.length ? `<details><summary>Sections</summary>${entries(item.children)}</details>` : ''}</li>`).join('')}</ul>`;
-  return `<div class="workspace"><h1>Books</h1><div class="books-grid">${bookSections().map(book => `<section class="panel"><h2>${bookMark(book.slug)}<a href="${pageHref(book.slug)}">${esc(book.title)}</a></h2>${entries(book.children)}</section>`).join('')}</div><a href="#/all-pages">All pages</a></div>`;
+  const entries = items => `<ul>${items.map(item => `<li>${UI.link({href:navHref(item),text:item.title})}${item.children?.length ? UI.disclosure({attrs:{},titleHtml:`Sections`,bodyHtml:`${entries(item.children)}`}) : ''}</li>`).join('')}</ul>`;
+  return `<div class="workspace"><h1>Books</h1><div class="books-grid">${bookSections().map(book => UI.panel({attrs:{'class':'panel'},bodyHtml:`<h2>${bookMark(book.slug)}<a href="${pageHref(book.slug)}">${esc(book.title)}</a></h2>${entries(book.children)}`})).join('')}</div><a href="#/all-pages">All pages</a></div>`;
 }
 
 function bookMark(slug) {
@@ -116,7 +117,7 @@ function bookMark(slug) {
 function card(entry, eyebrow = 'REFERENCE') {
   const page = state.data.pages[entry.slug];
   const description = entry.slug === 'create-character' ? 'Build your samurai with clans, schools, skills, and a live XP budget.' : page?.excerpt || 'Explore this section of the archive.';
-  return `<a class="page-card" href="${pageHref(entry.slug)}"><span class="card-top"><span class="card-icon" aria-hidden="true">${iconFor(entry.title)}</span><span class="card-arrow" aria-hidden="true">↗</span></span><span class="card-eyebrow">${esc(eyebrow)}</span><strong>${esc(entry.title)}</strong><span class="card-description">${esc(description)}</span></a>`;
+  return UI.card({attrs:{'class':'page-card'},href:pageHref(entry.slug),bodyHtml:`<span class="card-top"><span class="card-icon" aria-hidden="true">${iconFor(entry.title)}</span><span class="card-arrow" aria-hidden="true">↗</span></span><span class="card-eyebrow">${esc(eyebrow)}</span><strong>${esc(entry.title)}</strong><span class="card-description">${esc(description)}</span>`});
 }
 
 function iconFor(title) {
@@ -126,7 +127,7 @@ function iconFor(title) {
 
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
-  return `<div class="workspace"><div class="workspace-head"><h1>Characters</h1><button data-dashboard="new">Create PC</button></div><div class="character-list">${characters.map(c => `<article class="character-tile"><div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div><div class="character-actions"><button data-dashboard="open" data-id="${esc(c.id)}">Edit</button><button data-dashboard="remove" data-id="${esc(c.id)}">Delete</button></div></article>`).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
+  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Create PC',attrs:{'data-dashboard':'new'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`<div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Edit',variant:'secondary',attrs:{'data-dashboard':'open','data-id':c.id}})}${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
 }
 
 function renderArticle(page) {
@@ -156,7 +157,7 @@ function renderArticle(page) {
       else link.replaceWith(document.createTextNode(link.textContent));
     }
   }
-  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1>${esc(page.title)}</h1></div>${toc.length ? `<details class="inline-contents"><summary>Contents</summary><nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav></details>` : ''}<div class="article-content">${wrapper.innerHTML}</div>${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
+  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1>${esc(page.title)}</h1></div>${toc.length ? UI.disclosure({attrs:{'class':'inline-contents'},titleHtml:`Contents`,bodyHtml:`<nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>`}) : ''}<div class="article-content">${wrapper.innerHTML}</div>${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
 
 }
 
@@ -167,10 +168,9 @@ function openRules(href) {
   let slug,anchor;
   try {slug=decodeURIComponent(match[1]);anchor=decodeURIComponent(match[2] || '');}catch{return;}
   if(!rulesDialog) {
-    rulesDialog=document.createElement('dialog');
-    rulesDialog.className='rules-popup';
-    rulesDialog.setAttribute('aria-labelledby','rules-popup-title');
-    rulesDialog.innerHTML='<div class="rules-popup-header"><h2 id="rules-popup-title"></h2><button type="button" aria-label="Close rules" autofocus>Close</button></div><div class="rules-popup-body"></div>';
+    const template=document.createElement('template');
+    template.innerHTML=UI.dialog({title:'',titleId:'rules-popup-title',attrs:{class:'rules-popup'},headerClass:'rules-popup-header',bodyClass:'rules-popup-body',headerHtml:`<h2 id="rules-popup-title"></h2>${UI.button({text:'Close',variant:'secondary',attrs:{'aria-label':'Close rules',autofocus:true}})}`});
+    rulesDialog=template.content.firstElementChild;
     document.body.append(rulesDialog);
     rulesDialog.querySelector('button').addEventListener('click',()=>rulesDialog.close());
     rulesDialog.addEventListener('close',()=>{
