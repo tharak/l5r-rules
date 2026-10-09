@@ -441,6 +441,25 @@ test('numeric steppers preserve decimal precision, bounds and saved values',asyn
   assert.equal((await c.data()).derived.honor,10);
 });
 
+test('Wounds card follows wound thresholds and recalculates its status when Earth changes',async()=>{
+  const c=await character();
+  for(const [value,status,hue] of [[0,'Healthy',120],[10,'Healthy',120],[11,'Nicked',103],[14,'Nicked',103],[15,'Grazed',86],[19,'Hurt',69],[23,'Injured',51],[27,'Crippled',34],[31,'Down',17],[35,'Out',0],[38,'Out',0],[39,'Dead',0]]) {
+    c.change({field:'woundsTaken'},String(value));
+    const html=sectionHtml(c,'rolls');
+    assert.match(html,new RegExp(`--wound-hue:${hue}"`));
+    assert.match(html,new RegExp(`role="status">${status}</span>`));
+    assert.doesNotMatch(html,/Wounds taken/);
+    assert.equal((html.match(/aria-current="true"/g)||[]).length,status==='Dead'?0:1);
+  }
+  c.change({field:'woundsTaken'},'11');
+  for(const trait of ['Stamina','Willpower'])c.click({action:'trait',trait,delta:'1'});
+  assert.match(sectionHtml(c,'rolls'),/role="status">Healthy<\/span>/);
+  assert.match(sectionHtml(c,'rolls'),/aria-current="true"><span>Healthy \(\+0\)<\/span><strong>15<\/strong>/);
+  const loaded=await c.reload();
+  assert.equal((await loaded.data()).character.woundsTaken,11);
+  assert.match(sectionHtml(loaded,'rolls'),/--wound-hue:120/);
+});
+
 test('legacy approvals remain saved and Imperial family approval lives in Identity',async()=>{
   const c=await character({exceptions:[{id:'legacy',code:'rank:skill:Defense',explanation:'Existing approval'}]});
   c.change({field:'clan'},'Imperial');

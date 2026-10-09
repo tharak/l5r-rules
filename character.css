@@ -142,8 +142,19 @@
 @media print{.rules-popup{display:none!important}body.rules-open{overflow:visible}}
 
 @media screen {
-  .creator-roll-wounds { margin-top: 18px; }
-  .creator-roll-wounds > .creator-ledger-heading { margin-top: 18px; }
+  #creator-rolls .creator-roll-wounds {
+    --ring-heading: hsl(var(--wound-hue) 45% 80%);
+    --trait-heading: hsl(var(--wound-hue) 45% 90%);
+    --ring-surface: hsl(var(--wound-hue) 40% 96%);
+    margin-top: 18px; max-width: 420px; background: var(--ring-surface);
+  }
+  #creator-rolls .creator-roll-wounds .creator-ring-head { justify-content: space-between; }
+  #creator-rolls .creator-roll-wounds .creator-ring-head > b { width: auto; height: auto; }
+  .creator-roll-wounds .creator-wound-status { color: hsl(var(--wound-hue) 70% 24%); }
+  .creator-roll-wounds .creator-number-field { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+  .creator-roll-wounds .creator-wounds { border: 0; margin: 0; }
+  .creator-roll-wounds .creator-wounds > div { padding: 8px 10px; }
+  .creator-roll-wounds .creator-wounds [aria-current="true"] { background: var(--trait-heading); font-weight: 700; }
   .creator-roll-combat { margin-top: 18px; }
   .creator-standing-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 13px; }
   @media(max-width:700px) { .creator-standing-fields { grid-template-columns: 1fr; } }
