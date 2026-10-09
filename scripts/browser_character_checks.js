@@ -34,7 +34,7 @@ async page => {
     check(await p.locator('#creator-summary [data-field="woundsTaken"]').count()===0,'Wounds stepper remains in Character Record');
     check(await p.locator('#creator-summary .creator-ledger-heading').count()===0,'Removed Character Record sections remain');
     check(await p.locator('#creator-rolls > .creator-roll-wounds + .creator-roll-combat .creator-combat').count()===1,'Combat values must follow Wounds in section 00');
-    check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wounds > div').count()===8,'Cumulative wound values must appear below Wounds taken');
+    check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wounds > div').count()===8,'Eight wound statuses must appear below the stepper');
     check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wound-status').innerText()==='Healthy','Wounds card must show the current status');
     check(await p.locator('#creator-rolls .creator-roll-wounds').evaluate(node=>getComputedStyle(node).getPropertyValue('--wound-hue').trim())==='120','Healthy wounds must use green');
     check(await p.locator('#creator-story .creator-standing-fields,#creator-story #creator-equipment').count()===0,'Story still contains standing or equipment');

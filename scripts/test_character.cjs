@@ -454,7 +454,10 @@ test('Wounds card follows wound thresholds and recalculates its status when Eart
   c.change({field:'woundsTaken'},'11');
   for(const trait of ['Stamina','Willpower'])c.click({action:'trait',trait,delta:'1'});
   assert.match(sectionHtml(c,'rolls'),/role="status">Healthy<\/span>/);
-  assert.match(sectionHtml(c,'rolls'),/aria-current="true"><span>Healthy \(\+0\)<\/span><strong>15<\/strong>/);
+  assert.match(sectionHtml(c,'rolls'),/Wounds - <span class="creator-wound-status" role="status">Healthy<\/span>/);
+  assert.match(sectionHtml(c,'rolls'),/aria-current="true"><span>Healthy<\/span><\/div>/);
+  const track=sectionHtml(c,'rolls').match(/<div class="creator-wounds">([\s\S]*?)<\/div><\/div><div class="creator-roll-combat">/)[1];
+  assert.doesNotMatch(track,/<strong>|<small>|\(\+|Earth ×/);
   const loaded=await c.reload();
   assert.equal((await loaded.data()).character.woundsTaken,11);
   assert.match(sectionHtml(loaded,'rolls'),/--wound-hue:120/);

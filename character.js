@@ -266,7 +266,7 @@
     const severity=levelIndex<0?wounds.levels.length-1:levelIndex;
     const hue=Math.round(120*(1-severity/Math.max(1,wounds.levels.length-1)));
     const status=wounds.currentLevel.replace(/\s*\([^)]*\)/g,'');
-    return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}"><div class="creator-ring-head"><strong>Wounds (<span class="creator-wound-status" role="status">${escapeHtml(status)}</span>)</strong><b>${wounds.current}</b></div><div class="creator-rank-row">${renderNumber('woundsTaken',wounds.current)}</div><div class="creator-wounds">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span>${escapeHtml(level.label)}</span><strong>${level.total}</strong></div>`).join('')}<small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div></div>`;
+    return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}"><div class="creator-ring-head"><strong>Wounds - <span class="creator-wound-status" role="status">${escapeHtml(status)}</span></strong><b>${wounds.current}</b></div><div class="creator-rank-row">${renderNumber('woundsTaken',wounds.current)}</div><div class="creator-wounds">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span>${escapeHtml(level.label.replace(/\s*\([^)]*\)/g,''))}</span></div>`).join('')}</div></div>`;
   }
 
   function renderCombat(data) {
