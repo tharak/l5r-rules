@@ -613,8 +613,8 @@ test('cost guidance shows limits while trait, skill, and option edits remain ava
  assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 5\./);
  assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 10\./);
  assert.match(c.root.innerHTML,/Advantages \(40\)/);assert.match(c.root.innerHTML,/Disadvantages \(12\)/);
- assert.match(c.root.innerHTML,/Maximum: 15 total points\./);
- assert.match(c.root.innerHTML,/Up to 10 XP from disadvantages count toward your budget\./);
+ assert.match(c.root.innerHTML,/Up to 15 XP\./);
+ assert.match(c.root.innerHTML,/Up to 10 XP\./);
  c.click({action:'trait',trait:'Strength',delta:'1'});c.click({action:'skill',skill:'Defense',delta:'1'});
  const {character:s,derived:d}=await c.data();assert.equal(d.traits.Strength.rank,11);assert.equal(d.skills.Defense.rank,11);
  assert.ok(d.blockers.some(e=>e.code==='rank:trait:Strength'));assert.ok(d.blockers.some(e=>e.code==='rank:skill:Defense'));
