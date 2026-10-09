@@ -301,7 +301,10 @@
       if(trained(/Otomo Diplomat/) && name==='Etiquette')bonus++;
       if(trained(/First Dawn Scholars/) && (name==='Etiquette' || name.startsWith('Lore:')))bonus++;
       const override=mods.skillRoll?.[name] || {};
-      if(skill.traitRank)skill.roll=dicePool(skill.rank+skill.traitRank+bonus+number(override.rolled),skill.traitRank+kept+number(override.kept),number(override.bonus));
+      if(skill.traitRank) {
+        skill.rollBase={rolled:skill.rank+skill.traitRank+bonus+number(override.rolled),kept:skill.traitRank+kept+number(override.kept),bonus:number(override.bonus)};
+        skill.roll=dicePool(skill.rollBase.rolled,skill.rollBase.kept,skill.rollBase.bonus);
+      }
     }
     d.creationCost=Object.values(costItems).reduce((sum,e)=>sum+e.cost,0);
     const history=s.progression.history;

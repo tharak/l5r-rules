@@ -12,6 +12,7 @@
   let uiError = '';
   let emphasisSkill = '';
   let emphasisView = 'skills';
+  let rollState = null;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let layout = 'current';
   let hideRankZeroSkills = true;
@@ -121,11 +122,11 @@
     const skillNames = Object.keys(skills).filter(name=>!hideRankZeroSkills || skills[name].rank>0).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
       const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
-      const control = experimental() ? `<div class="creator-rank-row creator-trait-display"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></div>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span><div class="rank-control" role="group" aria-label="${trait} rank"><button type="button" data-action="trait" data-trait="${trait}" data-delta="-1" ${item.rank <= item.base ? 'disabled' : ''} aria-label="Decrease ${trait}">−</button><output aria-label="${trait} rank">${item.rank}</output><button type="button" data-action="trait" data-trait="${trait}" data-delta="1" ${item.rank >= rankLimit() ? 'disabled' : ''} aria-label="Increase ${trait} for ${cost} XP">+</button></div></div>`;
+      const control = experimental() ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span><div class="rank-control" role="group" aria-label="${trait} rank"><button type="button" data-action="trait" data-trait="${trait}" data-delta="-1" ${item.rank <= item.base ? 'disabled' : ''} aria-label="Decrease ${trait}">−</button><output aria-label="${trait} rank">${item.rank}</output><button type="button" data-action="trait" data-trait="${trait}" data-delta="1" ${item.rank >= rankLimit() ? 'disabled' : ''} aria-label="Increase ${trait} for ${cost} XP">+</button></div></div>`;
       if (!experimental()) return control;
       return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list creator-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${renderSkillRow(name,skills[name],'rings')}</li>`).join('')}</ul></div>`;
     };
-    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">${experimental()?'00':'02'}</span><div><h2>${sectionTitle('traits')}</h2>${experimental()?'':'<p>All Rings begin at 2. Family and school benefits are applied automatically.</p>'}</div></div>${experimental()?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p>'}<div class="creator-ring-grid">${TRAIT_GROUPS.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}"><div class="creator-ring-head">${experimental()?`<span class="creator-ring-mark creator-ring-symbol" data-ring="${group.ring}" aria-hidden="true"></span>`:`<span class="creator-ring-mark">${group.mark}</span>`}<div><strong>${group.ring}</strong></div><b>${data.rings[group.ring]}</b></div>${experimental()?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div></section>`;
+    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">${experimental()?'00':'02'}</span><div><h2>${sectionTitle('traits')}</h2>${experimental()?'':'<p>All Rings begin at 2. Family and school benefits are applied automatically.</p>'}</div></div>${experimental()?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p>'}<div class="creator-ring-grid">${TRAIT_GROUPS.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}">${experimental()?`<button type="button" class="creator-ring-head creator-roll-ring" data-action="open-roll" data-roll-kind="ring" data-roll-name="${group.ring}" aria-label="Roll ${group.ring} Ring">`:'<div class="creator-ring-head">'}${experimental()?`<span class="creator-ring-mark creator-ring-symbol" data-ring="${group.ring}" aria-hidden="true"></span>`:`<span class="creator-ring-mark">${group.mark}</span>`}<${experimental()?'span':'div'}><strong>${group.ring}</strong></${experimental()?'span':'div'}><b>${data.rings[group.ring]}</b>${experimental()?'</button>':'</div>'}${experimental()?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div></section>`;
   }
 
   function renderSkillRoll(name, skill, view = 'skills') {
@@ -145,7 +146,7 @@
 
   function renderCompactSkillRow(name,skill) {
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
-    return `<div class="creator-skill-row creator-skill-compact" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><strong class="creator-skill-name">${escapeHtml(name)}</strong><div class="creator-skill-roll" aria-label="${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></div>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${skill.emphases.map(emphasis=>`<span>${escapeHtml(emphasis)}</span>`).join(' ')}</span>` : ''}</div>`;
+    return `<div class="creator-skill-row creator-skill-compact" data-ring="${ring}" data-skill-name="${escapeHtml(name)}"><button type="button" class="creator-skill-name creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong></button><button type="button" class="creator-skill-roll creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></button>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${skill.emphases.map(emphasis=>`<button type="button" class="creator-roll-emphasis" data-action="open-roll" data-roll-kind="emphasis" data-roll-skill="${escapeHtml(name)}" data-roll-name="${escapeHtml(emphasis)}" aria-label="Roll ${escapeHtml(name)} with ${escapeHtml(emphasis)} emphasis">${escapeHtml(emphasis)}</button>`).join(' ')}</span>` : ''}</div>`;
   }
 
   function renderSkillRow(name,skill,view = 'skills') {
@@ -487,7 +488,12 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     if (!root?.isConnected || !catalog || (!external && !editorRoute())) return;
     const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
-    root.innerHTML = `<div class="creator-page${experimental()?' creator-lab':''}"><div class="creator-header"><div class="creator-header-row"><div><h1>Character</h1></div><div class="creator-header-actions">${!external?`<a href="${experimental()?'#/create-character':'#/create-character-lab'}">${experimental()?'Current layout':'Try experimental layout'}</a>`:''}<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a><button type="button" data-action="save-close">Save PC</button><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div>${renderNavigation(data)}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}</div>`;
+    root.innerHTML = `<div class="creator-page${experimental()?' creator-lab':''}"><div class="creator-header"><div class="creator-header-row"><div><h1>Character</h1></div><div class="creator-header-actions">${!external?`<a href="${experimental()?'#/create-character':'#/create-character-lab'}">${experimental()?'Current layout':'Try experimental layout'}</a>`:''}<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a><button type="button" data-action="save-close">Save PC</button><button type="button" data-action="export">Export JSON ↗</button><button type="button" data-action="print">Print sheet ↗</button></div></div></div>${renderNavigation(data)}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${rollState?renderRollDialog():''}</div>`;
+    const rollDialog = root.querySelector('.creator-roll-dialog');
+    if (rollDialog) {
+      rollDialog.oncancel = event => { event.preventDefault(); closeRoll(); };
+      rollDialog.showModal();
+    }
     const emphasisDialog = root.querySelector('.creator-emphasis-dialog');
     if (emphasisDialog) {
       emphasisDialog.oncancel = event => { event.preventDefault(); closeEmphases(); };
@@ -516,6 +522,69 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     }
   }
 
+  function renderRollBody() {
+    const pool = window.CharacterDice.adjustPool(rollState.base,rollState.bonuses);
+    const signed = value => `${value >= 0 ? '+' : ''}${value}`;
+    const result = rollState.result;
+    return `<output class="creator-roll-pool" aria-label="Dice pool">${pool.rolled}k${pool.kept}${signed(pool.bonus)}</output><div class="creator-roll-bonuses">${[['rolled','X · Rolled dice'],['kept','Y · Kept dice'],['bonus','Z · Total bonus']].map(([key,label])=>`<div><span>${label}</span><div class="rank-control" role="group" aria-label="${label}"><button type="button" data-action="roll-bonus" data-roll-part="${key}" data-delta="-1" aria-label="Decrease ${label}">−</button><output aria-label="${label} adjustment">${signed(rollState.bonuses[key])}</output><button type="button" data-action="roll-bonus" data-roll-part="${key}" data-delta="1" aria-label="Increase ${label}">+</button></div></div>`).join('')}</div><div class="creator-roll-actions"><button type="button" class="creator-primary" data-action="roll-dice">Roll</button><button type="button" data-action="reset-roll-bonuses">Reset bonuses</button></div><div class="creator-roll-result" aria-live="polite" aria-atomic="true">${result?`<div class="creator-roll-total"><span>Total</span><strong>${result.total}</strong></div><ol class="creator-roll-dice">${result.dice.map((die,index)=>`<li class="${die.kept?'kept':'discarded'}" aria-label="Die ${index+1}: ${die.total}, ${die.kept?'kept':'discarded'}"><strong>${die.total}</strong><span>${die.kept?'Kept':'Discarded'}</span>${die.faces.length>1 || die.rerolled?`<small>${die.rerolled?'1 → ':''}${die.faces.join(' + ')}</small>`:''}</li>`).join('')}</ol>`:''}</div>`;
+  }
+
+  function renderRollDialog() {
+    return `<dialog class="creator-roll-dialog" aria-labelledby="roll-dialog-title"><header><h2 id="roll-dialog-title">${escapeHtml(rollState.title)}</h2><button type="button" data-action="close-roll" aria-label="Close roll">Close</button></header><div class="creator-roll-dialog-body">${renderRollBody()}</div></dialog>`;
+  }
+
+  function refreshRollDialog(button) {
+    const body = root.querySelector('.creator-roll-dialog-body');
+    body.innerHTML = renderRollBody();
+    Array.from(body.querySelectorAll('[data-action]')).find(target=>target.dataset.action===button.dataset.action && target.dataset.rollPart===button.dataset.rollPart && target.dataset.delta===button.dataset.delta)?.focus();
+  }
+
+  function closeRoll() {
+    const trigger = rollState.trigger;
+    rollState = null;
+    render();
+    Array.from(root.querySelectorAll('[data-action="open-roll"]')).find(button=>button.dataset.rollKind===trigger.kind && button.dataset.rollName===trigger.name && button.dataset.rollSkill===trigger.skill && button.getAttribute('aria-label')===trigger.label)?.focus();
+  }
+
+  function handleRollAction(action,button) {
+    if (action === 'open-roll') {
+      const kind = button.dataset.rollKind, name = button.dataset.rollName;
+      const data = build();
+      let base, title, explodes = true;
+      if (kind === 'ring' || kind === 'trait') {
+        const rank = kind === 'ring' ? data.rings[name] : data.traits[name]?.rank;
+        if (!rank) return true;
+        base = {rolled:rank,kept:rank,bonus:0};
+        title = `${name} · ${kind === 'ring'?'Ring':'Trait'}`;
+      } else {
+        const skillName = kind === 'emphasis' ? button.dataset.rollSkill : name;
+        const skill = data.skills[skillName] || R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills[skillName];
+        if (!skill?.roll || (kind === 'emphasis' && !skill.emphases.includes(name))) return true;
+        base = skill.rollBase || skill.roll;
+        explodes = skill.rank > 0;
+        title = kind === 'emphasis' ? `${skillName} · ${name}` : skillName;
+      }
+      rollState = {base,title,explodes,emphasis:kind==='emphasis',bonuses:{rolled:0,kept:0,bonus:0},trigger:{kind,name,skill:button.dataset.rollSkill,label:button.getAttribute('aria-label')}};
+      rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(base),rollState);
+      render();
+      return true;
+    }
+    if (!['close-roll','roll-bonus','reset-roll-bonuses','roll-dice'].includes(action)) return false;
+    if (!rollState) return true;
+    if (action === 'close-roll') { closeRoll(); return true; }
+    if (action === 'roll-bonus') {
+      const part = button.dataset.rollPart;
+      if (!Object.hasOwn(rollState.bonuses,part)) return true;
+      rollState.bonuses[part] += Number(button.dataset.delta);
+      rollState.result = null;
+    } else if (action === 'reset-roll-bonuses') {
+      rollState.bonuses = {rolled:0,kept:0,bonus:0};
+      rollState.result = null;
+    } else rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(rollState.base,rollState.bonuses),rollState);
+    refreshRollDialog(button);
+    return true;
+  }
+
   function closeEmphases() {
     const name = emphasisSkill;
     emphasisSkill = '';
@@ -527,6 +596,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     const button = event.target.closest('[data-action]');
     if (!button) return;
     const action = button.dataset.action;
+    if (handleRollAction(action,button)) return;
     if (action === 'open-emphases') {
       if (!build().skills[button.dataset.skill]?.rank) return;
       emphasisSkill = button.dataset.skill; emphasisView = button.dataset.skillView; uiError = ''; render(); return;
@@ -666,6 +736,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
     external = shared;
     emphasisSkill = '';
+    rollState = null;
     root = element;
     root.onclick = onClick;
     root.onchange = onChange;

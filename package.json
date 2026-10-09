@@ -2,7 +2,7 @@
   "name": "l5r-rules",
   "private": true,
   "scripts": {
-    "test": "node --test scripts/test_character.cjs scripts/test_character_rules.cjs scripts/test_character_sync.cjs scripts/test_campaign.cjs",
+    "test": "node --test scripts/test_character_dice.cjs scripts/test_character.cjs scripts/test_character_rules.cjs scripts/test_character_sync.cjs scripts/test_campaign.cjs",
     "test:rules": "node --test scripts/test_rules.cjs scripts/test_campaign_service.cjs",
     "build": "node scripts/build_site.cjs"
   },
