@@ -635,7 +635,12 @@
       if (!current) return;
       if (Number(button.dataset.delta) > 0) sheet.skills[name] = current.rank + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) {
-        if (current.rank - 1) sheet.skills[name] = current.rank - 1; else delete sheet.skills[name];
+        if (current.rank - 1) sheet.skills[name] = current.rank - 1;
+        else {
+          delete sheet.skills[name];
+          delete sheet.emphases[name];
+          delete sheet.legacyEmphases[name];
+        }
       }
     } else if (action === 'add-skill') {
       const name = skillIdentity(root.querySelector('#new-skill').value).name;

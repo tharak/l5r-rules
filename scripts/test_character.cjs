@@ -148,6 +148,29 @@ test('catalog emphasis choices charge once, persist, and refund when removed',as
   assert.equal((await restored.data()).derived.xpRemaining,before);
 });
 
+test('reducing a skill to zero clears paid and legacy emphases, refunds XP and survives relearning',async()=>{
+  const c=await character({skills:{'Heavy Weapons (Tetsubo)':2,Knives:1},emphases:{'Heavy Weapons':['Masakari'],Knives:['Tanto']},legacyEmphases:{'Heavy Weapons':['Dai Tsuchi']}});
+  c.root.onchange({target:{dataset:{hideZeroSkills:''},checked:false}});
+  c.click({action:'skill',skill:'Heavy Weapons',delta:'-1'});
+  let data=await c.data();
+  assert.deepEqual(data.derived.skills['Heavy Weapons'].emphases,['Dai Tsuchi','Tetsubo','Masakari']);
+  assert.equal(data.derived.xpSpent,6);
+  c.click({action:'skill',skill:'Heavy Weapons',delta:'-1'});
+  data=await c.data();
+  assert.equal(data.character.skills['Heavy Weapons'],undefined);
+  assert.equal(data.character.emphases['Heavy Weapons'],undefined);
+  assert.equal(data.character.legacyEmphases['Heavy Weapons'],undefined);
+  assert.equal(data.derived.xpSpent,3);
+  assert.deepEqual(data.derived.skills.Knives.emphases,['Tanto']);
+  for(const section of ['rolls','skills'])assert.doesNotMatch(sectionHtml(c,section),/Tetsubo|Masakari|Dai Tsuchi/);
+  const restored=await c.reload();
+  restored.inputs['#new-skill']={value:'Heavy Weapons'};
+  restored.click({action:'add-skill'});
+  data=await restored.data();
+  assert.deepEqual(data.derived.skills['Heavy Weapons'].emphases,[]);
+  assert.equal(data.derived.xpSpent,4);
+});
+
 test('trait choices respect fixed catalog traits and specialties, with choices for varying and custom skills',async()=>{
   const c=await character(),options=name=>Array.from(c.window.CharacterCatalog.skillTraitOptions(name,catalog));
   assert.deepEqual(options('Heavy Weapons'),['Agility']);
