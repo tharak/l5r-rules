@@ -160,6 +160,7 @@
   .creator-value-tiles { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 10px; }
   .creator-value-tiles > div { display: flex; align-items: baseline; padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 12px; }
   .creator-value-tiles > div > strong { color: var(--ink); font-size: 12px; }
+  .creator-wounds.creator-value-tiles > div > strong { margin-inline-start: .35em; }
   .creator-roll-wounds .creator-wounds [aria-current="true"] { background: var(--trait-heading); font-weight: 700; }
   .creator-roll-combat { margin-top: 18px; }
   .creator-standing-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 13px; }
