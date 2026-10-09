@@ -178,13 +178,13 @@
   .creator-ring[data-ring="Water"], .creator-skill-row[data-ring="Water"] { background: #e8f0f3; }
   .creator-ring[data-ring="Fire"], .creator-skill-row[data-ring="Fire"] { background: #f8e9e2; }
   .creator-ring[data-ring="Void"], .creator-skill-row[data-ring="Void"] { background: #efe9f4; }
-  .creator-lab .creator-ring[data-ring="Earth"] { --ring-heading: #bca778; --trait-heading: #d9cba8; }
-  .creator-lab .creator-ring[data-ring="Air"] { --ring-heading: #9caf77; --trait-heading: #c8d5aa; }
-  .creator-lab .creator-ring[data-ring="Water"] { --ring-heading: #91b3c4; --trait-heading: #c4d9e2; }
-  .creator-lab .creator-ring[data-ring="Fire"] { --ring-heading: #d29a83; --trait-heading: #e9c5b5; }
-  .creator-lab .creator-ring[data-ring="Void"] { --ring-heading: #b29bc5; --trait-heading: #d7c6e5; }
-  .creator-lab .creator-ring-head { background: var(--ring-heading); }
-  .creator-lab .creator-trait-display { background: var(--trait-heading); }
+  #creator-rolls .creator-ring[data-ring="Earth"] { --ring-heading: #bca778; --trait-heading: #d9cba8; }
+  #creator-rolls .creator-ring[data-ring="Air"] { --ring-heading: #9caf77; --trait-heading: #c8d5aa; }
+  #creator-rolls .creator-ring[data-ring="Water"] { --ring-heading: #91b3c4; --trait-heading: #c4d9e2; }
+  #creator-rolls .creator-ring[data-ring="Fire"] { --ring-heading: #d29a83; --trait-heading: #e9c5b5; }
+  #creator-rolls .creator-ring[data-ring="Void"] { --ring-heading: #b29bc5; --trait-heading: #d7c6e5; }
+  #creator-rolls .creator-ring-head { background: var(--ring-heading); }
+  #creator-rolls .creator-trait-display { background: var(--trait-heading); }
   .creator-equipment-row select, .creator-option-row select { background: #fffbf2; border-color: var(--line); color: var(--ink); }
   .creator-ring-head > b { background: var(--wash); color: var(--ink); border-color: #b9aa8d; }
   .rank-control { border-color: #b9aa8d; border-radius: 2px; }

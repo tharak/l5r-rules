@@ -6,6 +6,21 @@ async page => {
     await p.goto('http://127.0.0.1:5000/?emulators#/characters');
     await p.getByRole('button',{name:'Create PC',exact:true}).click();
     await p.locator('[data-field="name"]').waitFor();
+    check(await p.locator('.creator-page > #creator-rolls + .creator-layout').count()===1,'Rolls must be above the default editing layout');
+    check(await p.locator('#creator-rolls h2').textContent()==='Rolls','Rolls heading missing');
+    check(await p.locator('#creator-rolls .creator-step').textContent()==='00','Rolls section is not numbered 00');
+    check(await p.locator('.creator-lab,a[href="#/create-character-lab"]').count()===0,'Experimental layout or switch remains');
+    await p.getByRole('button',{name:'Roll Earth Ring',exact:true}).click();
+    check(await p.locator('.creator-roll-dice li').count()===2,'Default Ring roll did not run');
+    const originalRoll=await p.locator('.creator-roll-result').innerHTML();
+    await p.getByRole('button',{name:'Increase Total bonus',exact:true}).click();
+    check(await p.locator('.creator-roll-result').innerHTML()===originalRoll,'Bonus change cleared the result');
+    await p.getByRole('button',{name:'Reset bonuses',exact:true}).click();
+    check(await p.locator('.creator-roll-dice li').count()===0,'Reset did not clear the result');
+    await p.getByRole('button',{name:'Close roll',exact:true}).click();
+    await p.getByRole('button',{name:'Roll Agility trait',exact:true}).click();
+    check(await p.locator('.creator-roll-dice li').count()===2,'Default Trait roll did not run');
+    await p.keyboard.press('Escape');
     check(await p.locator('[data-public]').count()===7,'Seven section privacy controls missing');
     check(!await p.locator('[data-public="abilities"]').isChecked(),'Abilities default public');
     check(await p.getByRole('button',{name:'Begin play',exact:true}).count()===0,'Removed phase switch remains');
@@ -76,12 +91,18 @@ async page => {
     await p.getByRole('button',{name:'Increase Reflexes for 12 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Heavy Weapons for 2 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Heavy Weapons for 3 XP',exact:true}).click();
-    const heavy=p.locator('.creator-skill-row').filter({has:p.locator('strong').filter({hasText:/^Heavy Weapons$/})});
+    const heavy=p.locator('#creator-skills .creator-skill-row').filter({has:p.locator('strong').filter({hasText:/^Heavy Weapons$/})});
     await heavy.getByRole('button',{name:'Add emphasis for Heavy Weapons',exact:true}).click();
     await p.getByRole('dialog',{name:'Heavy Weapons · Emphases',exact:true}).waitFor();
     await p.getByRole('button',{name:'Buy Masakari emphasis for Heavy Weapons',exact:true}).click();
     await p.keyboard.press('Escape');
     check((await heavy.locator('.creator-skill-emphases').innerText()).includes('Masakari'),'Purchased emphasis missing from row');
+    await p.getByRole('button',{name:'Roll Heavy Weapons',exact:true}).click();
+    check(await p.locator('.creator-roll-dice li').count()===5,'Default skill roll did not reflect training');
+    await p.keyboard.press('Escape');
+    await p.getByRole('button',{name:'Roll Heavy Weapons with Masakari emphasis',exact:true}).click();
+    check(await p.locator('#roll-dialog-title').textContent()==='Heavy Weapons · Masakari','Default emphasis roll missing');
+    await p.keyboard.press('Escape');
     check(!await p.locator('.creator-validation').count(),'Valid sheet has unresolved creation violations');
     await p.locator('[data-equipped="school:0"]').check();
     const weaponIndex=school.equipment.findIndex(e=>/Heavy Weapon/i.test(e.name));
@@ -147,10 +168,13 @@ async page => {
     await p.emulateMedia({media:'screen'});
     await p.getByRole('button',{name:'Save PC',exact:true}).click();await p.waitForURL(/#\/characters$/);
     await p.reload();await p.getByRole('button',{name:'Edit',exact:true}).click();
+    await p.goto('http://127.0.0.1:5000/?emulators#/create-character-lab');
+    await p.waitForURL(/#\/create-character$/);
+    await p.locator('#creator-rolls').waitFor();
     await p.locator('.creator-xp-history > summary').click();
     check((await p.locator('.creator-xp-history').innerText()).includes('PRIVATE HISTORY EXPLANATION'),'Offline XP history lost on reload');
     check(await p.locator('[data-field="notes"]').inputValue()==='OWNER PRIVATE NOTES\nSecond line','Offline notes lost');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    return 'Character browser checks passed: editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, sidebar XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
+    return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, sidebar XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
   } finally {await context.close();}
 }
