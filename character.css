@@ -158,6 +158,8 @@
   .creator-option-heading h3, .creator-option-heading .creator-source { margin: 0; }
   .creator-option-rules { flex-basis: 100%; min-width: 0; font-size: 12px; line-height: 1.6; }
   .creator-option-rules p { margin: 8px 0; }
+  .creator-option-row .creator-option-choice { display: flex; flex-direction: column; flex-basis: 100%; min-width: 0; gap: 6px; white-space: normal; font-size: 11px; }
+  .creator-option-row .creator-option-choice input, .creator-option-row .creator-option-choice select { width: 100%; padding: 10px; text-align: left; font-size: 13px; }
 }
 
 @media screen {
