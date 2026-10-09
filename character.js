@@ -265,11 +265,11 @@
     const wounds=data.combat.wounds, levelIndex=wounds.levels.findIndex(level=>wounds.current<=level.total);
     const severity=levelIndex<0?wounds.levels.length-1:levelIndex;
     const hue=Math.round(120*(1-severity/Math.max(1,wounds.levels.length-1)));
-    return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}" aria-label="Wound levels and current wounds"><div class="creator-ring-head"><strong>Wounds</strong>${renderNumber('woundsTaken',wounds.current,{...numericFields.woundsTaken,showLabel:false})}</div><div class="creator-wounds">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span${index===levelIndex?' class="creator-wound-status" role="status"':''}>${escapeHtml(level.label)}</span>: <strong>${level.total}</strong></div>`).join('')}${levelIndex<0?'<div aria-current="true"><span class="creator-wound-status" role="status">Dead</span></div>':''}</div></div>`;
+    return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}" aria-label="Wound levels and current wounds"><div class="creator-ring-head"><strong>Wounds</strong>${renderNumber('woundsTaken',wounds.current,{...numericFields.woundsTaken,showLabel:false})}</div><div class="creator-wounds creator-value-tiles">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span${index===levelIndex?' class="creator-wound-status" role="status"':''}>${escapeHtml(level.label)}</span>: <strong>${level.total}</strong></div>`).join('')}<div${levelIndex<0?' aria-current="true"':''}><span${levelIndex<0?' class="creator-wound-status" role="status"':''}>Dead</span>: <strong>${Math.floor(wounds.maximum)+1}</strong></div>${UI.button({text:`Heal · ${data.combat.healing}`,variant:'secondary',size:'compact',attrs:{'data-action':'heal-wounds','aria-label':`Heal ${data.combat.healing} wounds`,'disabled':wounds.current<=0 || data.combat.healing<=0}})}</div></div>`;
   }
 
   function renderCombat(data) {
-    return `<div class="creator-roll-combat"><div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (equipped)</span><strong>${data.combat.armorTN}</strong></div><div><span>Healing / day</span><strong>${data.combat.healing}</strong></div><div><span>Reduction</span><strong>${data.combat.reduction}</strong></div></div></div>`;
+    return `<div class="creator-roll-combat creator-ring"><div class="creator-ring-head"><strong>Combat values</strong></div><div class="creator-combat creator-value-tiles"><div><span>Initiative roll</span>: <strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (equipped)</span>: <strong>${data.combat.armorTN}</strong></div><div><span>Healing / day</span>: <strong>${data.combat.healing}</strong></div><div><span>Reduction</span>: <strong>${data.combat.reduction}</strong></div></div></div>`;
   }
 
   function renderSummary(data) {
@@ -314,7 +314,7 @@
 
   function renderNavigation() {
     const sections=[['rolls','Rolls'],['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Story'],['equipment','Equipment']];
-    return `<nav class="creator-nav" aria-label="Character sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:'Save PC',attrs:{'data-action':'save-close'}})}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
@@ -465,7 +465,7 @@
     if (!root?.isConnected || !catalog || (!external && !editorRoute())) return;
     const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
-    root.innerHTML = `<div class="creator-page"><div class="creator-header"><div class="creator-header-row"><div><h1>Character</h1></div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:'Save PC',attrs:{'data-action':'save-close'}})}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</div></div>${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${rollState?renderRollDialog():''}</div>`;
+    root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${rollState?renderRollDialog():''}</div>`;
     const rollDialog = root.querySelector('.creator-roll-dialog');
     if (rollDialog) {
       rollDialog.oncancel = event => { event.preventDefault(); closeRoll(); };
@@ -606,6 +606,8 @@
       const value=Math.max(0,Math.min(30,(Number(entry.cost)||0)+Number(button.dataset.delta)));
       onChange({target:{dataset:{kind,index:button.dataset.index},value:String(value)}});
       return;
+    } else if (action === 'heal-wounds') {
+      sheet.woundsTaken=Math.max(0,(Number(sheet.woundsTaken)||0)-Math.max(0,Number(build().combat.healing)||0));
     } else if (action === 'money-step') {
       const key=button.dataset.field, delta=Number(button.dataset.delta);
       if (!['koku','bu','zeni'].includes(key) || !Number.isInteger(delta)) return;

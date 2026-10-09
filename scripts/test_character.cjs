@@ -454,7 +454,7 @@ test('Wounds card follows wound thresholds and recalculates its status when Eart
   c.change({field:'woundsTaken'},'11');
   for(const trait of ['Stamina','Willpower'])c.click({action:'trait',trait,delta:'1'});
   assert.match(sectionHtml(c,'rolls'),/role="status">Healthy \(\+0\)<\/span>/);
-  const card=sectionHtml(c,'rolls').split('aria-label="Wound levels and current wounds">')[1].split('<div class="creator-roll-combat">')[0];
+  const card=sectionHtml(c,'rolls').split('aria-label="Wound levels and current wounds">')[1].split('<div class="creator-roll-combat')[0];
   assert.match(card,/<div class="creator-ring-head"><strong>Wounds<\/strong><div class="creator-number-field">/);
   assert.doesNotMatch(card,/<span>Wounds<\/span>|<small>|Earth ×/);
   assert.match(card,/role="status">Healthy \(\+0\)<\/span>: <strong>15<\/strong>/);
@@ -465,6 +465,16 @@ test('Wounds card follows wound thresholds and recalculates its status when Eart
   const loaded=await c.reload();
   assert.equal((await loaded.data()).character.woundsTaken,11);
   assert.match(sectionHtml(loaded,'rolls'),/--wound-hue:120/);
+  assert.match(sectionHtml(loaded,'rolls'),/Dead<\/span>: <strong>58<\/strong>/);
+  const beforeHeal=await loaded.data();
+  assert.equal(beforeHeal.derived.combat.healing,7);
+  loaded.click({action:'heal-wounds'});
+  assert.equal((await loaded.data()).character.woundsTaken,4);
+  loaded.click({action:'heal-wounds'});
+  const healed=await (await loaded.reload()).data();
+  assert.equal(healed.character.woundsTaken,0);
+  assert.equal(healed.derived.xpRemaining,beforeHeal.derived.xpRemaining);
+  assert.match(sectionHtml(loaded,'rolls'),/aria-label="Heal 7 wounds" disabled/);
 });
 
 test('legacy approvals remain saved and Imperial family approval lives in Identity',async()=>{

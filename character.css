@@ -101,6 +101,7 @@
 @media screen {
   .creator-roll-details { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,2fr); gap: 18px; align-items: start; margin-top: 18px; }
   .creator-roll-details > .creator-roll-combat { min-width: 0; margin-top: 0; }
+  .creator-roll-details .creator-ring-head { min-height: 68px; }
   @media(max-width:800px) { .creator-roll-details { grid-template-columns: 1fr; } }
   .creator-layout > .creator-main { width: 100%; min-width: 0; }
 .creator-starting-xp{display:flex;align-items:center;gap:9px;font-size:12px;color:#c8d7ca}.creator-starting-xp input{width:78px}
@@ -155,8 +156,10 @@
   .creator-roll-wounds .creator-ring-head > .creator-number-field { flex: none; }
   .creator-roll-wounds .creator-wound-status { color: hsl(var(--wound-hue) 70% 24%); }
   .creator-roll-wounds .creator-number-field { flex: none; }
-  .creator-roll-wounds .creator-wounds { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 10px; }
-  .creator-roll-wounds .creator-wounds > div { padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
+  #creator-rolls .creator-roll-combat { --ring-heading: var(--wash); background: var(--surface); }
+  .creator-value-tiles { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 10px; }
+  .creator-value-tiles > div { display: flex; align-items: baseline; padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 12px; }
+  .creator-value-tiles > div > strong { color: var(--ink); font-size: 12px; }
   .creator-roll-wounds .creator-wounds [aria-current="true"] { background: var(--trait-heading); font-weight: 700; }
   .creator-roll-combat { margin-top: 18px; }
   .creator-standing-fields { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 13px; }
@@ -188,8 +191,8 @@
   #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
   #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
-  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(50px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
-  #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 0; width: 100%; justify-self: stretch; }
+  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(44px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
+  #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 44px; width: 100%; justify-self: stretch; }
   #creator-rolls .creator-ring-traits { display: grid; grid-template-columns: 1fr; align-items: start; }
   #creator-rolls .creator-ring-trait-column { display: grid; grid-template-columns: 124px minmax(0,1fr); min-width: 0; background: var(--trait-heading); }
   #creator-rolls .creator-trait-display { flex-direction: row; flex-wrap: nowrap; align-items: baseline; align-self: start; justify-content: flex-start; gap: 6px; }
@@ -209,6 +212,7 @@
   .creator-roll-skill, .creator-roll-emphasis { min-width: 0; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
   .creator-roll-skill { display: block; }
   .creator-roll-emphasis { max-width: 100%; overflow-wrap: anywhere; }
+  #creator-rolls .creator-ring :is(.creator-ring-trait-column,.creator-skill-row,.creator-roll-ring,.creator-roll-trait,.creator-roll-skill,.creator-roll-emphasis) { min-width: 44px; }
   .creator-roll-ring:hover, .creator-roll-trait:hover, .creator-roll-skill:hover, .creator-roll-emphasis:hover { filter: brightness(.96); }
   .creator-roll-ring:focus-visible, .creator-roll-trait:focus-visible, .creator-roll-skill:focus-visible, .creator-roll-emphasis:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
   .creator-roll-dialog { width: min(560px,calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); background: var(--surface); color: var(--ink); box-shadow: 0 24px 80px #211c1466; }
@@ -265,11 +269,16 @@
   .creator-emphasis-choices button { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; text-align: left}
   .creator-emphasis-choices small { color: var(--muted); white-space: nowrap; font-size: 11px; }
 }
-@media print { #creator-rolls, .creator-emphasis-dialog, .creator-roll-dialog { display: none !important; } }
+@media print { .creator-nav, #creator-rolls, .creator-emphasis-dialog, .creator-roll-dialog { display: none !important; } }
 
 /* Section 01 contains the character record; the editor has one main column. */
 @media screen {
   .creator-page .creator-layout { display: block; }
+  .creator-page { padding-top: 24px; }
+  .creator-nav { flex-wrap: wrap; align-items: center; gap: 10px; overflow: visible; }
+  .creator-nav-sections { display: flex; gap: 6px; flex: 1 1 620px; min-width: 0; overflow-x: auto; }
+  .creator-nav .creator-header-actions { flex: 0 1 auto; flex-wrap: wrap; margin: 0; }
+  .creator-nav .creator-header-actions > a { min-height: 40px; }
   #creator-identity .creator-record { position: static; width: 100%; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
   #creator-identity .creator-summary-inner { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
   #creator-identity .creator-record-header { margin-bottom: 18px; }
