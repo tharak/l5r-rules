@@ -34,6 +34,10 @@
   const flaw = (s,name) => s.disadvantages.some(a => a.name.toLowerCase() === name.toLowerCase());
   const waived = (s,code) => s.exceptions.some(e => (e.code === code || e.code === '*') && String(e.explanation || '').trim());
   const optionVariants={Consumed:{Control:4,Determination:6,Insight:4,Knowledge:4,Perfection:5,Strength:5,Will:4}};
+  const optionChoiceNames = new Set(['Child of Chikushudo','Dark Paragon','Darling of the Court','Elemental Blessing','Friend of the Elements','Friendly Kami','Heart of Vengeance','Paragon','Soul of Artistry','Stolen Identity','Void Versatility','Watanu-Trained','Way of the Land','Well-Connected','Cursed by the Realm','Elemental Imbalance','Enlightened Madness','Failure of Bushido','Jealousy','Weakness','Wrath of the Kami']);
+  function optionNeedsChoice(entry,rule) {
+    return Boolean(optionVariants[entry.name] || optionChoiceNames.has(entry.name) || /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) || rule?.costs.length===0);
+  }
   function optionCost(entry, s, school, catalog, disadvantage = false) {
     if (entry.free) return 0;
     if (entry.customCost != null) return positive(entry.customCost);
@@ -514,5 +518,5 @@
     s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
     return s;
   }
-  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems,resetSection};
+  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,optionNeedsChoice,abilityQuote,freeAbilityLimits,spellElements,beginPlay,recordChange,award,buyOff,paidItems,resetSection};
 })();

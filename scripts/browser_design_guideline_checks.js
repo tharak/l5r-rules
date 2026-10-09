@@ -30,7 +30,7 @@ async page => {
         duplicateIds:[...document.querySelectorAll('[id]')].map(node=>node.id).filter((id,index,array)=>array.indexOf(id)!==index),
       };
     });
-    check(audit.count===36 && audit.count===audit.unique,'Expected 36 unique families');
+    check(audit.count===33 && audit.count===audit.unique,'Expected 33 unique families');
     check(await guide.locator('.dg-variant').count()===111,'An original example was lost');
     check(await guide.locator('iframe').count()===0,'Previews must load only when opened');
     check(audit.duplicateIds.length===0,'Duplicate host DOM IDs');
@@ -77,6 +77,21 @@ async page => {
     check(frames.every(frame=>frame.sandbox==='allow-same-origin' && frame.scripts===0),'Preview allows executable application actions');
     check(frames.every(frame=>frame.palette==='#eee5d3'),'Preview does not use the active site theme');
     check(frames.every(frame=>frame.printVisible),'Print specimen is invisible');
+    const merged = await guide.evaluate(()=>{
+      const doc=id=>document.querySelector(`[data-dg-preview="${id}"]`).contentDocument;
+      return {
+        colors:[...doc('UI-COLOR-PALETTE').querySelectorAll('[data-dg-color]')].map(n=>n.textContent),
+        header:['.site-brand','.topbar','.setting-banner'].every(selector=>doc('UI-SITE-NAVIGATION').querySelector(selector)),
+        images:doc('UI-RING-SYMBOLS').querySelectorAll('.creator-ring-symbol').length,
+        placeholders:doc('UI-BOOK-ICONS').querySelectorAll('.ui-ring-placeholder').length,
+        placeholderImages:doc('UI-BOOK-ICONS').querySelectorAll('.creator-ring-symbol').length,
+      };
+    });
+    check(merged.colors.length===15 && merged.colors.every(color=>/^#[0-9a-f]{6}$/i.test(color)),'Elemental palette colors missing');
+    check(new Set(merged.colors).size===15,'Elemental surfaces lost distinct colors');
+    check(merged.header,'Merged header composition missing');
+    check(merged.images===5 && merged.placeholders===5 && merged.placeholderImages===0,'Shared ring images or placeholders missing');
+
     const controls = await guide.evaluate(()=>{
       const doc=id=>document.querySelector(`[data-dg-preview="${id}"]`).contentDocument;
       const style=(id,selector)=>{const node=doc(id).querySelector(selector),s=node.ownerDocument.defaultView.getComputedStyle(node);return {background:s.backgroundColor,height:s.minHeight};};

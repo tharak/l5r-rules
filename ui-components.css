@@ -32,3 +32,18 @@
   .account-panel .ui-button.ui-button:hover:not(:disabled) { background: #dfd0b2; color: var(--ink); }
   .topbar .ui-button:hover:not(:disabled) { background: #ffffff12; color: #fff5e5; }
 }
+
+/* One elemental mark: image with an SVG placeholder underneath. */
+@media screen {
+  .ui-ring-mark { display: inline-grid; place-items: center; flex: none; width: 32px; height: 32px; vertical-align: middle; }
+  .ui-ring-mark > * { grid-area: 1 / 1; }
+  .ui-ring-mark .ui-ring-placeholder { display: block; width: 28px; height: 28px; }
+  .ui-ring-mark .creator-ring-symbol { display: block; width: 32px; height: 32px; background: transparent url('public/assets/ring-symbols.jpg') no-repeat; background-size: 436.2px 180px; background-position: var(--ring-symbol-x) var(--ring-symbol-y); }
+  .ui-ring-mark[data-ring="Earth"] { --ring-symbol-x: -304.2px; --ring-symbol-y: -29.4px; }
+  .ui-ring-mark[data-ring="Air"] { --ring-symbol-x: -338.4px; --ring-symbol-y: -29.4px; }
+  .ui-ring-mark[data-ring="Water"] { --ring-symbol-x: -293.4px; --ring-symbol-y: -61.8px; }
+  .ui-ring-mark[data-ring="Fire"] { --ring-symbol-x: -349.2px; --ring-symbol-y: -61.2px; }
+  .ui-ring-mark[data-ring="Void"] { --ring-symbol-x: -322.2px; --ring-symbol-y: -82.2px; }
+  .creator-ring .ui-ring-mark { background: transparent; border-radius: 0; text-shadow: none; color: var(--ink)!important; }
+  .ui-ring-mark.book-mark { width: 44px; height: 44px; }
+}

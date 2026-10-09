@@ -488,3 +488,52 @@ test('the options menu and added Greedy show the Mantis price without a false pr
  assert.equal((await c.data()).derived.disadvantages[1].cost,6);
  const result=await c.data();assert.ok(!result.derived.blockers.some(v=>v.code==='option-choice:disadvantage:'+result.character.disadvantages[1].id));
 });
+
+
+test('specific choice is shown only for parameterized options and variants',async()=>{
+  const c=await character({advantages:[{id:'simple',name:'Large',cost:3,selection:'Legacy detail'},{id:'ally',name:'Ally',cost:2}],disadvantages:[{id:'greedy',name:'Greedy',cost:4},{id:'consumed',name:'Consumed',cost:4,selection:'Knowledge'}]});
+  const html=sectionHtml(c,'options');
+  assert.doesNotMatch(html,/Specific choice for Large|Specific choice for Greedy/);
+  assert.match(html,/Specific choice for Ally/);
+  assert.match(html,/Specific choice for Consumed/);
+  assert.equal((await (await c.reload()).data()).character.advantages[0].selection,'Legacy detail');
+});
+
+test('each ability picker adds only its own catalog type and preserves acquisition',async()=>{
+  const c=await character();
+  for (const kind of ['spell','kata','kiho','tattoo','shadowlands']) {
+    const a=catalog.abilities.find(a=>a.kind===kind);
+    const html=sectionHtml(c,'abilities');
+    const picker=html.match(new RegExp(`<select[^>]*id="ability-choice-${kind}"[^>]*>([\\s\\S]*?)</select>`));
+    assert.ok(picker,kind);
+    assert.match(picker[1],new RegExp(`value="${a.id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}"`));
+    c.inputs['#ability-choice-'+kind]={value:a.id};
+    c.inputs['#ability-payment-'+kind]={value:kind==='tattoo'?'grant':'purchase'};
+    c.click({action:'add-ability',abilityKind:kind});
+  }
+  const saved=(await (await c.reload()).data()).character.abilities;
+  assert.deepEqual(saved.map(a=>a.kind).sort(),['kata','kiho','shadowlands','spell','tattoo']);
+  assert.equal(saved.find(a=>a.kind==='tattoo').grant,true);
+  const spell=catalog.abilities.find(a=>a.kind==='spell');
+  c.inputs['#ability-choice-kata']={value:spell.id};
+  c.click({action:'add-ability',abilityKind:'kata'});
+  assert.equal((await c.data()).character.abilities.length,5);
+});
+
+test('equipment buttons preserve equipped state and currency without removed labels',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  const armorIndex=(await c.data()).derived.school.equipment.findIndex(e=>e.name==='Light or Heavy Armor');
+  c.change({equipmentChoice:String(armorIndex)},'Light Armor');
+  const before=await c.data();
+  const armor=before.derived.equipment.find(entry=>entry.item?.kind==='armor');
+  assert.ok(armor);
+  assert.doesNotMatch(sectionHtml(c,'story'),/Starting money:|School outfit|<input[^>]*data-equipped/);
+  assert.match(sectionHtml(c,'story'),/data-action="toggle-equipped"/);
+  c.click({action:'toggle-equipped',equipped:armor.key});
+  const equipped=(await (await c.reload()).data());
+  assert.equal(equipped.character.equipped[armor.key],true);
+  assert.ok(equipped.derived.combat.armorTN>before.derived.combat.armorTN);
+  c.click({action:'toggle-equipped',equipped:armor.key});
+  assert.equal((await c.data()).character.equipped[armor.key],false);
+  assert.deepEqual((await c.data()).derived.money,before.derived.money);
+});

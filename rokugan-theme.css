@@ -150,17 +150,12 @@
   .creator-overview { background: var(--wash); border-color: var(--line); color: var(--muted); }
   .creator-ring, .creator-skill-list, .creator-option-list, .creator-equipment-list,
   .creator-empty, .creator-ability-list details { background: #fffbf2; border-color: var(--line); color: var(--muted); }
-  /* Share the Ring tint between traits and the skills that use them. */
-  .creator-ring[data-ring="Earth"], .creator-skill-row[data-ring="Earth"] { background: #f1ead8; }
-  .creator-ring[data-ring="Air"], .creator-skill-row[data-ring="Air"] { background: #eef1e3; }
-  .creator-ring[data-ring="Water"], .creator-skill-row[data-ring="Water"] { background: #e8f0f3; }
-  .creator-ring[data-ring="Fire"], .creator-skill-row[data-ring="Fire"] { background: #f8e9e2; }
-  .creator-ring[data-ring="Void"], .creator-skill-row[data-ring="Void"] { background: #efe9f4; }
-  #creator-rolls .creator-ring[data-ring="Earth"] { --ring-heading: #bca778; --trait-heading: #d9cba8; }
-  #creator-rolls .creator-ring[data-ring="Air"] { --ring-heading: #9caf77; --trait-heading: #c8d5aa; }
-  #creator-rolls .creator-ring[data-ring="Water"] { --ring-heading: #91b3c4; --trait-heading: #c4d9e2; }
-  #creator-rolls .creator-ring[data-ring="Fire"] { --ring-heading: #d29a83; --trait-heading: #e9c5b5; }
-  #creator-rolls .creator-ring[data-ring="Void"] { --ring-heading: #b29bc5; --trait-heading: #d7c6e5; }
+  /* The palette and editor share all three elemental surface colors. */
+  .creator-ring[data-ring="Earth"], .creator-skill-row[data-ring="Earth"] { --ring-surface: #f1ead8; --ring-heading: #bca778; --trait-heading: #d9cba8; background: var(--ring-surface); }
+  .creator-ring[data-ring="Air"], .creator-skill-row[data-ring="Air"] { --ring-surface: #eef1e3; --ring-heading: #9caf77; --trait-heading: #c8d5aa; background: var(--ring-surface); }
+  .creator-ring[data-ring="Water"], .creator-skill-row[data-ring="Water"] { --ring-surface: #e8f0f3; --ring-heading: #91b3c4; --trait-heading: #c4d9e2; background: var(--ring-surface); }
+  .creator-ring[data-ring="Fire"], .creator-skill-row[data-ring="Fire"] { --ring-surface: #f8e9e2; --ring-heading: #d29a83; --trait-heading: #e9c5b5; background: var(--ring-surface); }
+  .creator-ring[data-ring="Void"], .creator-skill-row[data-ring="Void"] { --ring-surface: #efe9f4; --ring-heading: #b29bc5; --trait-heading: #d7c6e5; background: var(--ring-surface); }
   #creator-rolls .creator-ring-head { background: var(--ring-heading); }
   #creator-rolls .creator-trait-display { background: var(--trait-heading); }
   :is(#creator-traits,#creator-rolls) .creator-ring-head > b {

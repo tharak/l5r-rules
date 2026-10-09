@@ -170,13 +170,6 @@
   #creator-rolls .creator-ring-head > span { flex: none; }
   #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
   #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
-  /* Element symbols from the supplied reference, displayed as one local image sprite. */
-  #creator-rolls .creator-ring-symbol { width: 32px; height: 32px; background: transparent url('public/assets/ring-symbols.jpg') no-repeat; background-size: 436.2px 180px; background-position: var(--ring-symbol-x) var(--ring-symbol-y); }
-  .creator-ring-symbol[data-ring="Earth"] { --ring-symbol-x: -304.2px; --ring-symbol-y: -29.4px; }
-  .creator-ring-symbol[data-ring="Air"] { --ring-symbol-x: -338.4px; --ring-symbol-y: -29.4px; }
-  .creator-ring-symbol[data-ring="Water"] { --ring-symbol-x: -293.4px; --ring-symbol-y: -61.8px; }
-  .creator-ring-symbol[data-ring="Fire"] { --ring-symbol-x: -349.2px; --ring-symbol-y: -61.2px; }
-  .creator-ring-symbol[data-ring="Void"] { --ring-symbol-x: -322.2px; --ring-symbol-y: -82.2px; }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
   #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(360px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
   #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 0; width: 100%; justify-self: stretch; }
@@ -256,3 +249,35 @@
   .creator-emphasis-choices small { color: var(--muted); white-space: nowrap; font-size: 11px; }
 }
 @media print { #creator-rolls, .creator-emphasis-dialog, .creator-roll-dialog { display: none !important; } }
+
+/* Section 01 contains the character record; the editor has one main column. */
+@media screen {
+  .creator-page .creator-layout { display: block; }
+  #creator-identity .creator-record { position: static; width: 100%; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+  #creator-identity .creator-summary-inner { display: block; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+  #creator-identity .creator-record-header { margin-bottom: 18px; }
+  #creator-identity .creator-summary-seal { display: none; }
+  #creator-identity .creator-summary-kicker, #creator-identity .creator-summary h3, #creator-identity .creator-summary p { text-align: left; }
+  #creator-identity .creator-summary h3 { margin: 8px 0 3px; color: var(--ink); font: 22px/1.3 var(--serif); overflow-wrap: anywhere; }
+  #creator-identity .creator-summary .creator-section-title { justify-content: flex-start; }
+  #creator-identity .creator-record-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; align-items: start; }
+  #creator-identity .creator-record-group { min-width: 0; }
+  #creator-identity .creator-record-group > * { margin: 0; }
+  #creator-identity .creator-record-group .creator-xp { height: 100%; }
+  #creator-identity .creator-record-group .creator-derived, #creator-identity .creator-record-group .creator-summary-rings { display: grid; grid-template-columns: 1fr; }
+  #creator-identity .creator-record-group .creator-derived > div { gap: 12px; }
+  #creator-identity .creator-summary-rings > div { gap: 12px; }
+  #creator-identity .creator-track i { max-width: 22px; }
+  @media (max-width: 1000px) { #creator-identity .creator-record-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+  @media (max-width: 600px) { #creator-identity .creator-record-grid { grid-template-columns: 1fr; } }
+}
+
+@media screen {
+  .creator-ability-pickers { display: grid; gap: 16px; margin: 20px 0; }
+  .creator-ability-picker { min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .creator-ability-picker h3 { margin: 0 0 10px; color: var(--ink); font: 18px var(--serif); }
+  .creator-ability-picker .ui-field-label { display: grid; gap: 6px; flex: 1; min-width: min(220px,100%); }
+  .creator-ability-picker .ui-field-label:first-child { flex: 2; }
+  .creator-equipment-row [data-equipped] { display: inline-block; margin: 6px 0 0 10px; }
+  .creator-equipment-row [data-equipped][aria-pressed="true"] { background: var(--jade); color: #fff5e5; border-color: var(--jade); }
+}

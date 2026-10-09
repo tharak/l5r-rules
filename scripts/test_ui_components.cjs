@@ -41,3 +41,14 @@ test('record editor shares fields and actions without taking ownership of contro
   assert.match(html,/ui-action-row/);
   assert.match(html,/data-campaign="session-save" disabled/);
 });
+
+test('ring images and icon placeholders use one elemental renderer',()=>{
+  for(const ring of ['Air','Earth','Fire','Water','Void']) {
+    const image=UI.ringMark({ring}),placeholder=UI.ringMark({ring,placeholder:true});
+    assert.match(image,/ui-ring-placeholder/);
+    assert.match(image,/creator-ring-symbol/);
+    assert.match(placeholder,/ui-ring-placeholder/);
+    assert.doesNotMatch(placeholder,/creator-ring-symbol/);
+    assert.ok(image.includes(`data-ring="${ring}"`));
+  }
+});

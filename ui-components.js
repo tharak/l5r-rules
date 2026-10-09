@@ -22,6 +22,20 @@
   function button({text='',html,variant='primary',size='regular',attrs={}} = {}) {
     return element('button',{type:'button',...attrs,class:classes('ui-button',`ui-button--${variant}`,`ui-button--${size}`,attrs.class)},content(text,html));
   }
+  // The elemental icon sits under the image sprite, remaining visible while
+  // the image is unavailable. Both Books and the character editor use this mark.
+  function ringMark({ring,placeholder=false,attrs={}} = {}) {
+    const marks = {
+      Air: '<path d="M5 12h15c7 0 7-8 2-8-3 0-4 2-4 3M5 17h23M5 22h13c7 0 7 8 2 8-3 0-4-2-4-3"/>',
+      Earth: '<path d="m4 27 12-21 12 21ZM11 15l5 4 5-4M8 27h16"/>',
+      Fire: '<path d="M17 3c2 8 11 12 10 20-1 6-5 8-11 8S5 27 5 21c0-5 4-8 6-11 0 5 1 7 3 8 4-4 4-10 3-15Z"/>',
+      Water: '<path d="M4 12c4-6 8 6 12 0s8 6 12 0M4 19c4-6 8 6 12 0s8 6 12 0M4 26c4-6 8 6 12 0s8 6 12 0"/>',
+      Void: '<circle cx="16" cy="17" r="12"/><circle cx="16" cy="17" r="7"/><circle cx="16" cy="17" r="1"/>'
+    };
+    if (!marks[ring]) return '';
+    const icon = `<svg class="ui-ring-placeholder" viewBox="0 0 32 34" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${marks[ring]}</svg>`;
+    return element('span',{'aria-hidden':true,...attrs,'data-ring':ring,class:classes('ui-ring-mark',attrs.class)},icon+(placeholder?'':element('span',{class:'creator-ring-symbol','data-ring':ring},'')));
+  }
   function link({text='',html,href='#',attrs={}} = {}) {
     return element('a',{href,...attrs,class:classes('ui-link',attrs.class)},content(text,html));
   }
@@ -83,5 +97,5 @@
   function recordEditor({fields=[],extraHtml='',actionsHtml='',attrs={}} = {}) {
     return element('div',{...attrs,class:classes('ui-record-editor',attrs.class)},fields.map(field).join('')+extraHtml+actionRow({bodyHtml:actionsHtml}));
   }
-  window.UI = {escape,attributes,element,button,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor};
+  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor};
 })();

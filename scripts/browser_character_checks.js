@@ -25,7 +25,9 @@ async page => {
     check(!await p.locator('[data-public="abilities"]').isChecked(),'Abilities default public');
     check(await p.getByRole('button',{name:'Begin play',exact:true}).count()===0,'Removed phase switch remains');
     check(await p.getByRole('heading',{name:'Creation review',exact:true}).count()===0,'Creation review card remains');
-    check(await p.locator('#creator-summary').count()===1,'Character summary removed');
+    check(await p.locator('#creator-identity #creator-summary').count()===1,'Character record must be inside section 01');
+    check(await p.locator('.creator-layout > .creator-summary').count()===0,'Standalone Character Record sidebar remains');
+    check(await p.locator('#creator-identity #xp-award').count()===1,'XP controls did not move into section 01');
     check(await p.locator('[data-action="reset-section"]').count()===7,'Creation section reset controls missing');
     const characterId=await p.evaluate(()=>CharacterBuilder.list()[0].id);
     await p.locator('[data-field="startingXP"]').fill('65');await p.locator('[data-field="startingXP"]').blur();
@@ -104,9 +106,9 @@ async page => {
     check(await p.locator('#roll-dialog-title').textContent()==='Heavy Weapons · Masakari','Default emphasis roll missing');
     await p.keyboard.press('Escape');
     check(!await p.locator('.creator-validation').count(),'Valid sheet has unresolved creation violations');
-    await p.locator('[data-equipped="school:0"]').check();
+    await p.locator('[data-equipped="school:0"]').click();
     const weaponIndex=school.equipment.findIndex(e=>/Heavy Weapon/i.test(e.name));
-    await p.locator('[data-equipped="school:'+weaponIndex+'"]').check();
+    await p.locator('[data-equipped="school:'+weaponIndex+'"]').click();
     await p.locator('[data-field="notes"]').fill('OWNER PRIVATE NOTES\nSecond line');
     const editorURL=p.url();
     await p.getByRole('link',{name:'View school rules ↗',exact:true}).click();
@@ -175,6 +177,6 @@ async page => {
     check((await p.locator('.creator-xp-history').innerText()).includes('PRIVATE HISTORY EXPLANATION'),'Offline XP history lost on reload');
     check(await p.locator('[data-field="notes"]').inputValue()==='OWNER PRIVATE NOTES\nSecond line','Offline notes lost');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, sidebar XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
+    return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, section 01 XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
   } finally {await context.close();}
 }
