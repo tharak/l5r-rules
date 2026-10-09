@@ -437,6 +437,24 @@ test('old advancement sheets allow ordinary option edits and removal without app
   assert.equal(saved.character.progression.history.length,0);
 });
 
+test('Social Position updates displayed and printed Status, persists, and permits manual adjustments',async()=>{
+  const c=await character();
+  c.inputs['#advantage-select']={value:'Social Position'};
+  c.click({action:'add-advantage'});
+  assert.equal((await c.data()).derived.status,2);
+  assert.match(c.root.innerHTML,/<output[^>]*aria-label="Status"[^>]*>2\.0<\/output>/);
+  assert.match(c.root.innerHTML,/<div>Status<b>2<\/b>/);
+  c.click({action:'number-step',field:'status',delta:'1'});
+  c.click({action:'number-step',field:'status',delta:'1'});
+  assert.equal((await c.data()).derived.status,2.2);
+  c.click({action:'number-step',field:'status',delta:'-1'});
+  const restored=await c.reload();
+  assert.equal((await restored.data()).derived.status,2.1);
+  assert.equal((await restored.data()).character.status,1.1);
+  restored.click({action:'remove-advantage',index:'0'});
+  assert.equal((await restored.data()).derived.status,1.1);
+});
+
 test('numeric steppers preserve decimal precision, bounds and saved values',async()=>{
   const c=await character();c.school('Crab','Hida Bushi');
   const initial=(await c.data()).derived.honor;

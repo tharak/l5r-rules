@@ -303,7 +303,7 @@
         <div class="print-sheet-body"><div class="print-left">
           <div class="print-ring-map">${element('Earth','Stamina','Willpower','trait-left')}${element('Air','Reflexes','Awareness','trait-right')}${element('Water','Strength','Perception','trait-left')}${element('Fire','Agility','Intelligence','trait-right')}<div class="print-void"><div>Void</div><b>${data.rings.Void}</b><span>Void Points Spent</span><div class="print-void-circles">${circles(0)}</div></div></div>
           <div class="print-skills"><div class="print-skill-head"><span></span><span>Skill Name</span><span>Rank</span><span>Trait</span><span>Roll</span><span>Emphases & Mastery Abilities</span></div>${skillRows}</div>
-        </div><div class="print-right"><div class="print-standing">${standing('Honor',data.honor)}${standing('Glory',data.glory)}${standing('Status',sheet.status)}${standing('Shadowlands Taint',data.taint)}</div>
+        </div><div class="print-right"><div class="print-standing">${standing('Honor',data.honor)}${standing('Glory',data.glory)}${standing('Status',data.status)}${standing('Shadowlands Taint',data.taint)}</div>
           ${table('Initiative',[['Insight Rank / Reflexes',`${data.insightRank} / ${data.traits.Reflexes.rank}`],['Modifiers',''],['Initiative Roll',data.combat.initiative.notation]])}
           ${table('Armor TN',[['Type / Bonus',''],['Reduction',''],['Base TN (before bonuses)',data.combat.baseArmorTN]])}
           ${table('Armor',[['TN Bonus',data.combat.armorTN-data.combat.baseArmorTN],['Reduction',data.combat.reduction],['Notes',data.combat.armor]])}
@@ -620,7 +620,8 @@
       const key=button.dataset.field, config=numericFields[key];
       if(!config)return;
       const value=Number(build()[key] ?? sheet[key]) || 0;
-      sheet[key]=Math.max(config.min,Math.min(config.max ?? Infinity,Math.round((value+Number(button.dataset.delta)*config.step)*10)/10));
+      const bonus=key==='status'?value-(Number(sheet.status)||0):0;
+      sheet[key]=Math.round((Math.max(config.min,Math.min(config.max ?? Infinity,Math.round((value+Number(button.dataset.delta)*config.step)*10)/10))-bonus)*10)/10;
     } else if (action === 'trait') {
       const trait = button.dataset.trait, current = build().traits[trait];
       if (Number(button.dataset.delta) > 0) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;

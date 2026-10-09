@@ -258,7 +258,7 @@
     for(const e of [...d.equipment])if(/^daisho$/i.test(e.name))for(const name of ['Katana','Wakizashi'])d.equipment.push({...e,name,key:`${e.key}:${name}`,item:C.item(name,catalog),equipped:!!s.equipped[`${e.key}:${name}`]});
     d.money=s.money || school?.money || {};
     d.honor=s.honor ?? (school?.honor ?? 0)+(has(s,'Virtuous')?1:0);
-    d.glory=number(s.glory)+(has(s,'Fame')?1:0);d.status=number(s.status);d.taint=number(s.taint);
+    d.glory=number(s.glory)+(has(s,'Fame')?1:0);d.status=number(s.status)+(has(s,'Social Position')?1:0);d.taint=number(s.taint);
     const mods=s.modifiers,armor=d.equipment.filter(e=>e.equipped && e.item?.kind==='armor'),activeArmor=armor[0]?.item;
     let initiativeFlat=number(mods.initiativeFlat)+(skills.Battle?.rank>=5?skills.Battle.rank:0);
     let tn=traits.Reflexes.rank*5+5+number(activeArmor?.tn)+number(mods.armorTN),reduction=number(activeArmor?.reduction)+number(mods.reduction);

@@ -210,6 +210,16 @@ test('Fame on an old advancement sheet retains effective Glory through repeated 
  const normalized=R.normalize(legacy);assert.equal(calc(normalized).glory,2);
  assert.equal(calc(R.normalize(plain(normalized))).glory,2);assert.equal(legacy.glory,2);
 });
+test('Social Position adds one Status rank without changing the saved base',()=>{
+ for(const status of [0,1,3.5]) {
+  const s=R.normalize({status,advantages:[{id:'position',name:'Social Position',cost:6}]});
+  assert.equal(calc(s).status,status+1);
+  assert.equal(s.status,status);
+  assert.equal(calc(R.normalize(plain(s))).status,status+1);
+  s.advantages=[];
+  assert.equal(calc(s).status,status);
+ }
+});
 test('maho has no mastery restriction and casts with Insight Rank rather than Taint or shugenja rank',()=>{
  const s=starting();s.schoolDecisions.maho=true;
  const spell=catalog.abilities.find(a=>a.slug==='maho'&&a.mastery===5&&['Air','Earth','Fire','Water'].includes(a.ring));assert.ok(spell);
