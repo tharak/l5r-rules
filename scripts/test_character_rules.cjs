@@ -276,10 +276,12 @@ test('Kakita, Bayushi, and Daidoji permanent benefits use their printed mechanic
  const bayushi=starting('Scorpion','Bayushi Bushi');const d=calc(bayushi);assert.equal(d.combat.initiative.rolled,d.insightRank+d.traits.Reflexes.rank+1);assert.equal(d.combat.initiative.kept,d.traits.Reflexes.rank+1);
  const daidoji=starting('Crane','Daidoji Iron Warrior');daidoji.honor=6.5;assert.equal(calc(daidoji).combat.wounds.healthy,12);assert.equal(calc(daidoji).combat.wounds.maximum,54);
 });
-test('buying off disadvantages costs the original points and requires explained table permission',()=>{
+test('buying off disadvantages costs the original points without requiring justification',()=>{
  const s=starting();s.disadvantages=[{id:'brash',name:'Brash',cost:3}];let p=play(s);
- assert.throws(()=>R.buyOff(p,0,catalog,''));const budget=calc(p).xpRemaining;
- p=R.buyOff(p,0,catalog,'GM approved after months of character growth');assert.equal(p.disadvantages.length,0);
+ const budget=calc(p).xpRemaining;
+ assert.throws(()=>R.buyOff(s,0,catalog));
+ p=R.buyOff(p,0,catalog);assert.equal(p.disadvantages.length,0);
+ assert.equal(p.progression.history.at(-1).explanation,'Disadvantage bought off from character editor.');
  assert.equal(p.progression.history.at(-1).amount,3);assert.equal(calc(p).xpRemaining,budget-3);assert.equal(calc(p).xpEarned,3);
 });
 test('explicit price corrections use amounts paid rather than a later quoted discount',()=>{

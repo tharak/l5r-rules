@@ -403,16 +403,27 @@ test('advantage and disadvantage cost steppers use displayed costs and persist X
   assert.equal((await c.data()).derived.advantages[0].cost,30);
 });
 
-test('cost corrections during advancement still require an explanation',async()=>{
+test('advantage and disadvantage edits during advancement save without justification prompts',async()=>{
   const c=await character({phase:'advancement',advantages:[{id:'large',name:'Large',baseCost:4,cost:4}]});
-  c.window.prompt=()=>'';
-  c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
-  assert.equal((await c.data()).derived.advantages[0].cost,4);
-  c.window.prompt=()=> 'GM approved correction';
+  c.window.prompt=()=>{throw new Error('A justification prompt must not appear');};
   c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
   const {character:s,derived:d}=await c.data();
   assert.equal(d.advantages[0].cost,5);
-  assert.ok(s.progression.history.some(e=>e.explanation==='GM approved correction'));
+  assert.ok(s.progression.history.some(e=>e.explanation==='Updated advantage cost from character editor.'));
+  c.inputs['#advantage-select']={value:'Luck'};c.click({action:'add-advantage'});
+  c.change({optionDetail:'advantage',index:'1'},'1');
+  assert.equal((await c.data()).character.advantages[1].selection,'1');
+  assert.ok(!(await c.data()).derived.blockers.some(e=>e.code.startsWith('advancement:advantage:')));
+  c.click({action:'remove-advantage',index:'1'});
+  c.inputs['#disadvantage-select']={value:'Brash'};c.click({action:'add-disadvantage'});
+  c.click({action:'option-cost',kind:'disadvantage',index:'0',delta:'1'});
+  assert.equal((await c.data()).derived.disadvantages[0].cost,4);
+  c.click({action:'buyoff-disadvantage',index:'0'});
+  const saved=await (await c.reload()).data();
+  assert.equal(saved.character.advantages.length,1);
+  assert.equal(saved.derived.advantages[0].cost,5);
+  assert.equal(saved.character.disadvantages.length,0);
+  assert.equal(saved.character.progression.history.find(e=>e.key?.startsWith('buyoff:')).amount,4);
 });
 
 test('numeric steppers preserve decimal precision, bounds and saved values',async()=>{

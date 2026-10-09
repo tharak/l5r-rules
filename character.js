@@ -412,9 +412,7 @@
       if(sheet.phase!=='creation' || !resetDescriptions[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
       sheet=R.resetSection(sheet,key,catalog);
     } else if(action==='buyoff-disadvantage') {
-      const reason=window.prompt('Explain the table’s approval to buy off this disadvantage (Core p. 299):');
-      if(!reason?.trim())return true;
-      sheet=R.buyOff(sheet,Number(button.dataset.index),catalog,reason.trim());
+      sheet=R.buyOff(sheet,Number(button.dataset.index),catalog);
     } else if(action==='award-xp') {
       try {sheet=R.award(sheet,xpAward,'XP added from character editor.');xpAward=0;}catch(e){uiError=e.message;}
     } else if(action==='add-emphasis') {
@@ -641,10 +639,7 @@
       const kind = action.slice(4), name = root.querySelector(`#${kind}-select`).value;
       const choice = catalog[kind === 'advantage' ? 'advantages' : 'disadvantages'].find(entry => entry.name === name);
       if (!choice) return;
-      let approval='';
-      if(sheet.phase==='advancement' && kind==='advantage'){approval=window.prompt('Explain the table’s approval for this advantage gained during play:')?.trim() || '';if(!approval)return;}
       const id=newId();sheet[kind === 'advantage' ? 'advantages' : 'disadvantages'].push({id,name,baseCost:choice.costs[0] || 0,cost:choice.costs[0] || 0});
-      if(approval){commitEdit(before);const payment=sheet.progression.history.find(e=>e.key===`advantage:${id}`);if(payment)payment.explanation=approval;save();render();return;}
     } else if (action === 'remove-advantage' || action === 'remove-disadvantage') {
       const collection = action === 'remove-advantage' ? 'advantages' : 'disadvantages';
       sheet[collection].splice(Number(button.dataset.index),1);
@@ -707,11 +702,11 @@
     }
     else if (event.target.dataset.choiceIndex !== undefined) sheet.schoolChoices[Number(event.target.dataset.choiceIndex)] = event.target.value.trim();
     else if (event.target.dataset.equipmentChoice !== undefined) sheet.equipmentChoices[Number(event.target.dataset.equipmentChoice)] = event.target.value.trim();
-    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name] && sheet.phase==='creation')delete entry.customCost;}}
+    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name] && sheet.phase==='creation')delete entry.customCost;commitEdit(before,'Updated '+event.target.dataset.optionDetail+' choice from character editor.');return;}}
     else if (event.target.dataset.kind) {
       const collection = event.target.dataset.kind === 'advantage' ? sheet.advantages : sheet.disadvantages;
       const entry = collection[Number(event.target.dataset.index)];
-      if (entry) { if (sheet.phase==='advancement') { const reason=window.prompt('Explain this cost correction:'); if(!reason?.trim()){render();return;} entry.customCost=Math.max(0,Number(event.target.value)||0);commitEdit(before,reason.trim());return;} entry.customCost=Math.max(0,Number(event.target.value)||0); }
+      if (entry) { entry.customCost=Math.max(0,Number(event.target.value)||0);commitEdit(before,'Updated '+event.target.dataset.kind+' cost from character editor.');return; }
     } else return;
     commitEdit(before);
   }

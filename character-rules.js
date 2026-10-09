@@ -403,10 +403,6 @@
         const expected=optionCost({...entry,customCost:null},s,d.school,catalog,kind==='disadvantage');
         if(s.phase==='creation' && entry.customCost!==expected)issue(`cost:${kind}:${entry.id}`,`${entry.name} ${kind==='disadvantage'?'grants':'costs'} ${expected} XP for this character.`);
       }
-      if(s.phase==='advancement' && !s.progression.baseline?.costItems?.[`${kind}:${entry.id}`] && kind==='advantage') {
-        const payment=s.progression.history.find(e=>e.key===`${kind}:${entry.id}` && e.kind==='purchase');
-        if(payment && !payment.explanation)issue(`advancement:${kind}:${entry.id}`,`${entry.name}: record table approval for gaining this ${rule?.label.match(/\[([^]]+)\]/)?.[1] || ''} advantage during play.`);
-      }
       if(optionVariants[entry.name] && !Object.keys(optionVariants[entry.name]).some(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase()))issue(`option-choice:${kind}:${entry.id}`,`Choose the ${entry.name} variant.`);
       if(entry.baseCost!=null && rule?.costs.length===0 && !optionVariants[entry.name] && !entry.customCost && !entry.baseCost)issue(`option-choice:${kind}:${entry.id}`,`Set the variable cost and specific choice for ${entry.name}.`);
       if(entry.baseCost!=null && /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) && !String(entry.selection || '').trim())issue(`option-choice:${kind}:${entry.id}`,`Record the skill, rank, person, or specific choice required by ${entry.name}.`);
@@ -487,10 +483,10 @@
   }
   function buyOff(input,index,catalog,explanation) {
     const s=normalize(input),entry=s.disadvantages[index];
-    if(s.phase!=='advancement' || !entry || !String(explanation || '').trim())throw new Error('Buying off a disadvantage requires an explanation of table approval.');
+    if(s.phase!=='advancement' || !entry)throw new Error('Buying off a disadvantage requires a selected disadvantage during advancement.');
     const d=calculate(s,catalog),cost=s.progression.baseline?.disadvantageCosts?.[entry.id] ?? d.disadvantages[index].cost;
     s.disadvantages.splice(index,1);
-    s.progression.history.push({id:`buyoff-${Date.now()}-${s.progression.history.length}`,at:new Date().toISOString(),kind:'purchase',key:`buyoff:${entry.id}`,amount:cost,label:`Buy off ${entry.name}`,explanation:String(explanation).trim()});
+    s.progression.history.push({id:`buyoff-${Date.now()}-${s.progression.history.length}`,at:new Date().toISOString(),kind:'purchase',key:`buyoff:${entry.id}`,amount:cost,label:`Buy off ${entry.name}`,explanation:String(explanation || '').trim() || 'Disadvantage bought off from character editor.'});
     return s;
   }
   function award(input,amount,explanation) {
