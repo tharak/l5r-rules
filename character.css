@@ -42,6 +42,7 @@
 .creator-skill-trait select{width:100%;min-width:0}
 .creator-skill-roll{min-width:40px;text-align:center}
 .creator-skill-roll strong{font-size:14px;color:#29402f}
+[data-school-skill="true"]::after{content:'•';display:inline-block;margin-left:.35em}
 .creator-skill-roll small{margin:0 0 3px;font-size:9px;color:#687566}
 @media(max-width:1050px){.creator-summary-inner{display:block}.creator-summary-rings{display:grid;grid-template-columns:1fr 1fr}}
 @media(max-width:700px){.creator-skill-row{flex-wrap:wrap;gap:8px}.creator-skill-row>div:first-child{flex-basis:100%}.creator-skill-values{width:100%;justify-content:space-between}.creator-skill-trait{flex:1;max-width:170px}.creator-skill-row strong{white-space:normal}}

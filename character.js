@@ -148,16 +148,20 @@
     return control;
   }
 
+  function renderSkillName(name,skill) {
+    return `<strong${skill.base?' data-school-skill="true" title="School skill"':''}>${escapeHtml(name)}</strong>`;
+  }
+
   function renderCompactSkillRow(name,skill) {
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
-    return UI.recordRow({attrs:{'class':'creator-skill-row creator-skill-compact','data-ring':ring,'data-skill-name':name},bodyHtml:`<button type="button" class="creator-skill-name creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong></button><button type="button" class="creator-skill-roll creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></button>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${skill.emphases.map(emphasis=>`<button type="button" class="creator-roll-emphasis" data-action="open-roll" data-roll-kind="emphasis" data-roll-skill="${escapeHtml(name)}" data-roll-name="${escapeHtml(emphasis)}" aria-label="Roll ${escapeHtml(name)} with ${escapeHtml(emphasis)} emphasis">${escapeHtml(emphasis)}</button>`).join(' ')}</span>` : ''}`});
+    return UI.recordRow({attrs:{'class':'creator-skill-row creator-skill-compact','data-ring':ring,'data-skill-name':name},bodyHtml:`<button type="button" class="creator-skill-name creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)}">${renderSkillName(name,skill)}</button><button type="button" class="creator-skill-roll creator-roll-skill" data-action="open-roll" data-roll-kind="skill" data-roll-name="${escapeHtml(name)}" aria-label="Roll ${escapeHtml(name)} dice pool"><strong>${escapeHtml(skill.roll?.notation || '—')}</strong></button>${skill.emphases.length ? `<span class="creator-skill-emphases" aria-label="${escapeHtml(name)} emphases">${skill.emphases.map(emphasis=>`<button type="button" class="creator-roll-emphasis" data-action="open-roll" data-roll-kind="emphasis" data-roll-skill="${escapeHtml(name)}" data-roll-name="${escapeHtml(emphasis)}" aria-label="Roll ${escapeHtml(name)} with ${escapeHtml(emphasis)} emphasis">${escapeHtml(emphasis)}</button>`).join(' ')}</span>` : ''}`});
   }
 
   function renderSkillRow(name,skill,view = 'skills') {
     if (view === 'rings') return renderCompactSkillRow(name,skill);
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
     const detail=[skill.base?'':skill.rank?'Purchased skill':'Untrained · Rank 0',skill.cost?`${skill.cost} XP spent`:'',skill.notes || ''].filter(Boolean).join(' · ');
-    return UI.recordRow({attrs:{'class':'creator-skill-row','data-ring':ring,'data-skill-name':name},bodyHtml:`<div><div class="creator-skill-label"><strong>${escapeHtml(name)}</strong>${detail?`<small>${escapeHtml(detail)}</small>`:''}</div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}${UI.button({text:'+emphasis',attrs:{'class':'creator-add-emphasis','data-action':'open-emphases','data-skill-view':view,'data-skill':name,'aria-label':`Add emphasis for ${name}`,'disabled':!(skill.rank)}})}</div>`});
+    return UI.recordRow({attrs:{'class':'creator-skill-row','data-ring':ring,'data-skill-name':name},bodyHtml:`<div><div class="creator-skill-label">${renderSkillName(name,skill)}${detail?`<small>${escapeHtml(detail)}</small>`:''}</div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}${UI.button({text:'+emphasis',attrs:{'class':'creator-add-emphasis','data-action':'open-emphases','data-skill-view':view,'data-skill':name,'aria-label':`Add emphasis for ${name}`,'disabled':!(skill.rank)}})}</div>`});
   }
 
   function renderSkillFilter() {
