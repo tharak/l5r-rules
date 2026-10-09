@@ -14,6 +14,58 @@ const grant=(kind,name,extra={})=>{const a=catalog.abilities.find(a=>a.kind===ki
 function play(s) {s=R.normalize(s);s.exceptions=calc(s).blockers.map(v=>({code:v.code,explanation:'Approved by our table for this test.'}));const result=R.beginPlay(s,catalog);assert.equal(result.violations.length,0);return result.sheet;}
 function change(s,fn,explanation='') {const next=R.normalize(plain(s));fn(next);return R.recordChange(s,next,catalog,explanation);}
 
+test('Dragon orders and Spider Monks grant their book-listed family benefit alongside school benefits',()=>{
+ for(const [clan,family,trait] of [['Dragon','Togashi','Reflexes'],['Dragon','Hitomi','Strength'],['Dragon','Hoshi','Void'],['Spider','Spider Monks','Reflexes']]) {
+  const s=R.normalize({clan,family}),d=calc(s);
+  assert.equal(d.familyTrait,trait,family);
+  for(const name of C.TRAIT_NAMES)assert.equal(d.traits[name].base,name===trait?3:2,`${family}: ${name}`);
+  assert.equal(d.xpSpent,0);assert.equal(d.roninFamilyCost,0);
+  if(clan==='Dragon') {
+   assert.equal(d.family.anchor,'toc3');assert.equal(d.family.kind,'order');
+   const school=C.schools(catalog).find(s=>s.name==='The Togashi Tattooed Order');
+   s.school=`${school.slug}#${school.anchor}`;
+   const trained=calc(s);
+   for(const name of C.TRAIT_NAMES)assert.equal(trained.traits[name].base,2+Number(name===trait)+Number(name===school.benefit),`${family} and school: ${name}`);
+   assert.equal(trained.school.brotherhood,undefined);
+  }
+ }
+});
+test('all listed Great Clan vassal families are selectable with source sections and one free benefit',()=>{
+ for(const [name,count] of [['Crab',10],['Crane',6],['Dragon',6],['Lion',9],['Mantis',7],['Phoenix',8],['Scorpion',7],['Unicorn',8]]) {
+  const clan=catalog.clans.find(c=>c.name===name),vassals=clan.families.filter(f=>f.parent);
+  assert.equal(vassals.length,count,name);
+  assert.equal(new Set(clan.families.map(f=>f.name)).size,clan.families.length);
+  for(const f of vassals) {
+   assert.equal(f.slug,clan.familySource);assert.ok(f.anchor);
+   if(f.traitOptions)continue;
+   const d=calc({clan:name,family:f.name});
+   assert.equal(d.traits[f.trait].base,3,f.name);assert.equal(d.xpSpent,0);
+   assert.equal(Object.values(d.traits).filter(t=>t.base===3).length,1,f.name);
+  }
+ }
+ // Names recurring in different clans retain the appropriate source and benefit.
+ assert.equal(calc({clan:'Crane',family:'Tsume'}).familyTrait,'Agility');
+ assert.equal(calc({clan:'Ronin',family:'Tsume'}).familyTrait,'Reflexes');
+ assert.equal(calc({clan:'Ronin',family:'Tsume'}).roninFamilyCost,5);
+});
+test('Moshibaru chooses exactly one physical trait; invalid choices grant no benefit',()=>{
+ const s=R.normalize({clan:'Crab',family:'Moshibaru'});
+ assert.ok(calc(s).blockers.some(v=>v.code==='family-trait'));
+ for(const trait of ['Stamina','Reflexes','Strength','Agility']) {
+  s.familyTrait=trait;const d=calc(s);
+  assert.equal(d.traits[trait].base,3);assert.equal(d.xpSpent,0);
+  assert.equal(Object.values(d.traits).filter(t=>t.base===3).length,1);
+  assert.ok(!d.blockers.some(v=>v.code==='family-trait'));
+ }
+ for(const trait of ['Void','Intelligence','Awareness','Willpower','Perception','Unknown']) {
+  s.familyTrait=trait;const d=calc(s);
+  assert.ok(d.blockers.some(v=>v.code==='family-trait'));
+  assert.ok(Object.values(d.traits).every(t=>t.base===2));
+ }
+ s.family='Hida';assert.equal(calc(s).familyTrait,'Strength');
+ assert.equal(R.resetSection(s,'identity',catalog).familyTrait,'');
+});
+
 test('creation benefits, trait/skill prices, rank caps and 40 XP; out of range drafts are not truncated',()=>{
  const s=starting();s.family='Hida';s.traitBuys.Strength=1;s.skills.Defense=3;
  const d=calc(s);assert.equal(d.traits.Strength.base,3);assert.equal(d.traits.Stamina.base,3);

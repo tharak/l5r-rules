@@ -28,18 +28,41 @@ def soup_for(slug):
 
 
 def family_matches(text, slug, anchor=""):
-    pattern = rf"(?:The\s+)?([A-Z][A-Za-z'’\- ]+?)\s+Family\s*:\s*\+\s*1\s+({TRAITS})\b"
-    return [{"name": match.group(1).strip(), "trait": match.group(2), "slug": slug, "anchor": anchor}
-            for match in re.finditer(pattern, text, re.I)]
+    pattern = rf"^\s*(?:The\s+)?([A-Z][A-Za-z'’\- ]+?)\s+(Family|Order|Monks)\s*:\s*\+\s*1\s+({TRAITS})\b"
+    families = []
+    for match in re.finditer(pattern, text, re.I | re.M):
+        name, kind, trait = match.groups()
+        family = {"name": name.strip(), "trait": trait, "slug": slug, "anchor": anchor}
+        if kind.lower() == "order":
+            family["kind"] = "order"
+        elif kind.lower() == "monks":
+            family["name"] += " Monks"
+        families.append(family)
+    return families
 
 
 def families_for(slug):
     soup = soup_for(slug)
     families = []
-    for h in soup.select("h1, h2, h3"):
-        families.extend(family_matches(h.get_text(" ", strip=True), slug, h.get("id", "")))
-    if not families:
-        families = family_matches(soup.get_text("\n", strip=True), slug)
+    anchor, vassals = "", False
+    # Alternatives can be paragraph labels (Hitomi/Hoshi, Spider Monks), and
+    # vassal entries are line-separated lists beneath their own heading.
+    for node in soup.select("h1, h2, h3, p"):
+        text = node.get_text(" ", strip=True)
+        if node.name.startswith("h"):
+            anchor = node.get("id", "")
+            vassals = bool(re.match(r"Vassal Famil(?:i)?es", text, re.I))
+        families.extend(family_matches(text, slug, anchor))
+        if vassals and node.name == "p":
+            pattern = rf"^\s*([A-Z][A-Za-z'’\- ]+?)\s*\(([^)]+)\)\s*:\s*\+\s*1\s+({TRAITS}|any Physical)\b"
+            for match in re.finditer(pattern, node.get_text("\n", strip=True), re.M):
+                name, parent, trait = match.groups()
+                family = {"name": name.strip(), "trait": trait, "slug": slug, "anchor": anchor,
+                          "parent": parent.strip()}
+                if trait == "any Physical":
+                    family["traitOptions"] = ["Stamina", "Reflexes", "Strength", "Agility"]
+                families.append(family)
+    families = list({family["name"]: family for family in families}.values())
     return families
 
 

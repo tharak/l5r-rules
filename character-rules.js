@@ -7,7 +7,7 @@
   function normalize(input = {}) {
     const s = {...input,version:2,phase:input.phase === 'advancement' ? 'advancement' : 'creation'};
     s.startingXP = integer(input.startingXP ?? input.progression?.baseline?.startingXP ?? 40);
-    for (const key of ['name','clan','family','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
+    for (const key of ['name','clan','family','familyTrait','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
     for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions']) s[key] = {...input[key]};
     for (const key of ['schoolChoices','equipmentChoices','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
     s.visibility = Object.fromEntries(['identity','traits','skills','options','story','summary','abilities'].map(k => [k,typeof input.visibility?.[k] === 'boolean' ? input.visibility[k] : k === 'identity']));
@@ -181,12 +181,13 @@
   function calculate(input, catalog, {untrainedSkills = []} = {}) {
     const s = normalize(input);
     const clan = catalog.clans.find(c => c.name === s.clan), family = clan?.families.find(f => f.name === s.family), school=C.school(s.school,catalog);
+    const familyTrait = family?.traitOptions ? (family.traitOptions.includes(s.familyTrait) ? s.familyTrait : '') : family?.trait;
     const baseline = s.phase==='advancement' ? s.progression.baseline : null;
     const traits={},rings={},traitCosts={},costItems={};
     const addCost=(id,cost,label)=>{costItems[id]={cost:positive(cost),label};};
     for (const group of C.TRAIT_GROUPS) {
       for (const trait of group.traits) {
-        const base = baseline?.traitBases?.[trait] ?? (2+number(family?.trait===trait)+number(school?.benefit===trait)+number(trait==='Void' && !!school?.brotherhood));
+        const base = baseline?.traitBases?.[trait] ?? (2+number(familyTrait===trait)+number(school?.benefit===trait)+number(trait==='Void' && !!school?.brotherhood));
         const rank=base+integer(s.traitBuys[trait]);
         traits[trait]={base,rank};traitCosts[trait]=C.purchasedRankCost(base,rank,trait==='Void'?6:4);
         for(let r=base+1;r<=rank;r++)addCost(`trait:${trait}:${r}`,r*(trait==='Void'?6:4),`${trait} ${r}`);
@@ -227,7 +228,7 @@
     const ir=insightRank(insight),training=trainingState(s,school,ir,catalog);
     const schoolRank=training.find(t=>t.school.slug===school?.slug && t.school.anchor===school?.anchor)?.rank || 1;
     const freeLimits=freeAbilityLimits(s,school,schoolRank);
-    const d={family,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,disadvantageTotal,xpEarned};
+    const d={family,familyTrait,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,disadvantageTotal,xpEarned};
     d.ancestors=s.ancestors.map(a=>({...catalog.ancestors?.find(e=>e.id===a.catalogId),...a}));
     const abilities=s.abilities.map(e=>abilityQuote(e,s,d,catalog));
     // Universal spells are free school grants, stored in the private Abilities section.
@@ -328,6 +329,7 @@
     if(!s.clan)issue('clan','Choose a clan or Brotherhood.');
     const clan=catalog.clans.find(c=>c.name===s.clan);
     if(clan?.families.length && !d.family)issue('family','Choose a family.');
+    if(d.family?.traitOptions && !d.familyTrait)issue('family-trait',`Choose a physical Trait for the ${d.family.name} family benefit.`);
     if(d.school && s.phase==='creation' && !clan?.schools.some(school=>`${school.slug}#${school.anchor}`===s.school) && !has(s,'Different School'))issue('different-school','A school outside your clan requires Different School or an explained table exception.');
     if(!d.school)issue('school','Choose a starting school.');
     if(d.school?.nonhuman)issue('nonhuman-system','This legacy sheet uses a nonhuman system. Continue with custom entries and its book reference.');
@@ -475,7 +477,7 @@
     for(const [key,e] of Object.entries(old.costItems))if(!next.costItems[key])append({kind:'refund',key,label:e.label,amount:-(paid[key]?.cost ?? 0),explanation:explanation || 'Removed purchase; refunded its recorded paid cost.'});
     // Explicit price edits are corrections; a changed clan/discount never reprices an old purchase.
     if(explanation)for(const [key,e] of Object.entries(next.costItems))if(old.costItems[key] && e.cost!==old.costItems[key].cost)append({kind:'correction',key,label:e.label,amount:e.cost-(paid[key]?.cost ?? old.costItems[key].cost),explanation});
-    const mechanical=['clan','family','school','training','schoolChoices','schoolDecisions','equipmentChoices','modifiers','disadvantages','honor','glory','status','taint'];
+    const mechanical=['clan','family','familyTrait','school','training','schoolChoices','schoolDecisions','equipmentChoices','modifiers','disadvantages','honor','glory','status','taint'];
     if(mechanical.some(k=>JSON.stringify(before[k])!==JSON.stringify(after[k])))append({kind:'correction',amount:0,label:'Sheet correction / training',explanation:explanation || 'Recorded change to training or mechanical choices.'});
     return after;
   }
@@ -499,7 +501,7 @@
     const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','emphases:','school-choice:'],options:['disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
     if(!exceptionPrefixes[section])return s;
     if(section==='identity') {
-      Object.assign(s,{name:'',clan:'',family:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
+      Object.assign(s,{name:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
       s.disadvantages=s.disadvantages.filter(a=>!a.grantSchool);
     } else if(section==='traits')s.traitBuys={};
     else if(section==='skills')Object.assign(s,{skills:{},skillTraits:{},emphases:{},legacyEmphases:{},schoolChoices:[]});

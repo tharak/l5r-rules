@@ -60,6 +60,27 @@ test('Save PC preserves personal edits and closes the sheet to Characters',async
   assert.equal(data.character.notes,'Personal notes');
 });
 
+test('family selector includes orders, monks and vassals, and persists the selectable physical benefit',async()=>{
+ const c=await character();c.change({field:'clan'},'Dragon');
+ for(const [name,trait] of [['Togashi','Reflexes'],['Hitomi','Strength'],['Hoshi','Void']]) {
+  assert.match(c.root.innerHTML,new RegExp(`${name} Order · \\+1 ${trait}`));
+  c.change({field:'family'},name);assert.equal((await c.data()).derived.traits[trait].base,3);
+ }
+ c.change({field:'clan'},'Spider');assert.match(c.root.innerHTML,/Spider Monks · \+1 Reflexes/);
+ c.change({field:'clan'},'Crab');assert.match(c.root.innerHTML,/Moshibaru \(Hida\) · \+1 any Physical/);
+ c.change({field:'family'},'Moshibaru');assert.match(c.root.innerHTML,/data-field="familyTrait"/);
+ c.change({field:'familyTrait'},'Reflexes');
+ const restored=await c.reload(),saved=await restored.data();
+ assert.equal(saved.character.family,'Moshibaru');assert.equal(saved.character.familyTrait,'Reflexes');
+ assert.equal(saved.derived.traits.Reflexes.base,3);
+ restored.change({field:'family'},'Hida');
+ assert.equal((await restored.data()).character.familyTrait,'');
+ assert.equal((await restored.data()).derived.traits.Reflexes.base,2);
+ assert.ok(!restored.root.innerHTML.includes('data-field="familyTrait"'));
+ restored.change({field:'family'},'Moshibaru');restored.change({field:'familyTrait'},'Strength');
+ restored.change({field:'clan'},'Dragon');assert.equal((await restored.data()).character.familyTrait,'');
+});
+
 test('the continuous editor adds XP before a school is chosen, persists awards, and permits ranks through 10',async()=>{
   const c=await character();
   c.inputs['#xp-award']={value:'500'};

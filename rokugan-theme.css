@@ -186,7 +186,10 @@
   #creator-rolls .creator-ring-head { background: var(--ring-heading); }
   #creator-rolls .creator-trait-display { background: var(--trait-heading); }
   .creator-equipment-row select, .creator-option-row select { background: #fffbf2; border-color: var(--line); color: var(--ink); }
-  .creator-ring-head > b { background: var(--wash); color: var(--ink); border-color: #b9aa8d; }
+  :is(#creator-traits,#creator-rolls) .creator-ring-head > b {
+    width: auto; height: auto; padding: 0; border: 0; border-radius: 0;
+    background: transparent; color: var(--ink);
+  }
   .rank-control { border-color: #b9aa8d; border-radius: 2px; }
   .rank-control b { color: var(--ink); }
   .rank-control button { background: var(--wash); color: var(--red); }
@@ -210,6 +213,7 @@
   .creator-validation li.approved, .creator-valid { color: #3e603f; }
 
   /* Long rules articles and dialogs remain comfortable to read on warm paper. */
+  .article { background: var(--surface); }
   .article-intro h1, .article-content h1, .article-content h2, .article-content h3,
   .article-content h4, .related h2, .section-heading h2, .page-card strong,
   .search-result strong, .search-empty strong, .rules-popup-header h2 { color: var(--ink); }
