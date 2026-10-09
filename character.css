@@ -329,3 +329,12 @@
   #creator-identity .creator-insight { justify-self: start; grid-column: 1; grid-row: auto; width: fit-content; max-width: min(100%,460px); box-sizing: border-box; margin: 0; }
   #creator-identity .creator-insight small { display: block; overflow-wrap: anywhere; }
 }
+
+@media screen {
+  #creator-skills .creator-skill-row:has(.creator-skill-trait-choice) { flex-wrap: wrap; align-items: flex-start; }
+  #creator-skills .creator-skill-row:has(.creator-skill-trait-choice) > div:first-child { flex: 1 1 220px; max-width: 100%; }
+  #creator-skills .creator-skill-row:has(.creator-skill-trait-choice) .creator-skill-label { display: block; }
+  #creator-skills .creator-skill-row:has(.creator-skill-trait-choice) .creator-skill-label strong { white-space: normal; overflow-wrap: anywhere; }
+  #creator-skills .creator-skill-values:has(.creator-skill-trait-choice) { flex: 2 1 520px; justify-content: flex-start; align-items: center; }
+  #creator-skills .creator-skill-row:has(.creator-skill-trait-choice) .creator-add-emphasis { margin-left: 0; }
+}
