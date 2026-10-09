@@ -175,7 +175,8 @@
   :is(#creator-traits,#creator-rolls) .creator-ring-head > b { width: 28px; height: 28px; flex: none; }
   #creator-rolls .creator-ring-head { justify-content: flex-start; }
   #creator-rolls .creator-ring-head > span { flex: none; }
-  #creator-rolls .creator-skill-filter { margin: 16px 0 0; color: var(--muted); }
+  #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
+  #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
   /* Element symbols from the supplied reference, displayed as one local image sprite. */
   #creator-rolls .creator-ring-symbol { width: 32px; height: 32px; background: transparent url('public/assets/ring-symbols.jpg') no-repeat; background-size: 436.2px 180px; background-position: var(--ring-symbol-x) var(--ring-symbol-y); }
   .creator-ring-symbol[data-ring="Earth"] { --ring-symbol-x: -304.2px; --ring-symbol-y: -29.4px; }

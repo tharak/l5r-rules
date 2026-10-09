@@ -15,7 +15,10 @@
   let rollState = null;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let hideRankZeroSkills = true;
+  let hiddenZeroSkillCategories = new Set();
   const SKILL_FILTER_KEY = 'l5r-rules-character-lab-hide-rank-zero';
+  const SKILL_CATEGORY_FILTER_KEY = 'l5r-rules-character-rolls-hidden-zero-categories';
+  const SKILL_FILTER_CATEGORIES = ['Artisan','Games','Perform','Lore'];
   const sectionTitle = key => sectionNames[key];
   const editorRoute = () => location.hash.split('#').slice(0,2).join('#') === '#/create-character';
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
@@ -117,7 +120,7 @@
 
   function renderTraits(data,rolling = false) {
     const skills = rolling ? (hideRankZeroSkills ? data.skills : R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills) : {};
-    const skillNames = Object.keys(skills).filter(name=>!hideRankZeroSkills || skills[name].rank>0).sort((a,b)=>a.localeCompare(b));
+    const skillNames = Object.keys(skills).filter(name=>skills[name].rank>0 || (!hideRankZeroSkills && !hiddenZeroSkillCategories.has(name.split(':')[0].trim().toLowerCase()))).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
       const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
       const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span><div class="rank-control" role="group" aria-label="${trait} rank"><button type="button" data-action="trait" data-trait="${trait}" data-delta="-1" ${item.rank <= item.base ? 'disabled' : ''} aria-label="Decrease ${trait}">−</button><output aria-label="${trait} rank">${item.rank}</output><button type="button" data-action="trait" data-trait="${trait}" data-delta="1" ${item.rank >= rankLimit() ? 'disabled' : ''} aria-label="Increase ${trait} for ${cost} XP">+</button></div></div>`;
@@ -154,7 +157,7 @@
   }
 
   function renderSkillFilter() {
-    return `<label class="creator-check creator-skill-filter"><input type="checkbox" data-hide-zero-skills ${hideRankZeroSkills?'checked':''}>Hide 0 rank skills</label>`;
+    return `<div class="creator-skill-filters"><label class="creator-check creator-skill-filter"><input type="checkbox" data-hide-zero-skills ${hideRankZeroSkills?'checked':''}>Hide 0 rank skills</label>${SKILL_FILTER_CATEGORIES.map(category=>`<label class="creator-check creator-skill-filter"><input type="checkbox" data-hide-zero-category="${category.toLowerCase()}" ${hiddenZeroSkillCategories.has(category.toLowerCase())?'checked':''}>Hide ${category}</label>`).join('')}</div>`;
   }
 
   function skillOptions() {
@@ -633,6 +636,14 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   }
 
   function onChange(event) {
+    if (event.target.dataset.hideZeroCategory !== undefined) {
+      const category = event.target.dataset.hideZeroCategory;
+      if (!SKILL_FILTER_CATEGORIES.some(name=>name.toLowerCase()===category)) return;
+      if (event.target.checked) hiddenZeroSkillCategories.add(category);
+      else hiddenZeroSkillCategories.delete(category);
+      try { localStorage.setItem(SKILL_CATEGORY_FILTER_KEY,JSON.stringify([...hiddenZeroSkillCategories])); } catch {}
+      render(); return;
+    }
     if (event.target.dataset.hideZeroSkills !== undefined) {
       hideRankZeroSkills = event.target.checked;
       try { localStorage.setItem(SKILL_FILTER_KEY,String(hideRankZeroSkills)); } catch {}
@@ -681,6 +692,11 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
 
   async function mount(element, shared = null) {
     try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
+    hiddenZeroSkillCategories = new Set();
+    try {
+      const saved = JSON.parse(localStorage.getItem(SKILL_CATEGORY_FILTER_KEY));
+      if (Array.isArray(saved)) hiddenZeroSkillCategories = new Set(saved.filter(category=>SKILL_FILTER_CATEGORIES.some(name=>name.toLowerCase()===category)));
+    } catch {}
     external = shared;
     emphasisSkill = '';
     rollState = null;
