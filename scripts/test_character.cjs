@@ -620,3 +620,19 @@ test('old advancement sheets can change outfit choices and remove their first tr
  const saved=await (await c.reload()).data();assert.equal(saved.character.training.length,0);assert.equal(saved.derived.schoolRank,1);
  assert.equal(saved.character.progression.history[0].amount,15);
 });
+
+
+test('Insight card shows the current formula and cumulative Courtier and Etiquette bonuses',async()=>{
+ const c=await character({skills:{Courtier:7,Etiquette:7}});
+ const card=()=>c.root.innerHTML.split('class="creator-xp creator-insight"')[1].split('</small>')[0];
+ assert.match(card(),/<span>Insight:<\/span><strong>134<\/strong>/);
+ for(const ring of ['Earth','Air','Water','Fire','Void'])assert.ok(card().includes(`${ring} 2`));
+ assert.match(card(),/× 10 \+ 14 Skill ranks \+ 10 Courtier bonus \+ 10 Etiquette bonus/);
+ c.click({action:'skill',skill:'Courtier',delta:'-1'});
+ assert.match(card(),/<strong>126<\/strong>/);assert.match(card(),/13 Skill ranks \+ 3 Courtier bonus \+ 10 Etiquette bonus/);
+ c.click({action:'trait',trait:'Stamina',delta:'1'});c.click({action:'trait',trait:'Willpower',delta:'1'});
+ assert.match(card(),/Earth 3/);assert.match(card(),/<strong>136<\/strong>/);
+ c.change({modifier:'insight'},'-2');assert.match(card(),/− 2 modifier/);assert.match(card(),/<strong>134<\/strong>/);
+ assert.equal((await c.data()).derived.insight,134);
+ const restored=await c.reload();assert.match(restored.root.innerHTML,/Insight:<\/span><strong>134<\/strong>/);
+});

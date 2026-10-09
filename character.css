@@ -324,3 +324,8 @@
 }
 
 .creator-option-column .creator-option-limit{margin:0 0 12px}
+
+@media screen {
+  #creator-identity .creator-insight { justify-self: start; grid-column: 1; grid-row: auto; width: fit-content; max-width: min(100%,460px); box-sizing: border-box; margin: 0; }
+  #creator-identity .creator-insight small { display: block; overflow-wrap: anywhere; }
+}

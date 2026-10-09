@@ -222,15 +222,14 @@
     const disadvantageTotal=disadvantages.reduce((sum,e)=>sum+e.cost,0),xpEarned=Math.min(10,disadvantageTotal);
     const roninFamilyCost=s.clan==='Ronin' && family?5:0;
     addCost('ronin-family',roninFamilyCost,'Ronin family');
-    let masteryInsight=0;
-    for(const [name,skill] of Object.entries(skills)) {
-      if(['Courtier','Etiquette'].includes(name))masteryInsight+=(skill.rank>=3?3:0)+(skill.rank>=7?7:0);
-    }
-    const insight=Object.values(rings).reduce((a,b)=>a+b,0)*10+Object.values(skills).reduce((sum,e)=>sum+e.rank,0)+masteryInsight+number(s.modifiers.insight);
+    const masteryBonus=name=>(skills[name]?.rank>=3?3:0)+(skills[name]?.rank>=7?7:0);
+    const insightBreakdown={rings:Object.values(rings).reduce((sum,rank)=>sum+rank,0)*10,skills:Object.values(skills).reduce((sum,skill)=>sum+skill.rank,0),courtier:masteryBonus('Courtier'),etiquette:masteryBonus('Etiquette'),modifier:number(s.modifiers.insight)};
+    const masteryInsight=insightBreakdown.courtier+insightBreakdown.etiquette;
+    const insight=Object.values(insightBreakdown).reduce((sum,value)=>sum+value,0);
     const ir=insightRank(insight),training=trainingState(s,school,ir,catalog);
     const schoolRank=training.find(t=>t.school.slug===school?.slug && t.school.anchor===school?.anchor)?.rank || 1;
     const freeLimits=freeAbilityLimits(s,school,schoolRank);
-    const d={family,familyTrait,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,disadvantageTotal,xpEarned};
+    const d={family,familyTrait,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,insightBreakdown,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,disadvantageTotal,xpEarned};
     d.ancestors=s.ancestors.map(a=>({...catalog.ancestors?.find(e=>e.id===a.catalogId),...a}));
     const abilities=s.abilities.map(e=>abilityQuote(e,s,d,catalog));
     // Universal spells are free school grants, stored in the private Abilities section.

@@ -80,6 +80,7 @@ test('creation benefits, trait/skill prices, rank caps and 40 XP; out of range d
 test('Insight boundaries include 250 and all later ranks; Courtier and Etiquette mastery add Insight',()=>{
  for(const [insight,rank] of [[149,1],[150,2],[174,2],[175,3],[199,3],[200,4],[224,4],[225,5],[249,5],[250,6],[274,6],[275,7],[300,8],[325,9]])assert.equal(R.insightRank(insight),rank);
  const s=R.normalize({skills:{Courtier:3,Etiquette:7}}),d=calc(s);assert.equal(d.insight,123);assert.equal(d.masteryInsight,13);
+ assert.deepEqual(plain(d.insightBreakdown),{rings:100,skills:10,courtier:3,etiquette:10,modifier:0});
 });
 test('optional untrained skill display preserves purchases, totals and normal calculations',()=>{
  const s=starting();s.skills.Defense=3;s.ancestors=[{id:'ancestor-shiba',name:'Shiba',cost:0}];
