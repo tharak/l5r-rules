@@ -46,6 +46,10 @@ Character and campaign edits save locally immediately and retry connection error
 
 ## Development and validation
 
+**Design Guideline**, linked in the footer at `#/design-guideline`, catalogs the active UI with visual previews, permanent `UI-…` IDs, variants, selectors, and usage locations. Filter by ID, name, selector, or page; click an ID to share its direct link. Page coverage scans every stored reference article. The guide is available without signing in, and its script-free previews use fictional data without invoking app actions.
+
+When changing a UI pattern, update its example and metadata in `design-guideline.js`. Preserve existing IDs when renaming or moving entries; assign a new semantic ID to a new pattern. Exclude retired templates and unused CSS. `npm test` checks inventory integrity and active template coverage. Run `playwright-cli run-code --filename scripts/browser_design_guideline_checks.js` from a static repository or `dist/` preview to verify filtering, deep links, responsive layout, print previews, safe interactions, and navigation regressions without signing in.
+
 Serve the repository root with `python3 -m http.server 8000`, or run `npm run build` and preview `dist/`. Production is https://l5r-rules.web.app.
 
 ```sh

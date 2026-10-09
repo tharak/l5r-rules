@@ -1,0 +1,39 @@
+.design-guide { max-width: 1440px; margin: auto; padding: 32px clamp(16px,4vw,60px) 72px; background: var(--paper); }
+.design-guide h1 { margin: 12px 0 18px; font: 400 clamp(30px,4vw,44px)/1.2 var(--serif); letter-spacing: -.04em; }
+.design-guide h2 { font: 24px/1.3 var(--serif); }
+.design-guide p { line-height: 1.7; }
+.design-guide .dg-intro { max-width: 760px; color: var(--muted); }
+.design-guide code { font-size: 11px; overflow-wrap: anywhere; }
+.design-guide a { text-underline-offset: 4px; }
+.design-guide a:hover { text-decoration: underline; }
+.design-guide .dg-tools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 12px 24px; align-items: end; margin: 28px 0 16px; padding: 22px; border: 1px solid var(--line); background: var(--surface); }
+.design-guide .dg-tools label { display: grid; gap: 8px; font-size: 12px; }
+.design-guide .dg-tools input { width: 100%; min-width: 0; padding: 12px; background: var(--paper); border: 1px solid var(--line); color: var(--ink); }
+.design-guide .dg-count { font-size: 12px; color: var(--muted); }
+.design-guide .dg-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
+.design-guide .dg-nav a { padding: 9px 12px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; }
+.design-guide .dg-category { margin: 36px 0; scroll-margin-top: 20px; }
+.design-guide .dg-category > h2 { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.design-guide .dg-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 22px; align-items: start; }
+.design-guide .dg-component { min-width: 0; border: 1px solid var(--line); background: var(--surface); scroll-margin-top: 20px; }
+.design-guide .dg-component:target { outline: 2px solid var(--red); outline-offset: 4px; }
+.design-guide .dg-entry-head { padding: 20px 20px 0; }
+.design-guide .dg-entry-head h3 { margin: 12px 0 8px; font: 20px/1.4 var(--serif); }
+.design-guide .dg-id { display: inline-block; color: var(--red); font-weight: 700; }
+.design-guide .dg-entry-head p { font-size: 12px; color: var(--muted); }
+.design-guide .dg-preview { margin: 16px 12px; border: 1px solid var(--line); background: var(--paper); }
+.design-guide iframe { display: block; width: 100%; height: 200px; border: 0; }
+.design-guide .dg-meta { padding: 0 20px 20px; font-size: 12px; line-height: 1.8; }
+.design-guide .dg-meta dt { margin-top: 12px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.design-guide .dg-meta dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.design-guide .dg-meta ul { padding-left: 18px; margin: 6px 0; }
+.design-guide .dg-meta a, .design-guide .dg-coverage a { color: var(--red); }
+.design-guide summary { cursor: pointer; line-height: 1.7; }
+.design-guide .dg-coverage { padding: 20px; margin-top: 24px; border: 1px solid var(--line); background: var(--surface); }
+.design-guide .dg-coverage > summary { font-family: var(--serif); font-size: 18px; }
+.design-guide .dg-coverage ul { padding-left: 20px; }
+.design-guide .dg-coverage li { margin: 10px 0; font-size: 12px; line-height: 1.8; }
+.design-guide .dg-page-patterns { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 12px; }
+.design-guide [hidden] { display: none !important; }
+@media (max-width: 850px) { .design-guide .dg-grid { grid-template-columns: 1fr; } }
+@media (max-width: 500px) { .design-guide .dg-tools { grid-template-columns: 1fr; padding: 16px; } .design-guide .dg-entry-head { padding: 16px 16px 0; } .design-guide .dg-meta { padding: 0 16px 16px; } }
