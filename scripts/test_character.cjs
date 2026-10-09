@@ -170,7 +170,7 @@ test('school skill ranks, emphases, trait, honor, outfit and training are free g
   assert.equal(d.money.koku,3);
   assert.ok(d.equipment.some(entry => entry.name === 'Daisho'));
   assert.match(d.techniques[0].name,/Eternal Stone/);
-  assert.match(c.root.innerHTML,/School rank 2 · Free/);
+  assert.doesNotMatch(c.root.innerHTML,/School rank \d+ · Free/);
 });
 
 test('skill upgrades cost only ranks above the school grant and cannot remove it', async () => {
@@ -535,11 +535,15 @@ test('separate equipment list preserves saved gear and money without equipped co
   assert.match(html,/Light Armor/);
   assert.doesNotMatch(sectionHtml(loaded,'story'),/creator-equipment-list|creator-standing-fields/);
   assert.match(sectionHtml(loaded,'identity'),/creator-standing-fields/);
+  loaded.click({action:'money-step',field:'koku',delta:'1'});
+  loaded.click({action:'money-step',field:'zeni',delta:'-1'});
+  loaded.click({action:'money-step',field:'zeni',delta:'-1'});
   loaded.inputs['#new-equipment']={value:'Rope'};loaded.click({action:'add-equipment'});
   const saved=await (await loaded.reload()).data();
   assert.equal(saved.character.equipment[0].name,'Rope');
   assert.equal(saved.character.equipped[armor.key],true);
-  assert.deepEqual(saved.derived.money,{koku:7,bu:2,zeni:1});
+  assert.deepEqual(saved.derived.money,{koku:8,bu:2,zeni:0});
+  assert.equal(saved.derived.xpRemaining,before.derived.xpRemaining,'Money changes must not spend XP');
   assert.ok(saved.derived.combat.armorTN>before.derived.combat.armorTN);
   loaded.click({action:'remove-equipment',index:'0'});
   assert.equal((await loaded.data()).character.equipment.length,0);

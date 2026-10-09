@@ -29,6 +29,9 @@ async page => {
     check(await p.locator('.creator-layout > .creator-summary').count()===0,'Standalone Character Record sidebar remains');
     check(await p.locator('#creator-identity #xp-award').count()===1,'XP controls did not move into section 01');
     check(await p.locator('#creator-summary .creator-standing-fields').count()===1,'Standing controls missing below XP');
+    check((await p.locator('#creator-summary .creator-standing-fields .creator-number-field > span').allTextContents()).join(',')==='Honor,Glory,Status,Taint','Standing controls are out of order');
+    check(await p.locator('#creator-rolls > .creator-ring-grid + .creator-roll-wounds [data-field="woundsTaken"]').count()===2,'Wounds control must follow the last ring');
+    check(await p.locator('#creator-summary [data-field="woundsTaken"]').count()===0,'Wounds stepper remains in Character Record');
     check(await p.locator('#creator-story .creator-standing-fields,#creator-story #creator-equipment').count()===0,'Story still contains standing or equipment');
     check(await p.locator('#creator-story h2').innerText()==='Story','Story heading missing');
     check(await p.locator('#creator-equipment h2').innerText()==='Equipment','Equipment heading missing');
