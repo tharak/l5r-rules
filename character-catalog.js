@@ -7,6 +7,7 @@
     {ring:'Void', mark:'V', traits:['Void']}
   ];
   const TRAIT_NAMES = TRAIT_GROUPS.flatMap(group => group.traits);
+  const WEAPON_SKILLS = ['Chain Weapons','Heavy Weapons','Kenjutsu','Knives','Kyujutsu','Ninjutsu','Polearms','Spears','Staves','War Fan'];
   const WOUND_LEVELS = ['Healthy (+0)','Nicked (+3)','Grazed (+5)','Hurt (+10)','Injured (+15)','Crippled (+20)','Down (+40)','Out'];
   function purchasedRankCost(base, rank, multiplier = 1) {
     let cost = 0;
@@ -30,7 +31,7 @@
     if (!entry || ['Weapons','Artisan','Craft','Games','Lore','Perform'].includes(name)) return false;
     const prompt = choice.prompt;
     if (/following list/i.test(prompt)) return category === 'Acting' || /^(Artisan|Perform): /.test(name);
-    if (/Weapon Skill/i.test(prompt)) return ['Chain Weapons','Heavy Weapons','Kenjutsu','Knives','Kyujutsu','Ninjutsu','Polearms','Spears','Staves','War Fan'].includes(category);
+    if (/Weapon Skill/i.test(prompt)) return WEAPON_SKILLS.includes(category);
     const types = ['Artisan','Craft','Lore','Perform'].filter(type => new RegExp(`\\b${type}\\b`, 'i').test(prompt));
     const groups = ['High','Bugei','Merchant','Low'].filter(group => new RegExp(`\\b${group}\\b`, 'i').test(prompt));
     if (/non-High/i.test(prompt)) return entry.group !== 'High';
@@ -82,6 +83,6 @@
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WOUND_LEVELS, purchasedRankCost, skillIdentity, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, WOUND_LEVELS, purchasedRankCost, skillIdentity, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

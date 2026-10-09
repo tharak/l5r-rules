@@ -8,8 +8,8 @@ const rootDir = path.resolve(__dirname, '..');
 const catalog = JSON.parse(fs.readFileSync(path.join(rootDir, 'public/character-data.json')));
 const source = fs.readFileSync(path.join(rootDir, 'character.js'), 'utf8');
 
-async function character(saved) {
-  const storage = new Map();
+async function character(saved,preferences = {}) {
+  const storage = new Map(Object.entries(preferences));
   if (saved) {
     storage.set('l5r-rules-characters-v1', JSON.stringify([{id:'saved', sheet:saved}]));
     storage.set('l5r-rules-active-character-v1', 'saved');
@@ -41,7 +41,7 @@ async function character(saved) {
     async data() {click({action:'export'}); return JSON.parse(await exported.text());},
     async reload() {
       const id = storage.get('l5r-rules-active-character-v1');
-      return character(JSON.parse(storage.get('l5r-rules-characters-v1')).find(entry => entry.id === id).sheet);
+      return character(JSON.parse(storage.get('l5r-rules-characters-v1')).find(entry => entry.id === id).sheet,Object.fromEntries(storage));
     }
   };
 }
@@ -79,6 +79,38 @@ test('family selector includes orders, monks and vassals, and persists the selec
  assert.ok(!restored.root.innerHTML.includes('data-field="familyTrait"'));
  restored.change({field:'family'},'Moshibaru');restored.change({field:'familyTrait'},'Strength');
  restored.change({field:'clan'},'Dragon');assert.equal((await restored.data()).character.familyTrait,'');
+});
+
+test('all Rolls hide filters start checked; weapon filter hides only zero ranks and persists user changes',async()=>{
+ const school=catalog.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');
+ const c=await character({clan:'Crab',family:'Hida',school:`${school.slug}#${school.anchor}`,skills:{Knives:2,'Weapons: Custom':0},skillTraits:{'Weapons: Custom':'Agility'},emphases:{Knives:['Tanto']}},{
+  'l5r-rules-character-lab-hide-rank-zero':'false',
+  'l5r-rules-character-rolls-hidden-zero-categories':'[]'
+ });
+ const rows=instance=>instance.root.innerHTML.split('id="creator-rolls"')[1].split('</section>')[0];
+ const toggle=(instance,dataset,checked)=>instance.root.onchange({target:{dataset,checked}});
+ assert.match(rows(c),/data-hide-zero-skills checked/);
+ for(const category of ['artisan','games','perform','lore','weapons'])assert.match(rows(c),new RegExp(`data-hide-zero-category="${category}" checked`));
+ assert.match(rows(c),/Hide Weapons 0/);
+ const before=(await c.data()).derived;
+ toggle(c,{hideZeroSkills:''},false);
+ assert.ok(rows(c).includes('data-ring-skill="Athletics"'));
+ for(const name of c.window.CharacterCatalog.WEAPON_SKILLS)assert.equal(rows(c).includes(`data-ring-skill="${name}"`),(before.skills[name]?.rank || 0)>0,name);
+ assert.ok(!rows(c).includes('data-ring-skill="Weapons: Custom"'));
+ assert.match(rows(c),/Tanto/);
+ toggle(c,{hideZeroCategory:'weapons'},false);
+ for(const name of [...c.window.CharacterCatalog.WEAPON_SKILLS,'Weapons: Custom'])assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
+ const restored=await c.reload();
+ assert.match(rows(restored),/data-hide-zero-skills >Hide 0 rank skills/);
+ assert.match(rows(restored),/data-hide-zero-category="weapons" >Hide Weapons 0/);
+ assert.ok(rows(restored).includes('data-ring-skill="War Fan"'));
+ toggle(restored,{hideZeroCategory:'weapons'},true);
+ assert.ok(!rows(restored).includes('data-ring-skill="War Fan"'));
+ assert.ok(rows(restored).includes('data-ring-skill="Knives"'));
+ assert.ok(rows(restored).includes('data-ring-skill="Heavy Weapons"'));
+ const after=(await restored.data()).derived;
+ for(const key of ['xpRemaining','xpSpent','insight','schoolRank'])assert.equal(after[key],before[key],key);
+ assert.deepEqual(after.skills,before.skills);
 });
 
 test('the continuous editor adds XP before a school is chosen, persists awards, and permits ranks through 10',async()=>{
