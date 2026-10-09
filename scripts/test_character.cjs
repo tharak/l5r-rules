@@ -120,7 +120,7 @@ test('the continuous editor adds XP before a school is chosen, persists awards, 
   for(let i=0;i<8;i++)c.click({action:'trait',trait:'Strength',delta:'1'});
   const data=await c.data();
   assert.equal(data.derived.traits.Strength.rank,10);
-  assert.ok(!data.derived.blockers.some(v=>v.code==='rank:trait:Strength'));
+  assert.ok(data.derived.blockers.some(v=>v.code==='rank:trait:Strength'));
   const restored=await c.reload(),saved=await restored.data();
   assert.equal(saved.derived.xpAwards,500);
   assert.equal(saved.derived.traits.Strength.rank,10);
@@ -600,9 +600,10 @@ test('separate equipment list preserves saved gear and money without equipped co
 
 test('cost guidance shows limits while trait, skill, and option edits remain available',async()=>{
  const c=await character({phase:'advancement',traitBuys:{Strength:8},skills:{Defense:10},advantages:[{id:'large',name:'Large',cost:40}],disadvantages:[{id:'doubt',name:'Doubt',cost:8},{id:'health',name:'Bad Health',cost:4}]});
+ assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 5\./);
  assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 10\./);
  assert.match(c.root.innerHTML,/Advantages \(40\)/);assert.match(c.root.innerHTML,/Disadvantages \(12\)/);
- assert.match(c.root.innerHTML,/No total point limit\./);
+ assert.match(c.root.innerHTML,/Maximum: 15 total points\./);
  assert.match(c.root.innerHTML,/Up to 10 XP from disadvantages count toward your budget\./);
  c.click({action:'trait',trait:'Strength',delta:'1'});c.click({action:'skill',skill:'Defense',delta:'1'});
  const {character:s,derived:d}=await c.data();assert.equal(d.traits.Strength.rank,11);assert.equal(d.skills.Defense.rank,11);

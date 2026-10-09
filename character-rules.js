@@ -219,6 +219,7 @@
     for(const a of advantages)addCost(`advantage:${a.id}`,a.cost,a.name);
     for(const a of s.ancestors)addCost(`ancestor:${a.id}`,a.cost ?? catalog.ancestors?.find(e=>e.id===a.catalogId)?.cost,a.name);
     for(const a of s.purchases)addCost(`custom:${a.id}`,a.cost,a.name);
+    const advantageTotal=advantages.reduce((sum,e)=>sum+e.cost,0);
     const disadvantageTotal=disadvantages.reduce((sum,e)=>sum+e.cost,0),xpEarned=Math.min(10,disadvantageTotal);
     const roninFamilyCost=s.clan==='Ronin' && family?5:0;
     addCost('ronin-family',roninFamilyCost,'Ronin family');
@@ -229,7 +230,7 @@
     const ir=insightRank(insight),training=trainingState(s,school,ir,catalog);
     const schoolRank=training.find(t=>t.school.slug===school?.slug && t.school.anchor===school?.anchor)?.rank || 1;
     const freeLimits=freeAbilityLimits(s,school,schoolRank);
-    const d={family,familyTrait,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,insightBreakdown,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,disadvantageTotal,xpEarned};
+    const d={family,familyTrait,school,traits,rings,traitCosts,skills,schoolRank,training,freeLimits,insight,insightRank:ir,masteryInsight,insightBreakdown,advantages,disadvantages,costItems,skillChoiceErrors:grants.errors,roninFamilyCost,advantageTotal,disadvantageTotal,xpEarned};
     d.ancestors=s.ancestors.map(a=>({...catalog.ancestors?.find(e=>e.id===a.catalogId),...a}));
     const abilities=s.abilities.map(e=>abilityQuote(e,s,d,catalog));
     // Universal spells are free school grants, stored in the private Abilities section.
@@ -331,15 +332,15 @@
     if(!d.school)issue('school','Choose a starting school.');
     if(d.school?.nonhuman)issue('nonhuman-system','This legacy sheet uses a nonhuman system. Continue with custom entries and its book reference.');
     if(s.clan==='Imperial')issue('imperial','Imperial families require table approval.');
-    const limit=10;
-    for(const [name,t] of Object.entries(d.traits))if(t.rank>limit)issue(`rank:trait:${name}`,`${name} ${t.rank} exceeds the rank limit of ${limit}.`);
+    for(const [name,t] of Object.entries(d.traits))if(t.rank>5)issue(`rank:trait:${name}`,`${name} ${t.rank} exceeds the Trait rank limit of 5.`);
     for(const [name,k] of Object.entries(d.skills)) {
-      if(k.rank>limit)issue(`rank:skill:${name}`,`${name} ${k.rank} exceeds the rank limit of ${limit}.`);
+      if(k.rank>10)issue(`rank:skill:${name}`,`${name} ${k.rank} exceeds the Skill rank limit of 10.`);
       const max=Math.min(5,Math.ceil(k.rank/2));
       if(k.emphases.length>max)issue(`emphases:${name}`,`${name} permits ${max} emphasis${max===1?'':'es'} at Rank ${k.rank}, including free emphases.`);
     }
     for(const name of Object.keys(s.emphases))if(!d.skills[name] && s.emphases[name].length)issue(`emphases:${name}`,`${name} must have at least one rank before an emphasis can be purchased.`);
     if(d.xpRemaining<0)issue('xp',`XP budget exceeded by ${-d.xpRemaining}.`);
+    if(d.advantageTotal>15)issue('advantages',`Advantages total ${d.advantageTotal} points, exceeding the limit of 15.`);
     if(d.disadvantageTotal>10)issue('disadvantages','Only 10 XP from disadvantages count toward your budget.');
     if(has(s,'Large') && flaw(s,'Small'))issue('size','Large and Small are incompatible.');
     for(const [i,c] of (d.school?.skillChoices || []).entries()) {
@@ -443,7 +444,7 @@
   }
   function resetSection(input,section,catalog) {
     const s=normalize(input);
-    const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','emphases:','school-choice:'],options:['disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
+    const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
     if(!exceptionPrefixes[section])return s;
     if(section==='identity') {
       Object.assign(s,{name:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});

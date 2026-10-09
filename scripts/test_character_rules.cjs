@@ -441,3 +441,15 @@ test('Greedy uses current Mantis prices or an explicit player override',()=>{
  const legacy=R.normalize({clan:'Mantis',disadvantages:[{name:'Greedy',cost:3}]});
  assert.equal(calc(legacy).disadvantages[0].cost,3);
 });
+
+
+test('Trait Rank 5 and 15 total advantage points are inclusive advisory limits',()=>{
+ const s=R.normalize({traitBuys:{Strength:3},skills:{Defense:10},advantages:[{id:'one',name:'Custom one',cost:8},{id:'two',name:'Custom two',cost:7}]});
+ let d=calc(s);assert.equal(d.traits.Strength.rank,5);assert.equal(d.advantageTotal,15);
+ assert.ok(!d.blockers.some(v=>v.code==='rank:trait:Strength'||v.code==='rank:skill:Defense'||v.code==='advantages'));
+ s.traitBuys.Strength=4;s.advantages[1].cost=8;d=calc(s);
+ assert.equal(d.traits.Strength.rank,6);assert.equal(d.advantageTotal,16);
+ assert.ok(d.blockers.some(v=>v.code==='rank:trait:Strength'&&v.message.includes('limit of 5')));
+ assert.ok(d.blockers.some(v=>v.code==='advantages'&&v.message.includes('limit of 15')));
+ assert.equal(R.normalize(s).traitBuys.Strength,4);assert.equal(R.normalize(s).advantages[1].cost,8);
+});
