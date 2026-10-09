@@ -133,12 +133,12 @@
   .creator-training-entry > strong, .creator-equipment-row strong,
   .creator-summary h2, .creator-summary strong, .creator-option-row > span,
   .creator-purchases .creator-option-row strong, .creator-skill-roll strong,
-  .creator-overview strong, .creator-overview b, .creator-page details summary { color: var(--ink); }
+  .creator-page details summary { color: var(--ink); }
   .creator-header p, .creator-panel-head p, .creator-rule, .creator-bottom,
   .creator-rank-row small, .creator-skill-row small, .creator-ring-head small,
   .creator-purchases p, .creator-equipment-row small, .creator-training-entry p,
   .creator-summary p, .creator-wounds small, .creator-fields label,
-  .creator-choice-grid label, .creator-starting-xp, .creator-option-row label,
+  .creator-choice-grid label, .creator-option-row label,
   .creator-skill-trait, .creator-equipment-row label, .creator-mastery,
   .creator-derived div, .creator-summary-rings div, .creator-reputation-row > div:first-child,
   .creator-wounds > div, .creator-ability-list dl { color: var(--muted); }
@@ -146,8 +146,7 @@
   .creator-summary-links a, .creator-school-note b, .creator-bonuses small,
   .creator-ability-list dt, .creator-summary-kicker { color: var(--red); }
   .creator-step { border-color: var(--red); color: var(--red); border-radius: 2px; }
-  .creator-bonuses > div, .creator-school-note, .creator-starting-money,
-  .creator-overview { background: var(--wash); border-color: var(--line); color: var(--muted); }
+  .creator-bonuses > div, .creator-school-note, .creator-starting-money { background: var(--wash); border-color: var(--line); color: var(--muted); }
   .creator-ring, .creator-skill-list, .creator-option-list, .creator-equipment-list,
   .creator-empty, .creator-ability-list details { background: #fffbf2; border-color: var(--line); color: var(--muted); }
   /* The palette and editor share all three elemental surface colors. */

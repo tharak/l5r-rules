@@ -30,14 +30,14 @@ async page => {
     check(await p.locator('#creator-identity #xp-award').count()===1,'XP controls did not move into section 01');
     check(await p.locator('[data-action="reset-section"]').count()===7,'Creation section reset controls missing');
     const characterId=await p.evaluate(()=>CharacterBuilder.list()[0].id);
-    await p.locator('[data-field="startingXP"]').fill('65');await p.locator('[data-field="startingXP"]').blur();
-    check((await p.locator('.creator-overview').innerText()).includes('XP 65'),'Starting XP budget did not update');
+    check(await p.locator('.creator-overview,[data-field="startingXP"]').count()===0,'Removed totals bar remains');
+    check(await p.locator('#creator-traits .creator-panel-head p').count()===0,'Removed section 02 description remains');
     await p.evaluate(()=>window.confirm=()=>false);
     await p.locator('[data-action="reset-section"][data-section="summary"]').click();
-    check(await p.locator('[data-field="startingXP"]').inputValue()==='65','Cancel reset changed the budget');
+    check(await p.locator('.creator-xp-total strong').innerText()==='40','Cancel reset changed the budget');
     await p.evaluate(()=>window.confirm=()=>true);
     await p.locator('[data-action="reset-section"][data-section="summary"]').click();
-    check(await p.locator('[data-field="startingXP"]').inputValue()==='40','Summary reset did not restore starting XP');
+    check(await p.locator('.creator-xp-total strong').innerText()==='40','Summary reset did not restore starting XP');
     await p.locator('[data-field="name"]').fill('Identity to reset');
     await p.locator('[data-action="reset-section"][data-section="identity"]').click();
     check(await p.locator('[data-field="name"]').inputValue()==='','Identity reset did not clear inputs');
@@ -147,9 +147,9 @@ async page => {
     await p.locator('#training-school').fill('Hida Bushi · basic');
     await p.getByRole('button',{name:'Add training',exact:true}).click();
     await p.getByRole('button',{name:'Advance Hida Bushi school rank',exact:true}).click();
-    check((await p.locator('.creator-overview').innerText()).includes('School Rank 2'),'School rank did not advance');
+    check((await p.locator('.creator-later-training').innerText()).includes('School Rank 2'),'School rank did not advance');
     await p.getByRole('button',{name:'Decrease Hida Bushi school rank',exact:true}).click();
-    check((await p.locator('.creator-overview').innerText()).includes('School Rank 1'),'School rank correction failed');
+    check((await p.locator('.creator-later-training').innerText()).includes('School Rank 1'),'School rank correction failed');
     check(await p.locator('#xp-reason,#summary-name').count()===0,'Removed record identity or reason field remains');
     await p.evaluate(()=>{for(let i=0;i<100;i++)document.querySelector('[data-action="xp-award-step"][data-delta="1"]').click();});
     check(await p.locator('#xp-award').innerText()==='100','XP stepper did not update');
@@ -180,6 +180,6 @@ async page => {
     check((await p.locator('.creator-xp-history').innerText()).includes('XP added from character editor.'),'Offline XP history lost on reload');
     check(await p.locator('[data-field="notes"]').inputValue()==='OWNER PRIVATE NOTES\nSecond line','Offline notes lost');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, section 01 XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
+    return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, compact navigation, seven creation resets, rule popups, signed-out drafts, validation, section 01 XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';
   } finally {await context.close();}
 }
