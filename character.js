@@ -17,6 +17,7 @@
   let hideRankZeroSkills = true;
   const SKILL_FILTER_KEY = 'l5r-rules-character-lab-hide-rank-zero';
   const experimental = () => layout === 'lab';
+  const sectionTitle = key => experimental() && key === 'traits' ? 'Rolls' : sectionNames[key];
   const editorRoute = () => ['#/create-character','#/create-character-lab'].includes(location.hash.split('#').slice(0,2).join('#'));
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
 
@@ -124,7 +125,7 @@
       if (!experimental()) return control;
       return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list creator-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${renderSkillRow(name,skills[name],'rings')}</li>`).join('')}</ul></div>`;
     };
-    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">02</span><div><h2>Rings & traits</h2>${experimental()?'':'<p>All Rings begin at 2. Family and school benefits are applied automatically.</p>'}</div></div>${experimental()?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p>'}<div class="creator-ring-grid">${TRAIT_GROUPS.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}"><div class="creator-ring-head">${experimental()?`<span class="creator-ring-mark creator-ring-symbol" data-ring="${group.ring}" aria-hidden="true"></span>`:`<span class="creator-ring-mark">${group.mark}</span>`}<div><strong>${group.ring}</strong></div><b>${data.rings[group.ring]}</b></div>${experimental()?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div></section>`;
+    return `<section class="creator-panel" id="creator-traits"><div class="creator-panel-head"><span class="creator-step">${experimental()?'00':'02'}</span><div><h2>${sectionTitle('traits')}</h2>${experimental()?'':'<p>All Rings begin at 2. Family and school benefits are applied automatically.</p>'}</div></div>${experimental()?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p>'}<div class="creator-ring-grid">${TRAIT_GROUPS.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}"><div class="creator-ring-head">${experimental()?`<span class="creator-ring-mark creator-ring-symbol" data-ring="${group.ring}" aria-hidden="true"></span>`:`<span class="creator-ring-mark">${group.mark}</span>`}<div><strong>${group.ring}</strong></div><b>${data.rings[group.ring]}</b></div>${experimental()?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div></section>`;
   }
 
   function renderSkillRoll(name, skill, view = 'skills') {
@@ -327,7 +328,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
 
   function renderNavigation(d) {
     const sections=[['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Equipment']];
-    if (experimental()) sections.splice(0,sections.length,['traits','Traits'],['identity','Identity'],['summary','Summary'],['options','Advantages'],['ancestors','Ancestors'],['skills','Skills'],['abilities','Spells & abilities'],['story','Equipment & story']);
+    if (experimental()) sections.splice(0,sections.length,['traits','Rolls'],['identity','Identity'],['summary','Summary'],['options','Advantages'],['ancestors','Ancestors'],['skills','Skills'],['abilities','Spells & abilities'],['story','Equipment & story']);
     return `<nav class="creator-nav" aria-label="Character sections">${sections.map(([key,label])=>`<button type="button" data-action="section" data-section="${key}">${label}</button>`).join('')}</nav>${experimental() ? '' : `<div class="creator-overview" aria-label="Character totals"><label class="creator-starting-xp">Starting XP<input type="number" min="0" step="1" data-field="startingXP" value="${d.startingXP}"></label><span>XP <b>${d.xpRemaining}</b></span><span>Insight <b>${d.insight}</b> · Rank <b>${d.insightRank}</b></span><span>School Rank <b>${d.schoolRank}</b></span></div>`}${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
@@ -341,7 +342,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   }
   function renderSection(content,key,d) {
     const issues=d.blockers.filter(v=>violationSection(v.code)===key);
-    const messages=issues.length?`<ul class="creator-validation" aria-label="${escapeHtml(sectionNames[key] || 'Progression')} choices">${issues.map(v=>`<li>${escapeHtml(v.message)}</li>`).join('')}</ul>`:'';
+    const messages=issues.length?`<ul class="creator-validation" aria-label="${escapeHtml(sectionTitle(key) || 'Progression')} choices">${issues.map(v=>`<li>${escapeHtml(v.message)}</li>`).join('')}</ul>`:'';
     // Keep feedback visible in the section that contains the corresponding control.
     return content.replace(key==='summary'?'</aside>':'</section>',messages+(key==='summary'?'</aside>':'</section>'));
   }
@@ -428,7 +429,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
     const before=R.normalize(JSON.parse(JSON.stringify(sheet)));
     if(action==='reset-section') {
       const key=button.dataset.section;
-      if(sheet.phase!=='creation' || !sectionNames[key] || !window.confirm(`Reset ${sectionNames[key]}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
+      if(sheet.phase!=='creation' || !sectionNames[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
       sheet=R.resetSection(sheet,key,catalog);
     } else if(action==='buyoff-disadvantage') {
       const reason=window.prompt('Explain the table’s approval to buy off this disadvantage (Core p. 299):');
@@ -506,7 +507,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
           row.className = 'creator-section-title';
           title.replaceWith(row);
           row.append(title);
-          row.insertAdjacentHTML('beforeend',`<button type="button" class="creator-reset-section" data-action="reset-section" data-section="${key}" aria-label="Reset ${sectionNames[key]}">Reset</button>`);
+          row.insertAdjacentHTML('beforeend',`<button type="button" class="creator-reset-section" data-action="reset-section" data-section="${key}" aria-label="Reset ${sectionTitle(key)}">Reset</button>`);
         }
         const privacy = `<div class="creator-section-tools"><label class="section-public"><input type="checkbox" data-public="${key}" ${visibility[key] ? 'checked' : ''} ${external ? 'disabled' : ''}> Public</label></div>`;
         if (heading) heading.insertAdjacentHTML('beforeend',privacy);
