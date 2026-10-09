@@ -17,11 +17,11 @@
   let xpAward = 0;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let hideRankZeroSkills = true;
+  let hideRankZeroMacroSkills = true;
   // Start the updated filters checked, then retain subsequent user choices.
   const SKILL_FILTER_KEY = 'l5r-rules-character-rolls-hide-rank-zero-v2';
-  const SKILL_CATEGORY_FILTER_KEY = 'l5r-rules-character-rolls-hidden-zero-categories-v2';
-  const SKILL_FILTER_CATEGORIES = ['Artisan','Games','Perform','Lore','Weapons'];
-  let hiddenZeroSkillCategories = new Set(SKILL_FILTER_CATEGORIES.map(category=>category.toLowerCase()));
+  const MACRO_SKILL_FILTER_KEY = 'l5r-rules-character-rolls-hide-zero-macro-skills-v1';
+  const LEGACY_SKILL_CATEGORY_FILTER_KEY = 'l5r-rules-character-rolls-hidden-zero-categories-v2';
   const sectionTitle = key => sectionNames[key];
   const editorRoute = () => location.hash.split('#').slice(0,2).join('#') === '#/create-character';
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
@@ -123,7 +123,7 @@
   function renderTraits(data,rolling = false) {
     const groups = rolling ? ['Void','Earth','Water','Air','Fire'].map(ring=>TRAIT_GROUPS.find(group=>group.ring===ring)) : TRAIT_GROUPS;
     const skills = rolling ? (hideRankZeroSkills ? data.skills : R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills) : {};
-    const skillNames = Object.keys(skills).filter(name=>skills[name].rank>0 || (!hideRankZeroSkills && !hiddenZeroSkillCategories.has(skillFilterCategory(name)))).sort((a,b)=>a.localeCompare(b));
+    const skillNames = Object.keys(skills).filter(name=>skills[name].rank>0 || (!hideRankZeroSkills && !(hideRankZeroMacroSkills && isMacroSkill(name)))).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
       const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
       const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span>${UI.stepper({value:item.rank,size:'compact',attrs:{'aria-label':`${trait} rank`},outputAttrs:{'aria-label':`${trait} rank`},decrease:{'data-action':'trait','data-trait':trait,'data-delta':'-1','disabled':item.rank <= item.base,'aria-label':`Decrease ${trait}`},increase:{'data-action':'trait','data-trait':trait,'data-delta':'1','aria-label':`Increase ${trait} for ${cost} XP`}})}</div>`;
@@ -165,12 +165,12 @@
   }
 
   function renderSkillFilter() {
-    return `<div class="creator-skill-filters">${UI.checkbox({label:'Hide 0 rank skills',attrs:{'type':'checkbox','data-hide-zero-skills':true,'checked':hideRankZeroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}${SKILL_FILTER_CATEGORIES.map(category=>UI.checkbox({label:`Hide ${category}${category==='Weapons'?' 0':''}`,attrs:{'type':'checkbox','data-hide-zero-category':category.toLowerCase(),'checked':hiddenZeroSkillCategories.has(category.toLowerCase())},labelAttrs:{'class':'creator-check creator-skill-filter'}})).join('')}</div>`;
+    return `<div class="creator-skill-filters">${UI.checkbox({label:'Hide 0 rank skills',attrs:{'type':'checkbox','data-hide-zero-skills':true,'checked':hideRankZeroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}${UI.checkbox({label:'Hide macro-skills 0',attrs:{'type':'checkbox','data-hide-zero-macro-skills':true,'checked':hideRankZeroMacroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}</div>`;
   }
 
-  function skillFilterCategory(name) {
+  function isMacroSkill(name) {
     const category = name.split(':')[0].trim();
-    return C.WEAPON_SKILLS.includes(category) ? 'weapons' : category.toLowerCase();
+    return C.MACRO_SKILLS.includes(category) || C.WEAPON_SKILLS.includes(category);
   }
 
   function skillOptions() {
@@ -695,12 +695,9 @@
 
   function onChange(event) {
     if (event.target.id === 'new-skill') return;
-    if (event.target.dataset.hideZeroCategory !== undefined) {
-      const category = event.target.dataset.hideZeroCategory;
-      if (!SKILL_FILTER_CATEGORIES.some(name=>name.toLowerCase()===category)) return;
-      if (event.target.checked) hiddenZeroSkillCategories.add(category);
-      else hiddenZeroSkillCategories.delete(category);
-      try { localStorage.setItem(SKILL_CATEGORY_FILTER_KEY,JSON.stringify([...hiddenZeroSkillCategories])); } catch {}
+    if (event.target.dataset.hideZeroMacroSkills !== undefined) {
+      hideRankZeroMacroSkills = event.target.checked;
+      try { localStorage.setItem(MACRO_SKILL_FILTER_KEY,String(hideRankZeroMacroSkills)); } catch {}
       render(); return;
     }
     if (event.target.dataset.hideZeroSkills !== undefined) {
@@ -751,10 +748,14 @@
   async function mount(element, shared = null) {
     hideRankZeroSkills = true;
     try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
-    hiddenZeroSkillCategories = new Set(SKILL_FILTER_CATEGORIES.map(category=>category.toLowerCase()));
+    hideRankZeroMacroSkills = true;
     try {
-      const saved = JSON.parse(localStorage.getItem(SKILL_CATEGORY_FILTER_KEY));
-      if (Array.isArray(saved)) hiddenZeroSkillCategories = new Set(saved.filter(category=>SKILL_FILTER_CATEGORIES.some(name=>name.toLowerCase()===category)));
+      const saved = localStorage.getItem(MACRO_SKILL_FILTER_KEY);
+      if (saved === null) {
+        const previous = JSON.parse(localStorage.getItem(LEGACY_SKILL_CATEGORY_FILTER_KEY));
+        if (Array.isArray(previous)) hideRankZeroMacroSkills = ['artisan','games','perform','lore','weapons'].every(category=>previous.includes(category));
+        localStorage.setItem(MACRO_SKILL_FILTER_KEY,String(hideRankZeroMacroSkills));
+      } else hideRankZeroMacroSkills = saved !== 'false';
     } catch {}
     external = shared;
     emphasisSkill = '';

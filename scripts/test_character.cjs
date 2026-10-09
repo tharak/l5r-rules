@@ -80,36 +80,57 @@ test('family selector includes orders, monks and vassals, and persists the selec
  restored.change({field:'clan'},'Dragon');assert.equal((await restored.data()).character.familyTrait,'');
 });
 
-test('all Rolls hide filters start checked; weapon filter hides only zero ranks and persists user changes',async()=>{
+test('Rolls macro filter covers all six categories at rank zero and preserves trained skills',async()=>{
  const school=catalog.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');
- const c=await character({clan:'Crab',family:'Hida',school:`${school.slug}#${school.anchor}`,skills:{Knives:2,'Weapons: Custom':0},skillTraits:{'Weapons: Custom':'Agility'},emphases:{Knives:['Tanto']}},{
+ const trained=['Artisan: Painting','Craft: Carpentry','Games: Go','Lore: History','Perform: Song','Knives'];
+ const zero=['Artisan: Origami','Craft: Brewing','Games: Shogi','Lore: Bushido','Perform: Dance','Weapons: Custom'];
+ const c=await character({clan:'Crab',family:'Hida',school:`${school.slug}#${school.anchor}`,skills:Object.fromEntries([...trained.map(name=>[name,2]),...zero.map(name=>[name,0])]),skillTraits:{'Weapons: Custom':'Agility','Craft: Brewing':'Intelligence','Craft: Carpentry':'Intelligence'},emphases:{Knives:['Tanto']}},{
   'l5r-rules-character-lab-hide-rank-zero':'false',
   'l5r-rules-character-rolls-hidden-zero-categories':'[]'
  });
  const rows=instance=>instance.root.innerHTML.split('id="creator-rolls"')[1].split('</section>')[0];
  const toggle=(instance,dataset,checked)=>instance.root.onchange({target:{dataset,checked}});
  assert.match(rows(c),/data-hide-zero-skills="true" checked/);
- for(const category of ['artisan','games','perform','lore','weapons'])assert.match(rows(c),new RegExp(`data-hide-zero-category="${category}" checked`));
- assert.match(rows(c),/Hide Weapons 0/);
+ assert.match(rows(c),/data-hide-zero-macro-skills="true" checked/);
+ assert.doesNotMatch(rows(c),/data-hide-zero-category=/);
  const before=(await c.data()).derived;
  toggle(c,{hideZeroSkills:''},false);
- assert.ok(rows(c).includes('data-ring-skill="Athletics"'));
+ assert.ok(rows(c).includes('data-ring-skill="Courtier"'));
  for(const name of c.window.CharacterCatalog.WEAPON_SKILLS)assert.equal(rows(c).includes(`data-ring-skill="${name}"`),(before.skills[name]?.rank || 0)>0,name);
- assert.ok(!rows(c).includes('data-ring-skill="Weapons: Custom"'));
+ for(const name of zero)assert.ok(!rows(c).includes(`data-ring-skill="${name}"`),name);
+ for(const name of trained)assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
  assert.match(rows(c),/Tanto/);
- toggle(c,{hideZeroCategory:'weapons'},false);
- for(const name of [...c.window.CharacterCatalog.WEAPON_SKILLS,'Weapons: Custom'])assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
+ toggle(c,{hideZeroMacroSkills:''},false);
+ for(const name of [...c.window.CharacterCatalog.WEAPON_SKILLS,...zero])assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
+ toggle(c,{hideZeroSkills:''},true);
+ for(const name of zero)assert.ok(!rows(c).includes(`data-ring-skill="${name}"`),name);
+ assert.ok(!rows(c).includes('data-ring-skill="Courtier"'));
+ for(const name of trained)assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
+ toggle(c,{hideZeroSkills:''},false);
  const restored=await c.reload();
  assert.match(rows(restored),/data-hide-zero-skills="true">Hide 0 rank skills/);
- assert.match(rows(restored),/data-hide-zero-category="weapons">Hide Weapons 0/);
+ assert.match(rows(restored),/data-hide-zero-macro-skills="true">Hide macro-skills 0/);
  assert.ok(rows(restored).includes('data-ring-skill="War Fan"'));
- toggle(restored,{hideZeroCategory:'weapons'},true);
+ toggle(restored,{hideZeroMacroSkills:''},true);
  assert.ok(!rows(restored).includes('data-ring-skill="War Fan"'));
  assert.ok(rows(restored).includes('data-ring-skill="Knives"'));
  assert.ok(rows(restored).includes('data-ring-skill="Heavy Weapons"'));
+ for(const name of zero)assert.ok(!rows(restored).includes(`data-ring-skill="${name}"`),name);
+ for(const name of trained)assert.ok(rows(restored).includes(`data-ring-skill="${name}"`),name);
  const after=(await restored.data()).derived;
  for(const key of ['xpRemaining','xpSpent','insight','schoolRank'])assert.equal(after[key],before[key],key);
  assert.deepEqual(after.skills,before.skills);
+});
+
+test('combined macro filter migrates old category preferences and prioritizes its saved value',async()=>{
+ const oldKey='l5r-rules-character-rolls-hidden-zero-categories-v2',newKey='l5r-rules-character-rolls-hide-zero-macro-skills-v1';
+ const all=JSON.stringify(['artisan','games','perform','lore','weapons']);
+ for(const [preferences,checked] of [[{},true],[{[oldKey]:all},true],[{[oldKey]:'["weapons"]'},false],[{[oldKey]:'[]'},false],[{[oldKey]:'invalid'},true],[{[oldKey]:all,[newKey]:'false'},false],[{[oldKey]:'[]',[newKey]:'true'},true]]) {
+  const c=await character(undefined,preferences);
+  const state=instance=>/data-hide-zero-macro-skills="true" checked/.test(sectionHtml(instance,'rolls'));
+  assert.equal(state(c),checked,JSON.stringify(preferences));
+  assert.equal(state(await c.reload()),checked,'Preference changed on reload');
+ }
 });
 
 test('the continuous editor adds XP before a school is chosen, persists awards, and permits ranks through 10',async()=>{
