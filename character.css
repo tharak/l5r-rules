@@ -172,7 +172,7 @@
   #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
   #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
-  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(360px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
+  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(50px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
   #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 0; width: 100%; justify-self: stretch; }
   #creator-rolls .creator-ring-traits { display: grid; grid-template-columns: 1fr; align-items: start; }
   #creator-rolls .creator-ring-trait-column { display: grid; grid-template-columns: 124px minmax(0,1fr); min-width: 0; background: var(--trait-heading); }
