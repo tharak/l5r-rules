@@ -531,7 +531,7 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
   }
 
   function renderRollDialog() {
-    return `<dialog class="creator-roll-dialog" aria-labelledby="roll-dialog-title"><header><h2 id="roll-dialog-title">${escapeHtml(rollState.title)}</h2><button type="button" data-action="close-roll" aria-label="Close roll">Close</button></header><div class="creator-roll-dialog-body">${renderRollBody()}</div></dialog>`;
+    return `<dialog class="creator-roll-dialog" aria-labelledby="roll-dialog-title"><header><h2 id="roll-dialog-title">${escapeHtml(rollState.title)}</h2></header><div class="creator-roll-dialog-body">${renderRollBody()}</div><footer><button type="button" data-action="close-roll" aria-label="Close roll">Close</button></footer></dialog>`;
   }
 
   function refreshRollDialog(button) {
