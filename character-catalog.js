@@ -8,6 +8,7 @@
   ];
   const TRAIT_NAMES = TRAIT_GROUPS.flatMap(group => group.traits);
   const WEAPON_SKILLS = ['Chain Weapons','Heavy Weapons','Kenjutsu','Knives','Kyujutsu','Ninjutsu','Polearms','Spears','Staves','War Fan'];
+  const MACRO_SKILLS = ['Artisan','Craft','Games','Lore','Perform','Weapons'];
   const WOUND_LEVELS = ['Healthy (+0)','Nicked (+3)','Grazed (+5)','Hurt (+10)','Injured (+15)','Crippled (+20)','Down (+40)','Out'];
   function purchasedRankCost(base, rank, multiplier = 1) {
     let cost = 0;
@@ -16,21 +17,26 @@
   }
   function skillIdentity(value, catalog) {
     const match = value.trim().match(/^(.*?)\s*\(([^)]+)\)$/);
-    let name = (match ? match[1] : value).trim().replace(/:\s*/g, ': ');
+    let name = (match ? match[1] : value).trim().replace(/\s*:\s*/g, ': ');
     let emphases = match ? [match[2].trim()] : [];
     const known = catalog.skills.find(skill => skill.name.toLowerCase() === name.split(':')[0].toLowerCase());
     if (known) name = known.name + name.slice(name.split(':')[0].length);
-    if (/^(Artisan|Craft|Games|Lore|Perform)$/.test(name) && emphases.length) {
+    if (MACRO_SKILLS.includes(name) && emphases.length) {
       name += `: ${emphases[0]}`; emphases = [];
     }
     return {name, emphases};
+  }
+  function requiresSkillSubtype(name) {
+    const [category,...subtype] = name.split(':');
+    return MACRO_SKILLS.includes(category.trim()) && !subtype.join(':').trim();
   }
   function allowedSchoolSkill(choice, value, catalog) {
     const {name} = skillIdentity(value, catalog), category = name.split(':')[0];
     const entry = catalog.skills.find(skill => skill.name === category);
     const specialty = name.split(': ').slice(1).join(': ');
     const group = Object.entries(entry?.specialtyGroups || {}).find(([name]) => name.toLowerCase() === specialty.toLowerCase())?.[1] || entry?.group;
-    if (!entry || ['Weapons','Artisan','Craft','Games','Lore','Perform'].includes(name)) return false;
+    if (!entry || requiresSkillSubtype(name)) return false;
+    if (choice.subtype && category !== choice.subtype) return false;
     const prompt = choice.prompt;
     if (/following list/i.test(prompt)) return category === 'Acting' || /^(Artisan|Perform): /.test(name);
     if (/Weapon Skill/i.test(prompt)) return WEAPON_SKILLS.includes(category);
@@ -55,8 +61,11 @@
       const value = sheet.schoolChoices[index]?.trim();
       if (!value) return;
       if (choice.kind === 'emphasis') { grant(choice.skill, 0, [value]); return; }
-      const {name, emphases} = skillIdentity(value, catalog);
-      if (!allowedSchoolSkill(choice, value, catalog)) errors[index] = 'Choose a skill that matches this school option. Use a specialty such as Lore: History for grouped skills.';
+      // Older subtype choices were saved as emphasis text, e.g. "Song".
+      const oldSubtype = choice.subtype && !value.includes(':') && !catalog.skills.some(skill=>skill.name.toLowerCase()===value.toLowerCase());
+      const selected = oldSubtype ? `${choice.subtype}: ${value}` : value;
+      const {name, emphases} = skillIdentity(selected, catalog);
+      if (!allowedSchoolSkill(choice, selected, catalog)) errors[index] = 'Choose a skill that matches this school option. Use a specialty such as Lore: History for grouped skills.';
       else if (emphases.length) errors[index] = 'This choice grants a skill rank. Add extra emphases under Other XP purchases.';
       else if (skills[name]) errors[index] = 'Choose a different skill; this school already grants that skill.';
       else grant(name, choice.rank, emphases);
@@ -85,6 +94,6 @@
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, WOUND_LEVELS, purchasedRankCost, skillIdentity, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

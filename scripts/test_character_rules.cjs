@@ -83,6 +83,9 @@ test('Insight boundaries include 250 and all later ranks; Courtier and Etiquette
  assert.deepEqual(plain(d.insightBreakdown),{rings:100,skills:10,courtier:3,etiquette:10,modifier:0});
 });
 test('school choices respect High and Low exceptions for Craft and Lore specialties',()=>{
+ for(const category of ['Artisan','Craft','Games','Lore','Perform','Weapons']) {
+  for(const value of [category,`${category}: `])assert.equal(C.allowedSchoolSkill({prompt:'Any Skill'},value,catalog),false,value);
+ }
  for(const [name,group] of [['Craft: Armorsmithing','High'],['Craft: Bowyer','High'],['Craft: Weaponsmithing','High'],['Craft: Carpentry','Merchant'],['Craft: Poison','Low'],['Lore: Anatomy','Low'],['Lore: Maho','Low'],['Lore: Shadowlands','Low'],['Lore: Underworld','Low'],['Lore: History','High']]) {
   for(const option of ['High','Merchant','Low'])assert.equal(C.allowedSchoolSkill({prompt:`Any ${option} Skill`},name,catalog),group===option,`${name}: ${option}`);
   assert.equal(C.allowedSchoolSkill({prompt:'Any non-Low Skill'},name,catalog),group!=='Low',name);

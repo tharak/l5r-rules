@@ -369,6 +369,42 @@ test('macro skills use specialty traits, varying skills ask for a trait and cust
   assert.equal((await c.data()).derived.skills['Custom skill'].roll.notation,'3k2');
 });
 
+test('macro-skills require a nonempty subtype while ordinary and custom skills remain valid',async()=>{
+  const c=await character();
+  for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons','lore: ','Games :']) {
+    c.inputs['#new-skill']={value:name};c.click({action:'add-skill'});
+    assert.deepEqual((await c.data()).character.skills,{});
+    assert.match(c.root.innerHTML,/Choose a macro-skill subtype/);
+  }
+  const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];
+  for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons'])assert.ok(!suggestions.includes(`value="${name}"`),name);
+  for(const name of ['Lore: History','Games: Go','Artisan: Custom art','Craft: Custom craft','Perform: Custom performance','Courtier','Custom skill','Games (Shogi)','Weapons (Crossbow)']) {
+    c.inputs['#new-skill']={value:name};c.click({action:'add-skill'});
+  }
+  const d=(await c.data()).derived;
+  for(const name of ['Lore: History','Games: Go','Artisan: Custom art','Craft: Custom craft','Perform: Custom performance','Courtier','Custom skill','Games: Shogi','Weapons: Crossbow'])assert.equal(d.skills[name].rank,1,name);
+  const legacy=await character({skills:{Lore:2}});
+  assert.match(sectionHtml(legacy,'skills'),/Lore requires a subtype/);
+});
+
+test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
+  const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
+  let d=(await c.data()).derived;
+  assert.equal(d.skills.Perform,undefined);
+  assert.match(c.root.innerHTML,/Choose a Perform subtype/);
+  c.change({choiceIndex:'0'},'Courtier');
+  assert.match((await c.data()).derived.skillChoiceErrors[0],/matches this school option/);
+  c.change({choiceIndex:'0'},'Perform: Song');
+  d=(await c.data()).derived;
+  assert.equal(d.skills['Perform: Song'].base,1);
+  assert.deepEqual(d.skills['Perform: Song'].emphases,[]);
+  assert.equal(d.xpSpent,0);
+  const saved=(await c.data()).character;
+  saved.schoolChoices=['Song'];
+  const legacy=await character(saved);
+  assert.equal((await legacy.data()).derived.skills['Perform: Song'].base,1);
+});
+
 test('all listed macro specialties appear in skill suggestions and eligible school choices',async()=>{
   const c=await character();c.school('Crane','Kakita Artisan');
   const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];

@@ -175,7 +175,7 @@
 
   function skillOptions() {
     const specialties = catalog.skills.flatMap(skill => [...new Set([...(skill.specialties || []), ...Object.keys(skill.specialtyTraits || {})])].map(specialty => `${skill.name}: ${specialty}`));
-    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...specialties, ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Lore: Gaijin'])].sort((a,b) => a.localeCompare(b));
+    const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...specialties, ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Lore: Gaijin'])].filter(name=>!C.requiresSkillSubtype(name)).sort((a,b) => a.localeCompare(b));
     const untrainedSkills = [...new Set([
       ...suggestions.filter(name=>!['Artisan','Craft','Games','Lore','Perform','Weapons'].includes(name)),
       ...Object.keys(sheet.skills),...Object.keys(sheet.skillTraits)
@@ -326,7 +326,7 @@
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
-    if (/^(rank:skill:|emphases:|school-choice:|chosen-art$|weapon-focus$)/.test(code)) return 'skills';
+    if (/^(rank:skill:|skill-subtype:|emphases:|school-choice:|chosen-art$|weapon-focus$)/.test(code)) return 'skills';
     if (/^(ability:|kiho-|tattoo-|spell-|affinity$|second-deficiency$)/.test(code)) return 'abilities';
     if (/^(equipment|armor$)/.test(code)) return 'equipment';
     if (code === 'modifiers') return 'story';
@@ -645,6 +645,14 @@
     } else if (action === 'add-skill') {
       const name = skillIdentity(root.querySelector('#new-skill').value).name;
       if (!name) return;
+      if (C.requiresSkillSubtype(name)) {
+        uiError = 'Choose a macro-skill subtype, such as Lore: History or Games: Go.';
+        render();
+        const input = root.querySelector('#new-skill');
+        input.value = name;
+        input.focus?.();
+        return;
+      }
       if (build().skills[name]) return;
       sheet.skills[name] = Math.max(1, Number(sheet.skills[name]) || 0);
     } else if (action === 'add-equipment') {
@@ -686,6 +694,7 @@
   }
 
   function onChange(event) {
+    if (event.target.id === 'new-skill') return;
     if (event.target.dataset.hideZeroCategory !== undefined) {
       const category = event.target.dataset.hideZeroCategory;
       if (!SKILL_FILTER_CATEGORIES.some(name=>name.toLowerCase()===category)) return;

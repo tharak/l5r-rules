@@ -117,6 +117,11 @@ def parse_skills(raw):
         notes = ""
         if re.search(r"\b(treat|may replace)\b", emphasis, re.I):
             notes, emphasis = emphasis, ""
+        if name in ("Artisan", "Craft", "Games", "Lore", "Perform", "Weapons"):
+            if not emphasis or re.search(r"\b(pick|choose)\b", emphasis, re.I):
+                choices.append({"prompt": f"Choose a {name} subtype", "kind": "skill", "rank": rank, "subtype": name})
+                continue
+            name, emphasis = f"{name}: {emphasis}", ""
         if re.search(r"\b(pick|choose)\b", emphasis, re.I):
             choices.append({"prompt": f"{name}: {emphasis}", "kind": "emphasis", "skill": name, "rank": 0})
             emphasis = ""

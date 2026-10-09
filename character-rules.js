@@ -334,6 +334,7 @@
     if(s.clan==='Imperial')issue('imperial','Imperial families require table approval.');
     for(const [name,t] of Object.entries(d.traits))if(t.rank>5)issue(`rank:trait:${name}`,`${name} ${t.rank} exceeds the Trait rank limit of 5.`);
     for(const [name,k] of Object.entries(d.skills)) {
+      if(k.rank && C.requiresSkillSubtype(name))issue(`skill-subtype:${name}`,`${name} requires a subtype. Use a skill such as Lore: History or Games: Go.`);
       if(k.rank>10)issue(`rank:skill:${name}`,`${name} ${k.rank} exceeds the Skill rank limit of 10.`);
       const max=Math.min(5,Math.ceil(k.rank/2));
       if(k.emphases.length>max)issue(`emphases:${name}`,`${name} permits ${max} emphasis${max===1?'':'es'} at Rank ${k.rank}, including free emphases.`);
@@ -444,7 +445,7 @@
   }
   function resetSection(input,section,catalog) {
     const s=normalize(input);
-    const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
+    const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','skill-subtype:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
     if(!exceptionPrefixes[section])return s;
     if(section==='identity') {
       Object.assign(s,{name:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
