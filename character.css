@@ -187,8 +187,8 @@
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
   #creator-traits .rank-control button { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 20px; }
   #creator-traits .rank-control output { min-width: 32px; min-height: 32px; padding-inline: 6px; font-size: 14px; }
-  #creator-rolls .creator-ring-grid { grid-template-columns: 1fr; overflow-x: visible; padding-bottom: 0; }
-  #creator-rolls .creator-ring:nth-child(n) { grid-column: 1; grid-row: auto; width: 100%; justify-self: stretch; }
+  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(360px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
+  #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 0; width: 100%; justify-self: stretch; }
   #creator-rolls .creator-ring-traits { display: grid; grid-template-columns: 1fr; align-items: start; }
   #creator-rolls .creator-ring-trait-column { display: grid; grid-template-columns: 124px minmax(0,1fr); min-width: 0; background: var(--trait-heading); }
   #creator-rolls .creator-trait-display { flex-direction: row; flex-wrap: nowrap; align-items: baseline; align-self: start; justify-content: flex-start; gap: 6px; }
