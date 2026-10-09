@@ -117,7 +117,7 @@ test('the continuous editor adds XP before a school is chosen, persists awards, 
   c.click({action:'xp-award-step',delta:'500'});
   c.click({action:'award-xp'});
   assert.equal((await c.data()).derived.xpRemaining,540);
-  for(let i=0;i<9;i++)c.click({action:'trait',trait:'Strength',delta:'1'});
+  for(let i=0;i<8;i++)c.click({action:'trait',trait:'Strength',delta:'1'});
   const data=await c.data();
   assert.equal(data.derived.traits.Strength.rank,10);
   assert.ok(!data.derived.blockers.some(v=>v.code==='rank:trait:Strength'));
@@ -400,16 +400,16 @@ test('advantage and disadvantage cost steppers use displayed costs and persist X
   for(let i=0;i<40;i++)c.click({action:'option-cost',kind:'advantage',index:'0',delta:'-1'});
   assert.equal((await c.data()).derived.advantages[0].cost,0);
   for(let i=0;i<40;i++)c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
-  assert.equal((await c.data()).derived.advantages[0].cost,30);
+  assert.equal((await c.data()).derived.advantages[0].cost,40);
 });
 
-test('advantage and disadvantage edits during advancement save without justification prompts',async()=>{
+test('old advancement sheets allow ordinary option edits and removal without approval or buyoff',async()=>{
   const c=await character({phase:'advancement',advantages:[{id:'large',name:'Large',baseCost:4,cost:4}]});
   c.window.prompt=()=>{throw new Error('A justification prompt must not appear');};
   c.click({action:'option-cost',kind:'advantage',index:'0',delta:'1'});
   const {character:s,derived:d}=await c.data();
   assert.equal(d.advantages[0].cost,5);
-  assert.ok(s.progression.history.some(e=>e.explanation==='Updated advantage cost from character editor.'));
+  assert.equal(s.phase,undefined);assert.equal(s.progression.history.length,0);
   c.inputs['#advantage-select']={value:'Luck'};c.click({action:'add-advantage'});
   c.change({optionDetail:'advantage',index:'1'},'1');
   assert.equal((await c.data()).character.advantages[1].selection,'1');
@@ -418,12 +418,13 @@ test('advantage and disadvantage edits during advancement save without justifica
   c.inputs['#disadvantage-select']={value:'Brash'};c.click({action:'add-disadvantage'});
   c.click({action:'option-cost',kind:'disadvantage',index:'0',delta:'1'});
   assert.equal((await c.data()).derived.disadvantages[0].cost,4);
-  c.click({action:'buyoff-disadvantage',index:'0'});
+  assert.ok(!c.root.innerHTML.includes('buyoff-disadvantage'));
+  c.click({action:'remove-disadvantage',index:'0'});
   const saved=await (await c.reload()).data();
   assert.equal(saved.character.advantages.length,1);
   assert.equal(saved.derived.advantages[0].cost,5);
   assert.equal(saved.character.disadvantages.length,0);
-  assert.equal(saved.character.progression.history.find(e=>e.key?.startsWith('buyoff:')).amount,4);
+  assert.equal(saved.character.progression.history.length,0);
 });
 
 test('numeric steppers preserve decimal precision, bounds and saved values',async()=>{
@@ -594,4 +595,28 @@ test('separate equipment list preserves saved gear and money without equipped co
   assert.ok(saved.derived.combat.armorTN>before.derived.combat.armorTN);
   loaded.click({action:'remove-equipment',index:'0'});
   assert.equal((await loaded.data()).character.equipment.length,0);
+});
+
+
+test('cost guidance shows limits while trait, skill, and option edits remain available',async()=>{
+ const c=await character({phase:'advancement',traitBuys:{Strength:8},skills:{Defense:10},advantages:[{id:'large',name:'Large',cost:40}],disadvantages:[{id:'doubt',name:'Doubt',cost:8},{id:'health',name:'Bad Health',cost:4}]});
+ assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 10\./);
+ assert.match(c.root.innerHTML,/Advantages \(40\)/);assert.match(c.root.innerHTML,/Disadvantages \(12\)/);
+ assert.match(c.root.innerHTML,/No total point limit\./);
+ assert.match(c.root.innerHTML,/Up to 10 XP from disadvantages count toward your budget\./);
+ c.click({action:'trait',trait:'Strength',delta:'1'});c.click({action:'skill',skill:'Defense',delta:'1'});
+ const {character:s,derived:d}=await c.data();assert.equal(d.traits.Strength.rank,11);assert.equal(d.skills.Defense.rank,11);
+ assert.ok(d.blockers.some(e=>e.code==='rank:trait:Strength'));assert.ok(d.blockers.some(e=>e.code==='rank:skill:Defense'));
+ assert.equal(s.phase,undefined);assert.equal(d.xpEarned,10);
+ const restored=await c.reload();assert.equal((await restored.data()).derived.skills.Defense.rank,11);
+});
+
+test('old advancement sheets can change outfit choices and remove their first training entry',async()=>{
+ const school=catalog.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');
+ const id=school.slug+'#'+school.anchor;
+ const c=await character({phase:'advancement',clan:'Crab',family:'Hida',school:id,training:[{school:id,rank:2}],progression:{baseline:{outfit:[{name:'Frozen outfit',key:'old'}]},history:[{kind:'award',amount:15}]}});
+ assert.match(c.root.innerHTML,/data-equipment-choice=/);assert.match(c.root.innerHTML,/data-action="remove-training" data-index="0"/);
+ c.click({action:'remove-training',index:'0'});
+ const saved=await (await c.reload()).data();assert.equal(saved.character.training.length,0);assert.equal(saved.derived.schoolRank,1);
+ assert.equal(saved.character.progression.history[0].amount,15);
 });

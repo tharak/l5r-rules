@@ -181,7 +181,7 @@ async page => {
     const downloadPromise=p.waitForEvent('download');await p.getByRole('button',{name:'Export JSON ↗',exact:true}).click();
     const downloaded=await downloadPromise;const stream=await downloaded.createReadStream();let json='';for await(const part of stream)json+=part;
     const exported=JSON.parse(json);
-    check(exported.character.continuousEditor===true,'Continuous editor state missing');
+    check(!('phase' in exported.character) && !('continuousEditor' in exported.character),'Retired editor mode remains');
     check(exported.character.startingXP===40,'Starting XP not exported');
     check(exported.derived.traits.Reflexes.rank===4,'Trait decrease did not restore Rank 4');
     check(exported.character.progression.history.some(e=>e.explanation==='XP added from character editor.'),'XP award not retained');

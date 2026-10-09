@@ -27,7 +27,7 @@ async page => {
     const exported=await exportPromise,stream=await exported.createReadStream();let text='';for await(const part of stream)text+=part;
     const document=JSON.parse(text);
     check(document.source==='l5r-rules','Export branding is incorrect');
-    check(document.character.version===2 && document.character.phase==='creation','Versioned creation model missing');
+    check(document.character.version===2 && !('phase' in document.character),'Versioned character model missing');
     check(document.character.startingXP===65,'Starting XP missing from saved export');
     check(document.character.visibility.abilities===false,'Abilities should start private');
     check(await live.locator('#creator-abilities').count()===1,'Abilities editor missing');

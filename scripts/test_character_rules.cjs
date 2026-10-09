@@ -11,8 +11,8 @@ const plain=v=>JSON.parse(JSON.stringify(v));
 const calc=s=>R.calculate(s,catalog);
 const starting=(clan='Crab',name='Hida Bushi')=>R.normalize({name:'Test PC',clan,family:catalog.clans.find(c=>c.name===clan).families[0]?.name || '',school:C.schools(catalog).find(s=>s.name===name).slug+'#'+C.schools(catalog).find(s=>s.name===name).anchor});
 const grant=(kind,name,extra={})=>{const a=catalog.abilities.find(a=>a.kind===kind&&(a.name===name || a.name.startsWith(name+' (')));assert.ok(a,`${kind}: ${name}`);return {id:'selected-'+a.id,catalogId:a.id,kind,name,grant:true,...extra};};
-function play(s) {s=R.normalize(s);s.exceptions=calc(s).blockers.map(v=>({code:v.code,explanation:'Approved by our table for this test.'}));const result=R.beginPlay(s,catalog);assert.equal(result.violations.length,0);return result.sheet;}
-function change(s,fn,explanation='') {const next=R.normalize(plain(s));fn(next);return R.recordChange(s,next,catalog,explanation);}
+function trained(s) {s=R.normalize(s);s.training=[{school:s.school,rank:1},...s.training];return s;}
+function change(s,fn) {const next=R.normalize(plain(s));fn(next);return next;}
 
 test('Dragon orders and Spider Monks grant their book-listed family benefit alongside school benefits',()=>{
  for(const [clan,family,trait] of [['Dragon','Togashi','Reflexes'],['Dragon','Hitomi','Strength'],['Dragon','Hoshi','Void'],['Spider','Spider Monks','Reflexes']]) {
@@ -72,8 +72,10 @@ test('creation benefits, trait/skill prices, rank caps and 40 XP; out of range d
  assert.equal(d.traitCosts.Strength,16);assert.equal(d.skills.Defense.cost,5);assert.equal(d.xpRemaining,19);
  s.traitBuys.Strength=2;s.skills.Defense=5;const draft=calc(s);
  assert.equal(draft.traits.Strength.rank,5);assert.equal(draft.skills.Defense.rank,5);
- assert.ok(draft.blockers.some(v=>v.code==='rank:trait:Strength'));
- assert.ok(draft.blockers.some(v=>v.code==='rank:skill:Defense'));
+ assert.ok(!draft.blockers.some(v=>v.code.startsWith('rank:')));
+ s.traitBuys.Strength=8;s.skills.Defense=11;
+ assert.ok(calc(s).blockers.some(v=>v.code==='rank:trait:Strength'));
+ assert.ok(calc(s).blockers.some(v=>v.code==='rank:skill:Defense'));
 });
 test('Insight boundaries include 250 and all later ranks; Courtier and Etiquette mastery add Insight',()=>{
  for(const [insight,rank] of [[149,1],[150,2],[174,2],[175,3],[199,3],[200,4],[224,4],[225,5],[249,5],[250,6],[274,6],[275,7],[300,8],[325,9]])assert.equal(R.insightRank(insight),rank);
@@ -94,18 +96,18 @@ test('optional untrained skill display preserves purchases, totals and normal ca
  assert.equal(JSON.stringify(s),original,'Untrained display mutated the saved character');
  assert.equal(calc(s).skills.Calligraphy,undefined);
 });
-test('editable starting XP defaults to 40 and survives advancement without repricing purchases',()=>{
+test('editable starting XP defaults to 40 and preserves awards and current purchase totals',()=>{
  const legacy=starting();assert.equal(calc(legacy).startingXP,40);
  const s=starting();s.startingXP=75;s.skills.Defense=3;let d=calc(s);assert.equal(d.xpRemaining,70);
- let p=play(s);assert.equal(p.progression.baseline.startingXP,75);
+ let p=R.normalize(s);
  p=R.award(p,10,'Session award');const spent=calc(p).xpSpent;
  p=change(p,s=>s.startingXP=100);d=calc(p);assert.equal(d.xpSpent,spent);assert.equal(d.xpRemaining,105);
- assert.ok(p.progression.history.some(e=>e.kind==='correction'&&e.label==='Starting XP 75 → 100'));
+ assert.deepEqual(plain(p.progression.history.map(e=>e.kind)),['award']);
  const again=R.normalize(plain(p));assert.equal(calc(again).xpRemaining,105);
  s.startingXP=0;assert.equal(calc(s).xpRemaining,-5);
  assert.equal(R.normalize({startingXP:-5}).startingXP,0);
 });
-test('creation section resets preserve identity, privacy and unrelated purchases while recalculating school grants',()=>{
+test('section resets preserve identity, privacy and unrelated purchases while recalculating school grants',()=>{
  const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.notes='Keep my notes';s.traitBuys.Strength=1;s.skills.Defense=3;
  s.advantages=[{id:'large',name:'Large',baseCost:4}];s.purchases=[{id:'custom',name:'Other purchase',cost:2}];s.abilities=[{id:'power',kind:'custom',name:'Custom power',cost:3}];
  s.exceptions=[{id:'trait-approval',code:'rank:trait:Strength',explanation:'Old trait approval'},{id:'power-approval',code:'ability:power',explanation:'Keep power approval'}];
@@ -122,13 +124,15 @@ test('creation section resets preserve identity, privacy and unrelated purchases
  const nextSchool=starting('Crane','Kakita Bushi');const changed=R.normalize({...s,clan:nextSchool.clan,family:nextSchool.family,school:nextSchool.school});
  const reset=R.resetSection(changed,'skills',catalog);assert.equal(calc(reset).skills.Iaijutsu.rank,1);assert.ok(!calc(reset).skills['Heavy Weapons']);
 });
-test('creation resets retain automatic spells and required school disadvantages; advancement history is preserved',()=>{
+test('resets retain automatic spells and required school disadvantages and unlock old advancement sheets',()=>{
  const shugenja=starting('Crab','Kuni Shugenja');shugenja.abilities=[{id:'custom',name:'Custom',kind:'custom',cost:3}];
  assert.equal(calc(R.resetSection(shugenja,'abilities',catalog)).abilities.filter(a=>a.slug==='universal-spells').length,3);
  const monk=C.schools(catalog).find(s=>/Shinmaki/.test(s.name));assert.ok(monk);
  const s=R.normalize({clan:'Brotherhood of Shinsei',school:monk.slug+'#'+monk.anchor});const reset=R.resetSection(s,'options',catalog);
  assert.ok(reset.disadvantages.some(a=>a.name==='Disturbing Countenance'&&a.free&&a.cost===0));
- const p=play(starting());p.skills.Defense=3;assert.deepEqual(plain(R.resetSection(p,'skills',catalog)),plain(R.normalize(p)));
+ const p={...starting(),phase:'advancement',skills:{Defense:3},progression:{baseline:{spent:5},history:[{kind:'award',amount:10}]}};
+ const cleared=R.resetSection(p,'skills',catalog);assert.equal(calc(cleared).skills.Defense.rank,1);assert.equal(calc(cleared).xpSpent,0);
+ assert.deepEqual(plain(cleared.progression),p.progression);assert.equal(cleared.phase,undefined);
 });
 test('free school skills/emphases and purchased emphases are separate; mastery benefits affect unarmed damage',()=>{
  const s=starting();s.emphases['Heavy Weapons']=['Tetsubo'];
@@ -156,7 +160,7 @@ test('Brotherhood starts with Void 3, Status 0 through UI, three free kiho and s
 });
 test('Togashi tattoo progression grants two at ranks 1, 3 and 5, with permanent unarmed school effect',()=>{
  const s=starting('Dragon','The Togashi Tattooed Order');assert.equal(calc(s).freeLimits.tattoos,2);
- const p=play(s);p.training[0].rank=3;assert.equal(calc(p).freeLimits.tattoos,4);assert.equal(calc(p).combat.unarmedDamage.notation,'3k2');
+ const p=trained(s);p.training[0].rank=3;assert.equal(calc(p).freeLimits.tattoos,4);assert.equal(calc(p).combat.unarmedDamage.notation,'3k2');
  p.training[0].rank=5;assert.equal(calc(p).freeLimits.tattoos,6);
 });
 test('kata and kiho eligibility use printed mastery, school requirements, and optional non-Brotherhood costs',()=>{
@@ -178,18 +182,32 @@ test('affinity/deficiency, Void permission, and memorization have separate rules
  s.abilities=[{id:'void',catalogId:voidSpell.id,kind:'spell',grant:true}];assert.ok(calc(s).abilities.find(a=>a.selectionId==='void').reasons.some(r=>r.includes('Ishiken')));
  const universal=calc(s).abilities.filter(a=>a.slug==='universal-spells');assert.equal(universal.length,3);assert.ok(universal.every(a=>a.cost===0));
 });
-test('free acquisition cannot bypass kata prices, tattoo progression, or starting spell grants',()=>{
+test('ability guidance distinguishes school grants from learned spells',()=>{
  const bushi=starting();bushi.abilities=[grant('kata','Striking as Earth')];assert.ok(calc(bushi).blockers.some(v=>v.code.startsWith('ability:')));
  const tattooed=starting('Dragon','The Togashi Tattooed Order');const tattoos=catalog.abilities.filter(a=>a.kind==='tattoo').slice(0,3);
  tattooed.abilities=tattoos.map((a,i)=>({id:'tattoo-'+i,catalogId:a.id,kind:'tattoo',grant:i<2}));assert.ok(calc(tattooed).blockers.some(v=>v.code==='ability:tattoo-2'));
  const shugenja=starting('Crab','Kuni Shugenja');const spell=catalog.abilities.find(a=>a.kind==='spell'&&a.ring==='Earth'&&a.mastery===1);
- shugenja.abilities=[{id:'extra',catalogId:spell.id,kind:'spell',grant:false}];assert.ok(calc(shugenja).blockers.some(v=>v.code==='ability:extra'));
+ shugenja.abilities=[{id:'extra',catalogId:spell.id,kind:'spell',grant:false}];assert.ok(!calc(shugenja).blockers.some(v=>v.code==='ability:extra'));
 });
-test('Begin play requires missing choices or explained approval; baseline contains no invented transactions',()=>{
- const s=starting();assert.ok(R.beginPlay(s,catalog).violations.length);
- s.exceptions=[{code:'*',explanation:''}];assert.ok(R.beginPlay(s,catalog).violations.length);
- const p=play(s);assert.equal(p.phase,'advancement');assert.equal(p.progression.history.length,0);assert.equal(p.progression.baseline.spent,calc(s).xpSpent);
- assert.equal(R.beginPlay(p,catalog).sheet.progression.history.length,0);
+test('old advancement metadata cannot freeze current benefits, prices, outfit, or XP totals',()=>{
+ const s=starting();s.traitBuys.Strength=1;s.skills.Defense=3;s.advantages=[{id:'large',name:'Large',baseCost:4}];
+ const history=[{kind:'award',amount:20},{kind:'purchase',amount:99},{kind:'refund',amount:-7},{kind:'correction',amount:3}];
+ const legacy={...plain(s),phase:'advancement',continuousEditor:true,progression:{baseline:{startingXP:40,spent:100,earned:10,traitBases:{Strength:8},skillGrants:{Defense:{base:8}},outfit:[{name:'Old outfit',key:'old'}],roninFamilyCost:20},history,startedAt:'2026-01-01'}};
+ const normalized=R.normalize(legacy),d=calc(normalized),current=calc(s);
+ assert.equal(normalized.phase,undefined);assert.equal(normalized.continuousEditor,undefined);
+ assert.equal(d.traits.Strength.rank,current.traits.Strength.rank);assert.equal(d.skills.Defense.rank,3);
+ assert.equal(d.xpSpent,current.xpSpent);assert.equal(d.xpEarned,0);assert.equal(d.xpRemaining,current.xpRemaining+20);
+ assert.deepEqual(plain(d.equipment),plain(current.equipment));
+ assert.deepEqual(plain(normalized.progression),legacy.progression);
+ assert.deepEqual(plain(R.normalize(normalized)),plain(normalized));
+ assert.equal(R.beginPlay,undefined);assert.equal(R.recordChange,undefined);assert.equal(R.buyOff,undefined);assert.equal(R.paidItems,undefined);
+ const next=change(normalized,v=>v.advantages[0].customCost=7);assert.equal(calc(next).advantages[0].cost,7);
+ assert.deepEqual(plain(next.progression.history),history);
+});
+test('Fame on an old advancement sheet retains effective Glory through repeated normalization',()=>{
+ const legacy={phase:'advancement',glory:2,advantages:[{id:'fame',name:'Fame',cost:3}]};
+ const normalized=R.normalize(legacy);assert.equal(calc(normalized).glory,2);
+ assert.equal(calc(R.normalize(plain(normalized))).glory,2);assert.equal(legacy.glory,2);
 });
 test('maho has no mastery restriction and casts with Insight Rank rather than Taint or shugenja rank',()=>{
  const s=starting();s.schoolDecisions.maho=true;
@@ -199,28 +217,30 @@ test('maho has no mastery restriction and casts with Insight Rank rather than Ta
  assert.equal(a.spellRoll.notation,R.dicePool(d.insightRank+d.rings[a.ring],d.rings[a.ring]).notation);
  s.taint=6;assert.equal(calc(s).abilities.find(a=>a.selectionId==='maho').spellRoll.notation,a.spellRoll.notation);
 });
-test('advancement records new rank payments and refunds their paid costs while later discounts stay nonretroactive',()=>{
- let p=play(starting());p=R.award(p,100,'Session 1');p=change(p,s=>s.traitBuys.Strength=1);
- assert.equal(p.progression.history.at(-1).amount,16);assert.equal(calc(p).xpRemaining,124);
- p=change(p,s=>s.skills.Defense=2);assert.equal(p.progression.history.at(-1).amount,2);
- p=change(p,s=>s.skills.Defense=1);assert.equal(p.progression.history.at(-1).kind,'refund');assert.equal(p.progression.history.at(-1).amount,-2);
- p=change(p,s=>s.advantages.push({id:'large',name:'Large',baseCost:4}));assert.equal(p.progression.history.at(-1).amount,3);
- const spent=calc(p).xpSpent;p=change(p,s=>s.clan='Crane');assert.equal(calc(p).xpSpent,spent);
- p=change(p,s=>s.advantages=[]);assert.equal(p.progression.history.at(-1).amount,-3);
+test('edits recalculate current purchases without generating a purchase or refund ledger',()=>{
+ let p=R.award(starting(),100,'Session 1');p=change(p,s=>s.traitBuys.Strength=1);
+ assert.equal(calc(p).xpSpent,16);assert.equal(calc(p).xpRemaining,124);
+ p=change(p,s=>s.skills.Defense=2);assert.equal(calc(p).xpSpent,18);
+ p=change(p,s=>s.skills.Defense=1);assert.equal(calc(p).xpSpent,16);
+ p=change(p,s=>s.advantages.push({id:'large',name:'Large',baseCost:4}));assert.equal(calc(p).advantages[0].cost,3);
+ p=change(p,s=>s.clan='Crane');assert.equal(calc(p).advantages[0].cost,4);
+ p=change(p,s=>s.advantages=[]);assert.equal(calc(p).advantages.length,0);
+ assert.deepEqual(plain(p.progression.history.map(e=>e.kind)),['award']);
 });
-test('memorization in play charges once and refunds the stored payment; baseline grants remain free after school changes',()=>{
- let p=play(starting('Crab','Kuni Shugenja'));
+test('memorization and school changes recalculate current costs and grants',()=>{
+ let p=trained(starting('Crab','Kuni Shugenja'));
  const a=catalog.abilities.find(a=>a.kind==='spell'&&a.ring==='Earth'&&a.mastery===1);
- p=change(p,s=>s.abilities.push({id:'spell',catalogId:a.id,kind:'spell'}));assert.equal(p.progression.history.at(-1).amount,0);
- p=change(p,s=>s.abilities[0].memorized=true);assert.equal(p.progression.history.at(-1).amount,1);
- const count=p.progression.history.length;p=change(p,s=>s.notes='changed');assert.equal(p.progression.history.length,count);
- p=change(p,s=>s.abilities[0].memorized=false);assert.equal(p.progression.history.at(-1).amount,-1);
- const base=calc(p).traits.Stamina.base;p=change(p,s=>s.school=starting('Crane','Kakita Bushi').school);assert.equal(calc(p).traits.Stamina.base,base);
+ p=change(p,s=>s.abilities.push({id:'spell',catalogId:a.id,kind:'spell'}));assert.equal(calc(p).xpSpent,0);
+ p=change(p,s=>s.abilities[0].memorized=true);assert.equal(calc(p).xpSpent,1);
+ p=change(p,s=>s.notes='changed');assert.equal(calc(p).xpSpent,1);
+ p=change(p,s=>s.abilities[0].memorized=false);assert.equal(calc(p).xpSpent,0);
+ p=change(p,s=>s.school=starting('Crane','Kakita Bushi').school);assert.equal(calc(p).traits.Stamina.base,2);
+ assert.equal(p.progression.history.length,0);
 });
 test('legacy migration preserves selections, custom charges, notes and six privacy choices without duplicate costs',()=>{
  const original={name:'Legacy',school:'sccrab#toc1',clan:'Crab',notes:'a\n\nb',skills:{'Lore:Shadowlands':3},schoolChoices:['Battle'],equipmentChoices:['Light Armor','Tetsubo'],purchases:[{name:'Kenjutsu emphasis',cost:2}],visibility:{identity:false,traits:true,skills:false,options:false,story:false,summary:true},customLegacyField:'keep'};
- const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,'creation');assert.equal(s.visibility.abilities,false);assert.equal(s.notes,original.notes);
- const p=play(s);assert.equal(calc(p).xpSpent,calc(s).xpSpent);assert.deepEqual(plain(p.purchases),plain(s.purchases));assert.equal(calc(p).xpSpent,7);
+ const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility.abilities,false);assert.equal(s.notes,original.notes);
+ const p=trained(s);assert.equal(calc(p).xpSpent,calc(s).xpSpent);assert.deepEqual(plain(p.purchases),plain(s.purchases));assert.equal(calc(p).xpSpent,7);
 });
 test('equipment applies armor, weapon skills/masteries, bow strength and arrows without charging XP',()=>{
  const s=starting();s.family='Hida';s.skills.Kenjutsu=3;s.equipment=[{id:'armor',name:'Heavy Armor'},{id:'blade',name:'Katana'},{id:'bow',name:'Yumi'}];s.equipped={armor:true,blade:true,bow:true,arrow:'weapon:Armor Piercing'};
@@ -232,7 +252,7 @@ test('equipment applies armor, weapon skills/masteries, bow strength and arrows 
 test('legacy emphases embedded in skill names survive migration without an invented purchase',()=>{
  const s=R.normalize({skills:{'Kenjutsu (Katana)':3},purchases:[{name:'Katana emphasis',cost:2}]});
  const d=calc(s);assert.deepEqual(plain(d.skills.Kenjutsu.emphases),['Katana']);assert.equal(d.creationCost,8);
- const p=play(s);assert.equal(calc(p).xpSpent,8);assert.equal(p.progression.history.length,0);
+ const p=trained(s);assert.equal(calc(p).xpSpent,8);assert.equal(p.progression.history.length,0);
 });
 test('permanent effects and explicit modifiers explain their source',()=>{
  const s=starting();s.advantages=[{name:'Quick Healer',cost:3}];s.disadvantages=[{name:'Bad Health',cost:4}];s.modifiers={armorTN:2,healing:1};
@@ -246,7 +266,7 @@ test('bow attacks use Reflexes and mastery increases bow Strength without exceed
 });
 test('school ranks are independent; paths replace techniques and advanced schools check printed prerequisites',()=>{
  const creation=starting();creation.modifiers.insight=75;assert.equal(calc(creation).insightRank,3);assert.equal(calc(creation).schoolRank,1);
- const p=play(starting());p.training[0].rank=2;p.skills.Iaijutsu=4;p.traitBuys.Awareness=1;p.traitBuys.Agility=1;
+ const p=trained(starting());p.training[0].rank=2;p.skills.Iaijutsu=4;p.traitBuys.Awareness=1;p.traitBuys.Agility=1;
  const path=catalog.training.find(t=>t.name==='Crab Defender');p.training.push({school:path.slug+'#'+path.anchor,rank:1});let d=calc(p);
  assert.ok(d.techniques.some(t=>t.name==='Starting technique'&&t.school==='Crab Defender'));
  assert.ok(!d.techniques.some(t=>t.school==='Hida Bushi'&&t.rank===2));
@@ -276,18 +296,18 @@ test('Kakita, Bayushi, and Daidoji permanent benefits use their printed mechanic
  const bayushi=starting('Scorpion','Bayushi Bushi');const d=calc(bayushi);assert.equal(d.combat.initiative.rolled,d.insightRank+d.traits.Reflexes.rank+1);assert.equal(d.combat.initiative.kept,d.traits.Reflexes.rank+1);
  const daidoji=starting('Crane','Daidoji Iron Warrior');daidoji.honor=6.5;assert.equal(calc(daidoji).combat.wounds.healthy,12);assert.equal(calc(daidoji).combat.wounds.maximum,54);
 });
-test('buying off disadvantages costs the original points without requiring justification',()=>{
- const s=starting();s.disadvantages=[{id:'brash',name:'Brash',cost:3}];let p=play(s);
- const budget=calc(p).xpRemaining;
- assert.throws(()=>R.buyOff(s,0,catalog));
- p=R.buyOff(p,0,catalog);assert.equal(p.disadvantages.length,0);
- assert.equal(p.progression.history.at(-1).explanation,'Disadvantage bought off from character editor.');
- assert.equal(p.progression.history.at(-1).amount,3);assert.equal(calc(p).xpRemaining,budget-3);assert.equal(calc(p).xpEarned,3);
+test('disadvantages can be removed freely and recalculate earned XP',()=>{
+ const s=starting();s.disadvantages=[{id:'brash',name:'Brash',cost:3}];
+ const budget=calc(s).xpRemaining,next=change(s,v=>v.disadvantages=[]);
+ assert.equal(calc(next).xpRemaining,budget-3);assert.equal(calc(next).xpEarned,0);
+ assert.equal(next.progression.history.length,0);
 });
-test('explicit price corrections use amounts paid rather than a later quoted discount',()=>{
- let p=play(starting());p=change(p,s=>s.advantages.push({id:'large',name:'Large',baseCost:4}));
- p=change(p,s=>s.clan='Crane');assert.equal(calc(p).advantages[0].cost,3);
- p=change(p,s=>s.advantages[0].customCost=5,'Table corrected the purchase price');assert.equal(calc(p).advantages[0].cost,5);assert.equal(p.progression.history.at(-1).amount,2);
+test('explicit option costs override current prices without an approval or ledger',()=>{
+ let p=change(starting(),s=>s.advantages.push({id:'large',name:'Large',baseCost:4}));
+ p=change(p,s=>s.clan='Crane');assert.equal(calc(p).advantages[0].cost,4);
+ p=change(p,s=>s.advantages[0].customCost=5);assert.equal(calc(p).advantages[0].cost,5);
+ assert.ok(!calc(p).blockers.some(v=>v.code==='cost:advantage:large'));
+ assert.equal(p.progression.history.length,0);
 });
 
 // Price facts cross-checked against the old Swift Resources/Advantages.json and
@@ -410,15 +430,13 @@ test('Consumed has variant prices and the Crane bonus applies only to Perfection
  s.clan='Crab';assert.equal(R.optionCost({name:'Consumed',baseCost:0,selection:'Perfection'},s,null,catalog,true),5);
 });
 
-test('a legitimate Greedy Mantis price has no price blocker and advancement retains paid amounts',()=>{
+test('Greedy uses current Mantis prices or an explicit player override',()=>{
  const s=starting('Mantis','Yoritomo Courtier');s.disadvantages=[{id:'greedy',name:'Greedy',baseCost:3,customCost:4}];
  let d=calc(s);assert.equal(d.disadvantages[0].cost,4);assert.equal(d.xpEarned,4);
  assert.ok(!d.blockers.some(v=>v.code==='cost:disadvantage:greedy'));
- delete s.disadvantages[0].customCost;const p=play(s);
- const changed=change(p,next=>next.clan='Crab');d=calc(changed);
- assert.equal(changed.progression.baseline.disadvantageCosts.greedy,4);
- assert.equal(d.xpEarned,4);
- const bought=R.buyOff(changed,0,catalog,'GM approved buyoff');assert.equal(bought.progression.history.at(-1).amount,4);
+ delete s.disadvantages[0].customCost;
+ const changed=change(s,next=>next.clan='Crab');d=calc(changed);assert.equal(d.xpEarned,3);
+ const overridden=change(changed,next=>next.disadvantages[0].customCost=6);assert.equal(calc(overridden).xpEarned,6);
  const legacy=R.normalize({clan:'Mantis',disadvantages:[{name:'Greedy',cost:3}]});
  assert.equal(calc(legacy).disadvantages[0].cost,3);
 });

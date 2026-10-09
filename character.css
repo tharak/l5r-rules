@@ -322,3 +322,5 @@
   .creator-money-fields .ui-stepper.ui-stepper { width: 100%; --ui-step: clamp(24px,8vw,32px); }
   .creator-money-fields .ui-stepper.ui-stepper output { flex: 1; min-width: 0; }
 }
+
+.creator-option-column .creator-option-limit{margin:0 0 12px}

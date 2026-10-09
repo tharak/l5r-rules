@@ -9,7 +9,7 @@
   const sectionNames={identity:'Identity & training',traits:'Rings & traits',skills:'Skills',options:'Advantages & disadvantages',abilities:'Abilities',story:'Story & equipment',equipment:'Equipment',summary:'Summary & combat'};
   const resetDescriptions={identity:'the name, clan, family, school, and training choices',traits:'purchased Trait ranks',skills:'purchased Skills, emphases, Trait choices, and selectable school Skills',options:'advantages, disadvantages, and ancestors',abilities:'selected abilities',story:'story notes, heritage, personal equipment, outfit choices, money, standing, custom purchases, and modifiers',summary:'starting XP to 40, wounds taken, and mechanical modifiers'};
   const escapeHtml = UI.escape;
-  const blank = () => R.normalize({continuousEditor:true});
+  const blank = () => R.normalize();
   let uiError = '';
   let emphasisSkill = '';
   let emphasisView = 'skills';
@@ -101,12 +101,10 @@
   const skillIdentity = value => C.skillIdentity(value,catalog);
   const allowedSchoolSkill = (choice,value) => C.allowedSchoolSkill(choice,value,catalog);
   const build = () => R.calculate(sheet,catalog);
-  const rankLimit = () => 10;
   const read = selector => root.querySelector(selector)?.value?.trim() || '';
   const newId = () => makeId();
   const abilityLabel = a => `${a.name} · ${a.kind}${a.ring ? ` · ${a.ring} ${a.mastery || ''}` : ''}`;
-  function commitEdit(before, explanation = '') {
-    sheet = R.recordChange(before,sheet,catalog,explanation);
+  function commitEdit() {
     save(); render();
   }
   const option = (value, label, selected) => UI.option({value,label,selected});
@@ -128,11 +126,11 @@
     const skillNames = Object.keys(skills).filter(name=>skills[name].rank>0 || (!hideRankZeroSkills && !hiddenZeroSkillCategories.has(skillFilterCategory(name)))).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
       const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
-      const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span>${UI.stepper({value:item.rank,size:'compact',attrs:{'aria-label':`${trait} rank`},outputAttrs:{'aria-label':`${trait} rank`},decrease:{'data-action':'trait','data-trait':trait,'data-delta':'-1','disabled':item.rank <= item.base,'aria-label':`Decrease ${trait}`},increase:{'data-action':'trait','data-trait':trait,'data-delta':'1','disabled':item.rank >= rankLimit(),'aria-label':`Increase ${trait} for ${cost} XP`}})}</div>`;
+      const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span>${UI.stepper({value:item.rank,size:'compact',attrs:{'aria-label':`${trait} rank`},outputAttrs:{'aria-label':`${trait} rank`},decrease:{'data-action':'trait','data-trait':trait,'data-delta':'-1','disabled':item.rank <= item.base,'aria-label':`Decrease ${trait}`},increase:{'data-action':'trait','data-trait':trait,'data-delta':'1','aria-label':`Increase ${trait} for ${cost} XP`}})}</div>`;
       if (!rolling) return control;
       return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list creator-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${renderSkillRow(name,skills[name],'rings')}</li>`).join('')}</ul></div>`;
     };
-    return UI.panel({attrs:{'class':'creator-panel','id':rolling?'creator-rolls':'creator-traits'},bodyHtml:`${UI.sectionHeading({step:rolling?'00':'02',title:rolling?'Rolls':sectionTitle('traits')})}${rolling?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Ranks can reach 10.</p>'}<div class="creator-ring-grid">${groups.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}">${rolling?`<button type="button" class="creator-ring-head creator-roll-ring" data-action="open-roll" data-roll-kind="ring" data-roll-name="${group.ring}" aria-label="Roll ${group.ring} Ring">`:'<div class="creator-ring-head">'}${UI.ringMark({ring:group.ring,attrs:{class:'creator-ring-mark'}})}<${rolling?'span':'div'}><strong>${group.ring}</strong></${rolling?'span':'div'}><b>${data.rings[group.ring]}</b>${rolling?'</button>':'</div>'}${rolling?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div>${rolling?`<div class="creator-roll-details">${renderWounds(data)}${renderCombat(data)}</div>`:''}`});
+    return UI.panel({attrs:{'class':'creator-panel','id':rolling?'creator-rolls':'creator-traits'},bodyHtml:`${UI.sectionHeading({step:rolling?'00':'02',title:rolling?'Rolls':sectionTitle('traits')})}${rolling?renderSkillFilter():'<p class="creator-rule">A Trait costs 4 × its new rank in XP. Void costs 6 × its new rank. Creation limit: Rank 4. Maximum: Rank 10.</p>'}<div class="creator-ring-grid">${groups.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring" data-ring="${group.ring}">${rolling?`<button type="button" class="creator-ring-head creator-roll-ring" data-action="open-roll" data-roll-kind="ring" data-roll-name="${group.ring}" aria-label="Roll ${group.ring} Ring">`:'<div class="creator-ring-head">'}${UI.ringMark({ring:group.ring,attrs:{class:'creator-ring-mark'}})}<${rolling?'span':'div'}><strong>${group.ring}</strong></${rolling?'span':'div'}><b>${data.rings[group.ring]}</b>${rolling?'</button>':'</div>'}${rolling?`<div class="creator-ring-traits">${traits}</div>`:traits}</div>`; }).join('')}</div>${rolling?`<div class="creator-roll-details">${renderWounds(data)}${renderCombat(data)}</div>`:''}`});
   }
 
   function renderSkillRoll(name, skill, view = 'skills') {
@@ -146,7 +144,7 @@
   }
 
   function renderSkillRank(name,skill) {
-    const control = UI.stepper({value:skill.rank,attrs:{'aria-label':`${name} rank`},outputAttrs:{'aria-label':`${name} rank`},decrease:{'data-action':'skill','data-skill':name,'data-delta':'-1','disabled':skill.rank <= skill.base,'aria-label':`Decrease ${name}`},increase:{'data-action':'skill','data-skill':name,'data-delta':'1','disabled':skill.rank >= rankLimit(),'aria-label':`Increase ${name} for ${skill.rank + 1} XP`}});
+    const control = UI.stepper({value:skill.rank,attrs:{'aria-label':`${name} rank`},outputAttrs:{'aria-label':`${name} rank`},decrease:{'data-action':'skill','data-skill':name,'data-delta':'-1','disabled':skill.rank <= skill.base,'aria-label':`Decrease ${name}`},increase:{'data-action':'skill','data-skill':name,'data-delta':'1','aria-label':`Increase ${name} for ${skill.rank + 1} XP`}});
     return control;
   }
 
@@ -186,7 +184,7 @@
     const skills = data.skills;
     const names = Object.keys(skills).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
-    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Ranks can reach 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${names.length ? `<div class="creator-skill-list"><div class="creator-skill-table-head"><span>Skill name</span><span>Trait · Roll · Rank</span></div>${names.map(name=>renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${names.length ? `<div class="creator-skill-list"><div class="creator-skill-table-head"><span>Skill name</span><span>Trait · Roll · Rank</span></div>${names.map(name=>renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}`});
   }
 
   function renderOptionChoice(kind,entry,index) {
@@ -201,10 +199,11 @@
       const entries = kind === 'advantage' ? catalog.advantages : catalog.disadvantages;
       const owned = kind === 'advantage' ? data.advantages : data.disadvantages;
       const totalPoints = owned.reduce((total, entry) => total + (Number(entry.cost) || 0), 0);
+      const limitMessage = kind === 'advantage' ? 'No total point limit.' : 'Up to 10 XP from disadvantages count toward your budget.';
       const id = `${kind}-select`;
-      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} (${totalPoints})</h3><a class="creator-source" data-rule-reference href="${sourceLink(kind === 'advantage' ? 'advantages' : 'disadvantages')}">Read full ${kind === 'advantage' ? 'advantage' : 'disadvantage'} rules ↗</a></div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.map(baseCost=>R.optionCost({name:entry.name,baseCost},sheet,data.school,catalog,kind==='disadvantage')))].join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`,'disabled':entry.cost>=30}})}</div>${UI.button({text:sheet.phase==='advancement' && kind==='disadvantage' ? 'Buy off' : '×',variant:'quiet',size:'compact',attrs:{'data-action':sheet.phase==='advancement' && kind==='disadvantage' ? 'buyoff-disadvantage' : 'remove-'+kind,'data-index':index,'aria-label':`${sheet.phase==='advancement' && kind==='disadvantage' ? 'Buy off ' : 'Remove '}${entry.name}`}})}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : '<div class="creator-empty">None selected.</div>'}</div>`;
+      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} (${totalPoints})</h3><a class="creator-source" data-rule-reference href="${sourceLink(kind === 'advantage' ? 'advantages' : 'disadvantages')}">Read full ${kind === 'advantage' ? 'advantage' : 'disadvantage'} rules ↗</a></div><p class="creator-rule creator-option-limit">${limitMessage}</p>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.map(baseCost=>R.optionCost({name:entry.name,baseCost},sheet,data.school,catalog,kind==='disadvantage')))].join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`}})}</div>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-'+kind,'data-index':index,'aria-label':`Remove ${entry.name}`}})}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : '<div class="creator-empty">None selected.</div>'}</div>`;
     };
-    return UI.panel({attrs:{'class':'creator-panel','id':'creator-options'},bodyHtml:`${UI.sectionHeading({step:'04',title:'Advantages & disadvantages'})}${data.disadvantageTotal > 10 ? `<p class="creator-rule">You selected ${data.disadvantageTotal} points; only 10 count toward your budget.</p>` : ''}<div class="creator-option-grid">${optionList('advantage')}${optionList('disadvantage')}</div>${renderAncestors(data)}`});
+    return UI.panel({attrs:{'class':'creator-panel','id':'creator-options'},bodyHtml:`${UI.sectionHeading({step:'04',title:'Advantages & disadvantages'})}${data.disadvantageTotal > 10 ? `<p class="creator-rule">You selected ${data.disadvantageTotal} disadvantage points; only 10 count toward your budget.</p>` : ''}<div class="creator-option-grid">${optionList('advantage')}${optionList('disadvantage')}</div>${renderAncestors(data)}`});
   }
 
   function startingMoney(data) {
@@ -244,7 +243,7 @@
   }
 
   function renderEquipment(data) {
-    const rows = data.equipment.map(entry => UI.recordRow({attrs:{'class':'creator-equipment-row'},bodyHtml:`<div><strong>${escapeHtml(entry.name)}</strong>${entry.source==='personal' || entry.pending?`<small>${[entry.source==='personal'?'Personal equipment':'',entry.pending?'Choose an item':''].filter(Boolean).join(' · ')}</small>`:''}</div>${entry.source === 'school' && entry.choice && sheet.phase==='creation' ? renderEquipmentChoice(data,entry) : ''}${entry.source === 'personal' ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-equipment','data-index':entry.index,'aria-label':`Remove ${entry.name}`}}) : ''}`})).join('');
+    const rows = data.equipment.map(entry => UI.recordRow({attrs:{'class':'creator-equipment-row'},bodyHtml:`<div><strong>${escapeHtml(entry.name)}</strong>${entry.source==='personal' || entry.pending?`<small>${[entry.source==='personal'?'Personal equipment':'',entry.pending?'Choose an item':''].filter(Boolean).join(' · ')}</small>`:''}</div>${entry.source === 'school' && entry.choice ? renderEquipmentChoice(data,entry) : ''}${entry.source === 'personal' ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-equipment','data-index':entry.index,'aria-label':`Remove ${entry.name}`}}) : ''}`})).join('');
     return UI.panel({attrs:{class:'creator-panel creator-equipment',id:'creator-equipment'},bodyHtml:`${UI.sectionHeading({step:'07',title:'Equipment'})}${UI.actionRow({attrs:{class:'creator-money-fields'},bodyHtml:['koku','bu','zeni'].map(k=>renderNumber(k,Number(data.money[k]) || 0,{label:k,step:1,min:0,action:'money-step',size:'compact'})).join('')})}${rows ? `<div class="creator-equipment-list">${rows}</div>` : '<div class="creator-empty">Choose a school to receive your starting outfit.</div>'}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-equipment','list':'equipment-suggestions','type':'text','placeholder':'Equipment name','aria-label':'Equipment name'}})}<datalist id="equipment-suggestions">${[...catalog.weapons,...catalog.armors].map(e=>`<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist>${UI.button({text:'Add equipment',attrs:{'data-action':'add-equipment'}})}`})}`});
   }
 
@@ -340,8 +339,8 @@
     return `<div class="creator-xp-controls">${UI.stepper({value:xpAward,label:'XP to add',outputAttrs:{id:'xp-award','aria-live':'polite'},decrease:{'data-action':'xp-award-step','data-delta':'-1','aria-label':'Decrease XP to add'},increase:{'data-action':'xp-award-step','data-delta':'1','aria-label':'Increase XP to add'}})}${UI.button({text:'Add',attrs:{'class':'creator-primary','data-action':'award-xp','disabled':xpAward===0}})}</div>${sheet.progression.history.length?UI.disclosure({attrs:{'class':'creator-xp-history'},titleHtml:`XP history`,bodyHtml:`<ul>${sheet.progression.history.map(e=>`<li>${escapeHtml(e.label)} · ${Number(e.amount)} XP${e.explanation?` · ${escapeHtml(e.explanation)}`:''}</li>`).join('')}</ul>`}):''}`;
   }
   function renderLaterTraining(d) {
-    const sources=sheet.phase==='creation' && !sheet.continuousEditor?catalog.training.filter(s=>s.kind==='path'):[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training];
-    return `<div class="creator-purchases"><h3>Later training</h3><p>School Ranks are recorded separately from Insight. A new basic school starts at your next Insight Rank and grants techniques after learning its School Skills. Paths replace their printed technique rank. Advanced schools require their printed entry requirements.</p><p class="creator-rule">Nonhuman and foreign character systems remain available in Books and custom records.</p>${sheet.training.map((t,i)=>{const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${sheet.phase==='creation' || i?UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}}):''}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'training-school','list':'training-suggestions','placeholder':'Search a school, path, or advanced school','aria-label':'Later school'}})}<datalist id="training-suggestions">${sources.map(s=>`<option value="${escapeHtml(s.name+' · '+(s.kind || 'basic'))}"></option>`).join('')}</datalist>${UI.button({text:'Add training',attrs:{'data-action':'add-training'}})}`})}</div>`;
+    const sources=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training];
+    return `<div class="creator-purchases"><h3>Later training</h3><p>School Ranks are recorded separately from Insight. A new basic school starts at your next Insight Rank and grants techniques after learning its School Skills. Paths replace their printed technique rank. Advanced schools require their printed entry requirements.</p><p class="creator-rule">Nonhuman and foreign character systems remain available in Books and custom records.</p>${sheet.training.map((t,i)=>{const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}})}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'training-school','list':'training-suggestions','placeholder':'Search a school, path, or advanced school','aria-label':'Later school'}})}<datalist id="training-suggestions">${sources.map(s=>`<option value="${escapeHtml(s.name+' · '+(s.kind || 'basic'))}"></option>`).join('')}</datalist>${UI.button({text:'Add training',attrs:{'data-action':'add-training'}})}`})}</div>`;
   }
   function renderSchoolDecisions(d,section) {
     const school=d.school;
@@ -408,15 +407,12 @@
   }
   function handleExtendedAction(action,button) {
     if(action==='section'){root.querySelector('#creator-'+button.dataset.section)?.scrollIntoView({behavior:'smooth',block:'start'});return true;}
-    const actions=['reset-section','buyoff-disadvantage','award-xp','add-emphasis','remove-emphasis','add-ability','remove-ability','memorize','add-custom-ability','add-ancestor','remove-ancestor','add-training','remove-training','train-rank'];
+    const actions=['reset-section','award-xp','add-emphasis','remove-emphasis','add-ability','remove-ability','memorize','add-custom-ability','add-ancestor','remove-ancestor','add-training','remove-training','train-rank'];
     if(!actions.includes(action))return false;
-    const before=R.normalize(JSON.parse(JSON.stringify(sheet)));
     if(action==='reset-section') {
       const key=button.dataset.section;
-      if(sheet.phase!=='creation' || !resetDescriptions[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
+      if(!resetDescriptions[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
       sheet=R.resetSection(sheet,key,catalog);
-    } else if(action==='buyoff-disadvantage') {
-      sheet=R.buyOff(sheet,Number(button.dataset.index),catalog);
     } else if(action==='award-xp') {
       try {sheet=R.award(sheet,xpAward,'XP added from character editor.');xpAward=0;}catch(e){uiError=e.message;}
     } else if(action==='add-emphasis') {
@@ -442,10 +438,10 @@
       if(choice && !sheet.training.some(t=>t.school===`${choice.slug}#${choice.anchor}`))sheet.training.push({school:`${choice.slug}#${choice.anchor}`,rank:1,enteredAtInsight:build().insightRank});else uiError='Choose training not already recorded.';
     } else if(action==='remove-training')sheet.training.splice(Number(button.dataset.index),1);
     else if(action==='train-rank') {const t=sheet.training[Number(button.dataset.index)];if(t)t.rank=Math.max(1,Math.min(10,t.rank+Number(button.dataset.delta || 1)));}
-    if(!uiError)commitEdit(before);else render();
+    if(!uiError)commitEdit();else render();
     return true;
   }
-  function handleExtendedChange(event,before) {
+  function handleExtendedChange(event) {
     const t=event.target,k=t.dataset;
     if(k.imperialApproval!==undefined){sheet.exceptions=sheet.exceptions.filter(e=>e.code!=='imperial');if(t.value.trim())sheet.exceptions.push({id:newId(),code:'imperial',label:'Imperial family approval',explanation:t.value.trim()});}
     else if(k.money!==undefined){sheet.money ||= {...build().money};sheet.money[k.money]=Math.max(0,Number(t.value)||0);}
@@ -455,7 +451,7 @@
       if(k.schoolDecision==='affinity' && /opposing Element/i.test(build().school?.affinity || ''))sheet.schoolDecisions.deficiency={Air:'Earth',Earth:'Air',Fire:'Water',Water:'Fire'}[t.value] || '';
     }
     else return false;
-    commitEdit(before,k.modifier!==undefined?sheet.modifierReason:'');return true;
+    commitEdit();return true;
   }
 
   function renderLayout(data) {
@@ -486,7 +482,7 @@
         if (!panel) continue;
         const heading = panel.querySelector('.creator-panel-head');
         const title = heading?.querySelector('h2') || panel.querySelector('#creator-record-title');
-        if (sheet.phase==='creation' && title) {
+        if (title) {
           const row = document.createElement('div');
           row.className = 'creator-section-title';
           title.replaceWith(row);
@@ -590,7 +586,6 @@
       emphasisSkill = button.dataset.skill; emphasisView = button.dataset.skillView; uiError = ''; render(); return;
     }
     if (action === 'close-emphases') { closeEmphases(); return; }
-    const before = R.normalize(JSON.parse(JSON.stringify(sheet)));
     uiError = '';
     if (handleExtendedAction(action,button)) return;
     if (action === 'save-close') {
@@ -607,7 +602,7 @@
       if(!['advantage','disadvantage'].includes(kind))return;
       const entry=build()[kind==='advantage'?'advantages':'disadvantages'][Number(button.dataset.index)];
       if(!entry)return;
-      const value=Math.max(0,Math.min(30,(Number(entry.cost)||0)+Number(button.dataset.delta)));
+      const value=Math.max(0,(Number(entry.cost)||0)+Number(button.dataset.delta));
       onChange({target:{dataset:{kind,index:button.dataset.index},value:String(value)}});
       return;
     } else if (action === 'heal-wounds') {
@@ -624,12 +619,12 @@
       sheet[key]=Math.max(config.min,Math.min(config.max ?? Infinity,Math.round((value+Number(button.dataset.delta)*config.step)*10)/10));
     } else if (action === 'trait') {
       const trait = button.dataset.trait, current = build().traits[trait];
-      if (Number(button.dataset.delta) > 0 && current.rank < rankLimit()) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;
+      if (Number(button.dataset.delta) > 0) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) sheet.traitBuys[trait] = Math.max(0,(Number(sheet.traitBuys[trait]) || 0) - 1);
     } else if (action === 'skill') {
       const name = button.dataset.skill, current = build().skills[name];
       if (!current) return;
-      if (Number(button.dataset.delta) > 0 && current.rank < rankLimit()) sheet.skills[name] = current.rank + 1;
+      if (Number(button.dataset.delta) > 0) sheet.skills[name] = current.rank + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) {
         if (current.rank - 1) sheet.skills[name] = current.rank - 1; else delete sheet.skills[name];
       }
@@ -673,7 +668,7 @@
       sheet = blank();
       if (external) sheet.visibility = visibility;
     } else return;
-    commitEdit(before);
+    commitEdit();
   }
 
   function onChange(event) {
@@ -691,8 +686,7 @@
       render(); return;
     }
     uiError = '';
-    const before = R.normalize(JSON.parse(JSON.stringify(sheet)));
-    if (handleExtendedChange(event,before)) return;
+    if (handleExtendedChange(event)) return;
     if (event.target.dataset.public) {
       if (external) return;
       sheet.visibility = {...window.SheetSharing.visibility(sheet),[event.target.dataset.public]:event.target.checked}; save(); render(); return;
@@ -701,7 +695,7 @@
     if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }
     else if (field === 'family') { sheet.family = event.target.value; sheet.familyTrait = ''; }
     else if (field === 'familyTrait') sheet.familyTrait = selectedFamily()?.traitOptions?.includes(event.target.value) ? event.target.value : '';
-    else if (field === 'school') { sheet.disadvantages=sheet.disadvantages.filter(a=>!a.grantSchool || a.grantSchool!==sheet.school); sheet.school = event.target.value; sheet.schoolChoices = []; sheet.equipmentChoices = []; if(sheet.phase==='creation'){sheet.money = null;sheet.honor = null;} const selected=C.school(sheet.school,catalog); if(selected?.brotherhood) sheet.status=0; if(/Shinmaki/i.test(selected?.name || '') && !sheet.disadvantages.some(a=>a.name==='Disturbing Countenance'))sheet.disadvantages.push({id:newId(),name:'Disturbing Countenance',cost:0,free:true,grantSchool:sheet.school}); }
+    else if (field === 'school') { sheet.disadvantages=sheet.disadvantages.filter(a=>!a.grantSchool || a.grantSchool!==sheet.school); sheet.school = event.target.value; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.money = null;sheet.honor = null; const selected=C.school(sheet.school,catalog); if(selected?.brotherhood) sheet.status=0; if(/Shinmaki/i.test(selected?.name || '') && !sheet.disadvantages.some(a=>a.name==='Disturbing Countenance'))sheet.disadvantages.push({id:newId(),name:'Disturbing Countenance',cost:0,free:true,grantSchool:sheet.school}); }
     else if(field==='startingXP'){if(event.target.value.trim()===''){render();return;}sheet.startingXP=Math.max(0,Math.floor(Number(event.target.value)||0));}
     else if (['status','glory','honor','taint','woundsTaken'].includes(field)) sheet[field] = Math.max(0, Number(event.target.value) || 0);
     else if (event.target.dataset.skillTrait !== undefined) {
@@ -711,13 +705,13 @@
     }
     else if (event.target.dataset.choiceIndex !== undefined) sheet.schoolChoices[Number(event.target.dataset.choiceIndex)] = event.target.value.trim();
     else if (event.target.dataset.equipmentChoice !== undefined) sheet.equipmentChoices[Number(event.target.dataset.equipmentChoice)] = event.target.value.trim();
-    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name] && sheet.phase==='creation')delete entry.customCost;commitEdit(before,'Updated '+event.target.dataset.optionDetail+' choice from character editor.');return;}}
+    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name])delete entry.customCost;commitEdit();return;}}
     else if (event.target.dataset.kind) {
       const collection = event.target.dataset.kind === 'advantage' ? sheet.advantages : sheet.disadvantages;
       const entry = collection[Number(event.target.dataset.index)];
-      if (entry) { entry.customCost=Math.max(0,Number(event.target.value)||0);commitEdit(before,'Updated '+event.target.dataset.kind+' cost from character editor.');return; }
+      if (entry) { entry.customCost=Math.max(0,Number(event.target.value)||0);commitEdit();return; }
     } else return;
-    commitEdit(before);
+    commitEdit();
   }
 
   function onInput(event) {
@@ -748,7 +742,6 @@
     root.onchange = onChange;
     root.oninput = onInput;
     sheet = R.normalize(shared ? shared.sheet : loadSheet());
-    sheet.continuousEditor = true;
     try {
       catalogPromise ||= fetch('public/character-data.json').then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
