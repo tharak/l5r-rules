@@ -149,11 +149,13 @@
     --ring-heading: hsl(var(--wound-hue) 45% 80%);
     --trait-heading: hsl(var(--wound-hue) 45% 90%);
     --ring-surface: hsl(var(--wound-hue) 40% 96%);
-    display: flex; align-items: center; gap: 12px; padding: 10px; background: var(--ring-surface);
+    background: var(--ring-surface);
   }
+  #creator-rolls .creator-roll-wounds .creator-ring-head { justify-content: space-between; }
+  .creator-roll-wounds .creator-ring-head > .creator-number-field { flex: none; }
   .creator-roll-wounds .creator-wound-status { color: hsl(var(--wound-hue) 70% 24%); }
   .creator-roll-wounds .creator-number-field { flex: none; }
-  .creator-roll-wounds .creator-wounds { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 0; }
+  .creator-roll-wounds .creator-wounds { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 10px; }
   .creator-roll-wounds .creator-wounds > div { padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px; font-size: 12px; }
   .creator-roll-wounds .creator-wounds [aria-current="true"] { background: var(--trait-heading); font-weight: 700; }
   .creator-roll-combat { margin-top: 18px; }

@@ -455,9 +455,13 @@ test('Wounds card follows wound thresholds and recalculates its status when Eart
   for(const trait of ['Stamina','Willpower'])c.click({action:'trait',trait,delta:'1'});
   assert.match(sectionHtml(c,'rolls'),/role="status">Healthy \(\+0\)<\/span>/);
   const card=sectionHtml(c,'rolls').split('aria-label="Wound levels and current wounds">')[1].split('<div class="creator-roll-combat">')[0];
-  assert.doesNotMatch(card,/creator-ring-head|<span>Wounds<\/span>|<strong>|<small>|Earth ×/);
+  assert.match(card,/<div class="creator-ring-head"><strong>Wounds<\/strong><div class="creator-number-field">/);
+  assert.doesNotMatch(card,/<span>Wounds<\/span>|<small>|Earth ×/);
+  assert.match(card,/role="status">Healthy \(\+0\)<\/span>: <strong>15<\/strong>/);
+  assert.match(card,/Nicked \(\+3\)<\/span>: <strong>21<\/strong>/);
   assert.match(card,/Nicked \(\+3\)/);
   assert.match(card,/Down \(\+40\)/);
+  assert.doesNotMatch(sectionHtml(c,'rolls'),/Unarmed damage|Void Points|Wounds ·|Wound capacity/);
   const loaded=await c.reload();
   assert.equal((await loaded.data()).character.woundsTaken,11);
   assert.match(sectionHtml(loaded,'rolls'),/--wound-hue:120/);
