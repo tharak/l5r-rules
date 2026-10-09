@@ -87,7 +87,7 @@ async page => {
     await p.locator('[data-action="reset-section"][data-section="skills"]').click();
     check(await p.locator('[data-choice-index="0"]').inputValue()==='','Skills reset did not clear selectable grants');
     await p.locator('[data-choice-index="0"]').fill('Battle');await p.locator('[data-choice-index="0"]').blur();
-    await p.locator('.creator-later-training > summary').click();
+    check(await p.locator('#training-school').isVisible(),'Later training picker must always be visible');
     await p.locator('#training-school').fill('Crab Defender · path');
     await p.getByRole('button',{name:'Add training',exact:true}).click();
     check(await p.locator('[data-action="remove-training"]').count()===1,'First creation path cannot be removed');
@@ -162,7 +162,7 @@ async page => {
       await p.getByRole('button',{name:'Close rules',exact:true}).click();
     }
     check(await p.locator('#creator-progression').count()===0,'Removed advancement panel remains');
-    if(!await p.locator('#training-school').isVisible())await p.locator('.creator-later-training > summary').click();
+    check(await p.locator('#training-school').isVisible(),'Later training picker must remain visible');
     await p.locator('#training-school').fill('Hida Bushi · basic');
     await p.getByRole('button',{name:'Add training',exact:true}).click();
     await p.getByRole('button',{name:'Advance Hida Bushi school rank',exact:true}).click();

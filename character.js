@@ -341,14 +341,16 @@
     return content.replace(key==='summary'?'</aside>':'</section>',messages+(key==='summary'?'</aside>':'</section>'));
   }
   function renderCreationOptions(d) {
-    return UI.disclosure({attrs:{'class':'creator-later-training'},titleHtml:`Later training`,bodyHtml:`${renderLaterTraining(d)}`});
+    return `<div class="creator-later-training">${renderLaterTraining(d)}</div>`;
   }
   function renderXPControls() {
     return `<div class="creator-xp-controls">${UI.stepper({value:xpAward,label:'XP to add',outputAttrs:{id:'xp-award','aria-live':'polite'},decrease:{'data-action':'xp-award-step','data-delta':'-1','aria-label':'Decrease XP to add'},increase:{'data-action':'xp-award-step','data-delta':'1','aria-label':'Increase XP to add'}})}${UI.button({text:'Add',attrs:{'class':'creator-primary','data-action':'award-xp','disabled':xpAward===0}})}</div>${sheet.progression.history.length?UI.disclosure({attrs:{'class':'creator-xp-history'},titleHtml:`XP history`,bodyHtml:`<ul>${sheet.progression.history.map(e=>`<li>${escapeHtml(e.label)} · ${Number(e.amount)} XP${e.explanation?` · ${escapeHtml(e.explanation)}`:''}</li>`).join('')}</ul>`}):''}`;
   }
   function renderLaterTraining(d) {
     const sources=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training];
-    return `<div class="creator-purchases"><h3>Later training</h3><p>School Ranks are recorded separately from Insight. A new basic school starts at your next Insight Rank and grants techniques after learning its School Skills. Paths replace their printed technique rank. Advanced schools require their printed entry requirements.</p><p class="creator-rule">Nonhuman and foreign character systems remain available in Books and custom records.</p>${sheet.training.map((t,i)=>{const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}})}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'training-school','list':'training-suggestions','placeholder':'Search a school, path, or advanced school','aria-label':'Later school'}})}<datalist id="training-suggestions">${sources.map(s=>`<option value="${escapeHtml(s.name+' · '+(s.kind || 'basic'))}"></option>`).join('')}</datalist>${UI.button({text:'Add training',attrs:{'data-action':'add-training'}})}`})}</div>`;
+    const training=sheet.training.map((entry,index)=>({...entry,index}));
+    if(d.school && !training.some(entry=>(entry.school || entry.id)===sheet.school))training.unshift({school:sheet.school,rank:d.schoolRank,index:-1});
+    return `<div class="creator-purchases"><h3>Later training</h3><p>School Ranks are recorded separately from Insight. A new basic school starts at your next Insight Rank and grants techniques after learning its School Skills. Paths replace their printed technique rank. Advanced schools require their printed entry requirements.</p><p class="creator-rule">Nonhuman and foreign character systems remain available in Books and custom records.</p><div class="creator-option-list" role="list" aria-label="Current schools">${training.map(t=>{const i=t.index;const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row','role':'listitem','data-training-index':i},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${i>=0?UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}}):''}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}</div>${!training.length?'<div class="creator-empty">No schools recorded. Choose a starting school above or add training below.</div>':''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'training-school','list':'training-suggestions','placeholder':'Search a school, path, or advanced school','aria-label':'Later school'}})}<datalist id="training-suggestions">${sources.map(s=>`<option value="${escapeHtml(s.name+' · '+(s.kind || 'basic'))}"></option>`).join('')}</datalist>${UI.button({text:'Add training',attrs:{'data-action':'add-training'}})}`})}</div>`;
   }
   function renderSchoolDecisions(d,section) {
     const school=d.school;
@@ -445,7 +447,15 @@
       const value=read('#training-school'),choice=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training].find(s=>s.name+' · '+(s.kind || 'basic')===value);
       if(choice && !sheet.training.some(t=>t.school===`${choice.slug}#${choice.anchor}`))sheet.training.push({school:`${choice.slug}#${choice.anchor}`,rank:1,enteredAtInsight:build().insightRank});else uiError='Choose training not already recorded.';
     } else if(action==='remove-training')sheet.training.splice(Number(button.dataset.index),1);
-    else if(action==='train-rank') {const t=sheet.training[Number(button.dataset.index)];if(t)t.rank=Math.max(1,Math.min(10,t.rank+Number(button.dataset.delta || 1)));}
+    else if(action==='train-rank') {
+      const index=Number(button.dataset.index);
+      let t=sheet.training[index];
+      if(index===-1 && selectedSchool()) {
+        t=sheet.training.find(entry=>(entry.school || entry.id)===sheet.school);
+        if(!t){t={school:sheet.school,rank:1};sheet.training.unshift(t);}
+      }
+      if(t)t.rank=Math.max(1,Math.min(10,t.rank+Number(button.dataset.delta || 1)));
+    }
     if(!uiError)commitEdit();else render();
     return true;
   }

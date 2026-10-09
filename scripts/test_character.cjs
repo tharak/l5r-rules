@@ -741,6 +741,36 @@ test('cost guidance shows limits while trait, skill, and option edits remain ava
  const restored=await c.reload();assert.equal((await restored.data()).derived.skills.Defense.rank,11);
 });
 
+test('Later training always shows the starting school, current training and the existing picker',async()=>{
+ const c=await character();
+ assert.match(c.root.innerHTML,/<div class="creator-later-training">/);
+ assert.doesNotMatch(c.root.innerHTML,/<details[^>]*class="creator-later-training"/);
+ assert.match(c.root.innerHTML,/No schools recorded/);
+ assert.match(c.root.innerHTML,/id="training-school"/);
+ c.school('Crab','Hida Bushi');
+ const list=instance=>instance.root.innerHTML.split('<div class="creator-later-training">')[1].split('<aside')[0];
+ assert.match(list(c),/Hida Bushi · School Rank 1/);
+ assert.equal((list(c).match(/data-training-index=/g)||[]).length,1);
+ assert.equal((await c.data()).character.training.length,0,'Displaying the starting school must not change saved training');
+ c.click({action:'train-rank',index:'-1',delta:'1'});
+ assert.equal((await c.data()).derived.schoolRank,2);
+ assert.equal((await c.data()).character.training.length,1);
+ assert.match(list(c),/Hida Bushi · School Rank 2/);
+ assert.equal((list(c).match(/data-training-index=/g)||[]).length,1,'Starting school must not appear twice');
+ c.inputs['#training-school']={value:'Crab Defender · path'};c.click({action:'add-training'});
+ c.inputs['#training-school']={value:'Kakita Bushi · basic'};c.click({action:'add-training'});
+ assert.match(list(c),/Crab Defender · School Rank 1 · path/);
+ assert.match(list(c),/Kakita Bushi · School Rank 1/);
+ assert.equal((list(c).match(/data-training-index=/g)||[]).length,3);
+ assert.doesNotMatch(list(c),/data-action="train-rank" data-index="1"/,'Paths do not have rank controls');
+ const restored=await c.reload();
+ assert.equal((await restored.data()).derived.schoolRank,2);
+ assert.equal((list(restored).match(/data-training-index=/g)||[]).length,3);
+ restored.click({action:'remove-training',index:'1'});
+ assert.doesNotMatch(list(restored),/<span>Crab Defender · School Rank/);
+ assert.match(list(restored),/id="training-school"/);
+});
+
 test('old advancement sheets can change outfit choices and remove their first training entry',async()=>{
  const school=catalog.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');
  const id=school.slug+'#'+school.anchor;
