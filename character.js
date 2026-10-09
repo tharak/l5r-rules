@@ -577,7 +577,6 @@ ${escapeHtml(sheet.notes)}</textarea></label><label class="creator-wide">Recorde
       const part = button.dataset.rollPart;
       if (!Object.hasOwn(rollState.bonuses,part)) return true;
       rollState.bonuses[part] += Number(button.dataset.delta);
-      rollState.result = null;
     } else if (action === 'reset-roll-bonuses') {
       rollState.bonuses = {rolled:0,kept:0,bonus:0};
       rollState.result = null;
