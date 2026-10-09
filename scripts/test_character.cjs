@@ -441,7 +441,7 @@ test('legacy approvals remain saved and Imperial family approval lives in Identi
 });
 
 function equipmentSelect(c,index) {
-  const select=sectionHtml(c,'story').match(new RegExp(`<select[^>]*data-equipment-choice="${index}"[^>]*>([\\s\\S]*?)</select>`));
+  const select=sectionHtml(c,'equipment').match(new RegExp(`<select[^>]*data-equipment-choice="${index}"[^>]*>([\\s\\S]*?)</select>`));
   assert.ok(select,`Equipment choice ${index} must be a dropdown`);
   return select[1];
 }
@@ -524,20 +524,23 @@ test('each ability picker adds only its own catalog type and preserves acquisiti
   assert.equal((await c.data()).character.abilities.length,5);
 });
 
-test('equipment buttons preserve equipped state and currency without removed labels',async()=>{
+test('separate equipment list preserves saved gear and money without equipped controls',async()=>{
   const c=await character();c.school('Crab','Hida Bushi');
   const armorIndex=(await c.data()).derived.school.equipment.findIndex(e=>e.name==='Light or Heavy Armor');
   c.change({equipmentChoice:String(armorIndex)},'Light Armor');
-  const before=await c.data();
-  const armor=before.derived.equipment.find(entry=>entry.item?.kind==='armor');
-  assert.ok(armor);
-  assert.doesNotMatch(sectionHtml(c,'story'),/Starting money:|School outfit|<input[^>]*data-equipped/);
-  assert.match(sectionHtml(c,'story'),/data-action="toggle-equipped"/);
-  c.click({action:'toggle-equipped',equipped:armor.key});
-  const equipped=(await (await c.reload()).data());
-  assert.equal(equipped.character.equipped[armor.key],true);
-  assert.ok(equipped.derived.combat.armorTN>before.derived.combat.armorTN);
-  c.click({action:'toggle-equipped',equipped:armor.key});
-  assert.equal((await c.data()).character.equipped[armor.key],false);
-  assert.deepEqual((await c.data()).derived.money,before.derived.money);
+  const before=await c.data(),armor=before.derived.equipment.find(entry=>entry.item?.kind==='armor');
+  const loaded=await character({...before.character,equipped:{[armor.key]:true},money:{koku:7,bu:2,zeni:1}});
+  const html=sectionHtml(loaded,'equipment');
+  assert.doesNotMatch(html,/Starting money:|School outfit|data-equipped|toggle-equipped|Equip<|Equipped</);
+  assert.match(html,/Light Armor/);
+  assert.doesNotMatch(sectionHtml(loaded,'story'),/creator-equipment-list|creator-standing-fields/);
+  assert.match(sectionHtml(loaded,'identity'),/creator-standing-fields/);
+  loaded.inputs['#new-equipment']={value:'Rope'};loaded.click({action:'add-equipment'});
+  const saved=await (await loaded.reload()).data();
+  assert.equal(saved.character.equipment[0].name,'Rope');
+  assert.equal(saved.character.equipped[armor.key],true);
+  assert.deepEqual(saved.derived.money,{koku:7,bu:2,zeni:1});
+  assert.ok(saved.derived.combat.armorTN>before.derived.combat.armorTN);
+  loaded.click({action:'remove-equipment',index:'0'});
+  assert.equal((await loaded.data()).character.equipment.length,0);
 });

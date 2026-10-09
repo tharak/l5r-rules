@@ -28,6 +28,11 @@ async page => {
     check(await p.locator('#creator-identity #creator-summary').count()===1,'Character record must be inside section 01');
     check(await p.locator('.creator-layout > .creator-summary').count()===0,'Standalone Character Record sidebar remains');
     check(await p.locator('#creator-identity #xp-award').count()===1,'XP controls did not move into section 01');
+    check(await p.locator('#creator-summary .creator-standing-fields').count()===1,'Standing controls missing below XP');
+    check(await p.locator('#creator-story .creator-standing-fields,#creator-story #creator-equipment').count()===0,'Story still contains standing or equipment');
+    check(await p.locator('#creator-story h2').innerText()==='Story','Story heading missing');
+    check(await p.locator('#creator-equipment h2').innerText()==='Equipment','Equipment heading missing');
+    check(await p.locator('.creator-nav [data-section="story"],.creator-nav [data-section="equipment"]').count()===2,'Story and Equipment navigation missing');
     check(await p.locator('[data-action="reset-section"]').count()===7,'Creation section reset controls missing');
     const characterId=await p.evaluate(()=>CharacterBuilder.list()[0].id);
     check(await p.locator('.creator-overview,[data-field="startingXP"]').count()===0,'Removed totals bar remains');
@@ -106,9 +111,7 @@ async page => {
     check(await p.locator('#roll-dialog-title').textContent()==='Heavy Weapons · Masakari','Default emphasis roll missing');
     await p.keyboard.press('Escape');
     check(!await p.locator('.creator-validation').count(),'Valid sheet has unresolved creation violations');
-    await p.locator('[data-equipped="school:0"]').click();
-    const weaponIndex=school.equipment.findIndex(e=>/Heavy Weapon/i.test(e.name));
-    await p.locator('[data-equipped="school:'+weaponIndex+'"]').click();
+    check(await p.locator('[data-equipped]').count()===0,'Equip controls remain');
     await p.locator('[data-field="notes"]').fill('OWNER PRIVATE NOTES\nSecond line');
     const editorURL=p.url();
     await p.getByRole('link',{name:'View school rules ↗',exact:true}).click();
@@ -166,7 +169,7 @@ async page => {
     check(exported.character.startingXP===40,'Starting XP not exported');
     check(exported.derived.traits.Reflexes.rank===4,'Trait decrease did not restore Rank 4');
     check(exported.character.progression.history.some(e=>e.explanation==='XP added from character editor.'),'XP award not retained');
-    check(exported.derived.combat.armorTN===30,'Equipped armor not calculated');
+    check(exported.derived.combat.armorTN===25,'Unequipped armor affected Armor TN');
     await p.emulateMedia({media:'print'});
     check(await p.locator('.creator-print-sheet').isVisible(),'Owner print missing');
     check((await p.locator('.creator-print-sheet').innerText()).includes('OWNER PRIVATE POWER'),'Owner abilities missing from print');
