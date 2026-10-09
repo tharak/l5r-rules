@@ -199,15 +199,25 @@ test('chosen craft skill receives two free ranks; invalid categories and duplica
   assert.equal(d.skills.Kenjutsu.rank,1);
   c.change({choiceIndex:'2'},'Kenjutsu (Katana)');
   assert.match((await c.data()).derived.skillChoiceErrors[2],/extra emphases/);
+  assert.match(c.root.innerHTML,/data-choice-index="2"/);
 });
 
 test('multi-skill and emphasis choices keep their correct counts', async () => {
   const c = await character(); c.school('Crane','Kakita Artisan');
   assert.equal((await c.data()).derived.school.skillChoices.length,3);
-  for (const [index,value] of ['Acting','Artisan: Painting','Perform: Song'].entries()) c.change({choiceIndex:String(index)},value);
+  c.change({choiceIndex:'0'},'Acting');
+  c.change({choiceIndex:'1'},'Artisan: Painting');
+  assert.match(c.root.innerHTML,/data-choice-index="2"/);
+  c.change({choiceIndex:'2'},'Perform: Song');
+  assert.doesNotMatch(c.root.innerHTML,/data-choice-index=/);
   assert.equal(Object.keys((await c.data()).derived.skills).length,7);
+  const restored = await c.reload();
+  assert.doesNotMatch(restored.root.innerHTML,/data-choice-index=/);
+  assert.equal((await restored.data()).derived.skills['Perform: Song'].base,1);
   c.school('Crab','Kaiu Engineer');
+  assert.match(c.root.innerHTML,/data-choice-index="0"/);
   c.change({choiceIndex:'0'},'Siege');
+  assert.doesNotMatch(c.root.innerHTML,/data-choice-index=/);
   assert.deepEqual((await c.data()).derived.skills.Engineering.emphases,['Siege']);
   assert.equal((await c.data()).derived.xpRemaining,40);
 });
