@@ -14,6 +14,7 @@
   let emphasisSkill = '';
   let emphasisView = 'skills';
   let rollState = null;
+  let xpAward = 0;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let hideRankZeroSkills = true;
   // Start the updated filters checked, then retain subsequent user choices.
@@ -262,7 +263,7 @@
   function renderSummary(data) {
     const ringList = TRAIT_GROUPS.map(group => `<div><span>${group.mark} ${group.ring}</span><strong>${data.rings[group.ring]}</strong></div>`).join('');
     const track = (label, value) => `<div class="creator-reputation-row"><div><span>${label}</span><strong>${value}</strong></div><div class="creator-track" aria-hidden="true">${Array.from({length:10},(_,index) => `<i class="${index < Math.floor(Number(value) || 0) ? 'filled' : ''}"></i>`).join('')}</div></div>`;
-    return `<aside class="creator-summary creator-record" id="creator-summary"><div class="creator-summary-inner"><div class="creator-record-header"><div class="creator-summary-seal" aria-hidden="true">◈</div><small class="creator-summary-kicker">CHARACTER RECORD</small><h3 id="summary-name">${escapeHtml(sheet.name || 'Unnamed samurai')}</h3><p>${escapeHtml([sheet.clan, sheet.family, data.school?.name].filter(Boolean).join(' · ') || 'Choose a clan to begin')}</p></div><div class="creator-record-grid"><div class="creator-record-group"><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><span>EXPERIENCE POINTS REMAINING</span><strong>${data.xpRemaining}</strong><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small>${renderXPControls()}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">Honor & standing</div><div class="creator-reputation">${track('Honor', data.honor)}${track('Glory', data.glory)}${track('Status', sheet.status)}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">The five rings</div><div class="creator-summary-rings">${ringList}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">Insight</div><div class="creator-derived"><div><span>Rings × 10 + Skills</span><strong>${data.insight}</strong></div><div><span>Insight Rank</span><strong>${data.insightRank}</strong></div></div></div><div class="creator-record-group"><div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (equipped)</span><strong>${data.combat.armorTN}</strong></div><div><span>Healing / day</span><strong>${data.combat.healing}</strong></div><div><span>Unarmed damage</span><strong>${data.combat.unarmedDamage.notation}</strong></div><div><span>Void Points</span><strong>${data.combat.voidPoints}</strong></div><div><span>Reduction</span><strong>${data.combat.reduction}</strong></div><div><span>Wounds taken · ${escapeHtml(data.combat.wounds.currentLevel)}</span><strong>${sheet.woundsTaken}</strong></div><div><span>Wound capacity</span><strong>${data.combat.wounds.maximum}</strong></div></div></div><div class="creator-record-group"><div class="creator-ledger-heading">Wounds · cumulative totals</div><div class="creator-wounds">${data.combat.wounds.levels.map(level => `<div><span>${level.label}</span><strong>${level.total}</strong></div>`).join('')}<small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div></div></div><div class="creator-summary-links"><a data-rule-reference href="${sourceLink('chargen')}">Creation rules ↗</a><a data-rule-reference href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
+    return `<aside class="creator-summary creator-record" id="creator-summary"><div class="creator-summary-inner"><div class="creator-record-header"><h3 class="creator-summary-kicker" id="creator-record-title">CHARACTER RECORD</h3></div><div class="creator-record-grid"><div class="creator-record-group"><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><div class="creator-xp-total"><span>XP:</span><strong>${data.xpRemaining}</strong></div><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small>${renderXPControls()}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">Honor & standing</div><div class="creator-reputation">${track('Honor', data.honor)}${track('Glory', data.glory)}${track('Status', sheet.status)}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">The five rings</div><div class="creator-summary-rings">${ringList}</div></div><div class="creator-record-group"><div class="creator-ledger-heading">Insight</div><div class="creator-derived"><div><span>Rings × 10 + Skills</span><strong>${data.insight}</strong></div><div><span>Insight Rank</span><strong>${data.insightRank}</strong></div></div></div><div class="creator-record-group"><div class="creator-ledger-heading">Combat values</div><div class="creator-derived creator-combat"><div><span>Initiative roll</span><strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (equipped)</span><strong>${data.combat.armorTN}</strong></div><div><span>Healing / day</span><strong>${data.combat.healing}</strong></div><div><span>Unarmed damage</span><strong>${data.combat.unarmedDamage.notation}</strong></div><div><span>Void Points</span><strong>${data.combat.voidPoints}</strong></div><div><span>Reduction</span><strong>${data.combat.reduction}</strong></div><div><span>Wounds taken · ${escapeHtml(data.combat.wounds.currentLevel)}</span><strong>${sheet.woundsTaken}</strong></div><div><span>Wound capacity</span><strong>${data.combat.wounds.maximum}</strong></div></div></div><div class="creator-record-group"><div class="creator-ledger-heading">Wounds · cumulative totals</div><div class="creator-wounds">${data.combat.wounds.levels.map(level => `<div><span>${level.label}</span><strong>${level.total}</strong></div>`).join('')}<small>Healthy: Earth × 5 · each further level adds Earth × 2</small></div></div></div><div class="creator-summary-links"><a data-rule-reference href="${sourceLink('chargen')}">Creation rules ↗</a><a data-rule-reference href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
   }
 
   function renderPrintSheet(data) {
@@ -324,7 +325,7 @@
     return UI.disclosure({attrs:{'class':'creator-later-training'},titleHtml:`Later training`,bodyHtml:`${renderLaterTraining(d)}`});
   }
   function renderXPControls() {
-    return `<div class="creator-xp-controls">${UI.field({label:'XP to add',attrs:{'id':'xp-award','type':'number','step':'1','aria-label':'XP awarded'}})}${UI.field({attrs:{'id':'xp-reason','placeholder':'Session or reason (optional)','aria-label':'XP explanation'}})}${UI.button({text:'Add XP',attrs:{'class':'creator-primary','data-action':'award-xp'}})}</div>${sheet.progression.history.length?UI.disclosure({attrs:{'class':'creator-xp-history'},titleHtml:`XP history`,bodyHtml:`<ul>${sheet.progression.history.map(e=>`<li>${escapeHtml(e.label)} · ${Number(e.amount)} XP${e.explanation?` · ${escapeHtml(e.explanation)}`:''}</li>`).join('')}</ul>`}):''}`;
+    return `<div class="creator-xp-controls">${UI.stepper({value:xpAward,label:'XP to add',outputAttrs:{id:'xp-award','aria-live':'polite'},decrease:{'data-action':'xp-award-step','data-delta':'-1','aria-label':'Decrease XP to add'},increase:{'data-action':'xp-award-step','data-delta':'1','aria-label':'Increase XP to add'}})}${UI.button({text:'Add',attrs:{'class':'creator-primary','data-action':'award-xp','disabled':xpAward===0}})}</div>${sheet.progression.history.length?UI.disclosure({attrs:{'class':'creator-xp-history'},titleHtml:`XP history`,bodyHtml:`<ul>${sheet.progression.history.map(e=>`<li>${escapeHtml(e.label)} · ${Number(e.amount)} XP${e.explanation?` · ${escapeHtml(e.explanation)}`:''}</li>`).join('')}</ul>`}):''}`;
   }
   function renderLaterTraining(d) {
     const sources=sheet.phase==='creation' && !sheet.continuousEditor?catalog.training.filter(s=>s.kind==='path'):[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training];
@@ -407,7 +408,7 @@
       if(!reason?.trim())return true;
       sheet=R.buyOff(sheet,Number(button.dataset.index),catalog,reason.trim());
     } else if(action==='award-xp') {
-      try {sheet=R.award(sheet,read('#xp-award'),read('#xp-reason') || 'XP added from character editor.');}catch(e){uiError=e.message;}
+      try {sheet=R.award(sheet,xpAward,'XP added from character editor.');xpAward=0;}catch(e){uiError=e.message;}
     } else if(action==='add-emphasis') {
       const name=button.dataset.skill,value=button.dataset.emphasis || read(`input[data-emphasis-name=${JSON.stringify(name)}]`);
       if(!value)uiError='Choose an emphasis.';
@@ -476,7 +477,7 @@
         const panel = root.querySelector('#'+id);
         if (!panel) continue;
         const heading = panel.querySelector('.creator-panel-head');
-        const title = heading?.querySelector('h2') || panel.querySelector('#summary-name');
+        const title = heading?.querySelector('h2') || panel.querySelector('#creator-record-title');
         if (sheet.phase==='creation' && title) {
           const row = document.createElement('div');
           row.className = 'creator-section-title';
@@ -566,6 +567,13 @@
     if (!button) return;
     const action = button.dataset.action;
     if (handleRollAction(action,button)) return;
+    if (action === 'xp-award-step') {
+      const delta=Number(button.dataset.delta), next=xpAward+delta;
+      if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(next)) return;
+      xpAward=next; render();
+      root.querySelector(`[data-action="xp-award-step"][data-delta="${delta}"]`)?.focus();
+      return;
+    }
     if (action === 'open-emphases') {
       if (!build().skills[button.dataset.skill]?.rank) return;
       emphasisSkill = button.dataset.skill; emphasisView = button.dataset.skillView; uiError = ''; render(); return;
@@ -711,7 +719,6 @@
     if (!['name','concept','notes','heritage'].includes(field)) return;
     sheet[field] = event.target.value;
     save();
-    if (field === 'name') root.querySelector('#summary-name').textContent = sheet.name || 'Unnamed samurai';
     root.querySelector('.creator-print-sheet').outerHTML = renderPrintSheet(build());
   }
 
@@ -726,6 +733,7 @@
     external = shared;
     emphasisSkill = '';
     rollState = null;
+    xpAward = 0;
     root = element;
     root.onclick = onClick;
     root.onchange = onChange;

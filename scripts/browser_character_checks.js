@@ -72,10 +72,10 @@ async page => {
     check(await p.locator('[data-action="remove-training"]').count()===1,'First creation path cannot be removed');
     await p.locator('[data-action="remove-training"]').click();
     check(await p.locator('[data-action="remove-training"]').count()===0,'Creation path was not removed');
-    await p.locator('#advantage-select').selectOption('Large');await p.getByRole('button',{name:'Add',exact:true}).first().click();
+    await p.locator('#advantage-select').selectOption('Large');await p.locator('#creator-options').getByRole('button',{name:'Add',exact:true}).first().click();
     await p.locator('[data-action="reset-section"][data-section="options"]').click();
     check(await p.locator('output[data-kind="advantage"]').count()===0,'Options reset did not clear advantages');
-    await p.locator('#advantage-select').selectOption('Large');await p.getByRole('button',{name:'Add',exact:true}).first().click();
+    await p.locator('#advantage-select').selectOption('Large');await p.locator('#creator-options').getByRole('button',{name:'Add',exact:true}).first().click();
     check(await p.locator('output[data-kind="advantage"]').innerText()==='3','Clan discount not shown in editor');
     await p.getByRole('button',{name:'Increase Large cost',exact:true}).click();
     check(await p.locator('output[data-kind="advantage"]').innerText()==='4','Advantage plus button did not update cost');
@@ -150,8 +150,11 @@ async page => {
     check((await p.locator('.creator-overview').innerText()).includes('School Rank 2'),'School rank did not advance');
     await p.getByRole('button',{name:'Decrease Hida Bushi school rank',exact:true}).click();
     check((await p.locator('.creator-overview').innerText()).includes('School Rank 1'),'School rank correction failed');
-    await p.locator('#xp-award').fill('100');await p.locator('#xp-reason').fill('PRIVATE HISTORY EXPLANATION');
-    await p.getByRole('button',{name:'Add XP',exact:true}).click();
+    check(await p.locator('#xp-reason,#summary-name').count()===0,'Removed record identity or reason field remains');
+    await p.evaluate(()=>{for(let i=0;i<100;i++)document.querySelector('[data-action="xp-award-step"][data-delta="1"]').click();});
+    check(await p.locator('#xp-award').innerText()==='100','XP stepper did not update');
+    await p.locator('[data-action="award-xp"]').click();
+    check(await p.locator('#xp-award').innerText()==='0','XP stepper did not reset after Add');
     await p.getByRole('button',{name:'Increase Reflexes for 16 XP',exact:true}).click();
     await p.getByRole('button',{name:'Increase Reflexes for 20 XP',exact:true}).click();
     check(await p.getByRole('button',{name:'Increase Reflexes for 24 XP',exact:true}).isEnabled(),'Advancement rank still capped at 4');
@@ -162,7 +165,7 @@ async page => {
     check(exported.character.continuousEditor===true,'Continuous editor state missing');
     check(exported.character.startingXP===40,'Starting XP not exported');
     check(exported.derived.traits.Reflexes.rank===4,'Trait decrease did not restore Rank 4');
-    check(exported.character.progression.history.some(e=>e.explanation==='PRIVATE HISTORY EXPLANATION'),'XP award not retained');
+    check(exported.character.progression.history.some(e=>e.explanation==='XP added from character editor.'),'XP award not retained');
     check(exported.derived.combat.armorTN===30,'Equipped armor not calculated');
     await p.emulateMedia({media:'print'});
     check(await p.locator('.creator-print-sheet').isVisible(),'Owner print missing');
@@ -174,7 +177,7 @@ async page => {
     await p.waitForURL(/#\/create-character$/);
     await p.locator('#creator-rolls').waitFor();
     await p.locator('.creator-xp-history > summary').click();
-    check((await p.locator('.creator-xp-history').innerText()).includes('PRIVATE HISTORY EXPLANATION'),'Offline XP history lost on reload');
+    check((await p.locator('.creator-xp-history').innerText()).includes('XP added from character editor.'),'Offline XP history lost on reload');
     check(await p.locator('[data-field="notes"]').inputValue()==='OWNER PRIVATE NOTES\nSecond line','Offline notes lost');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
     return 'Character browser checks passed: default Rolls and all four roll targets, retained results, experimental redirect, editable starting XP, seven creation resets, rule popups, signed-out drafts, validation, section 01 XP awards, emphasis popup and trait segments, desktop/mobile, privacy, print/export and reload.';

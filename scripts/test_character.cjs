@@ -48,7 +48,6 @@ async function character(saved,preferences = {}) {
 
 test('Save PC preserves personal edits and closes the sheet to Characters',async()=>{
   const c=await character();
-  c.inputs['#summary-name']={textContent:''};
   c.inputs['.creator-print-sheet']={outerHTML:''};
   c.root.oninput({target:{dataset:{field:'name'},value:'Saved PC'}});
   c.root.oninput({target:{dataset:{field:'notes'},value:'Personal notes'}});
@@ -115,7 +114,7 @@ test('all Rolls hide filters start checked; weapon filter hides only zero ranks 
 
 test('the continuous editor adds XP before a school is chosen, persists awards, and permits ranks through 10',async()=>{
   const c=await character();
-  c.inputs['#xp-award']={value:'500'};
+  c.click({action:'xp-award-step',delta:'500'});
   c.click({action:'award-xp'});
   assert.equal((await c.data()).derived.xpRemaining,540);
   for(let i=0;i<9;i++)c.click({action:'trait',trait:'Strength',delta:'1'});
@@ -126,9 +125,14 @@ test('the continuous editor adds XP before a school is chosen, persists awards, 
   assert.equal(saved.derived.xpAwards,500);
   assert.equal(saved.derived.traits.Strength.rank,10);
   assert.equal(saved.character.progression.history[0].explanation,'XP added from character editor.');
-  restored.inputs['#xp-award']={value:'1.5'};
+  restored.click({action:'xp-award-step',delta:'1.5'});
   restored.click({action:'award-xp'});
   assert.equal((await restored.data()).derived.xpAwards,500);
+  restored.click({action:'xp-award-step',delta:'-2'});
+  assert.equal((await restored.data()).derived.xpAwards,500,'Stepper drafts must not award XP');
+  restored.click({action:'award-xp'});
+  assert.equal((await restored.data()).derived.xpAwards,498);
+  assert.match(restored.root.innerHTML,/<output[^>]*id="xp-award"[^>]*>0<\/output>/);
 });
 
 test('catalog emphasis choices charge once, persist, and refund when removed',async()=>{

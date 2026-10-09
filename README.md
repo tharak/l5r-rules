@@ -20,7 +20,7 @@ Each PC has seven **Public** checkboxes. Identity starts public; the other secti
 
 ## Character editor
 
-Characters use one editor with 40 starting XP by default. **Starting XP** changes the initial budget. **Add XP** beside the remaining-XP total records an award or correction at any time, with an optional session or reason. XP history remains private. There is no Creation/Advancement switch or separate advancement panel. Traits and Skills can reach Rank 10 in this editor. Existing saved advancement baselines and paid-cost histories are preserved; characters without a baseline continue to calculate purchases from their current selections.
+Characters use one editor with 40 starting XP by default. **Starting XP** changes the initial budget. The character record displays **XP: value**. A stepper and **Add** button below it record an award or correction at any time. XP history remains private. There is no Creation/Advancement switch or separate advancement panel. Traits and Skills can reach Rank 10 in this editor. Existing saved advancement baselines and paid-cost histories are preserved; characters without a baseline continue to calculate purchases from their current selections.
 
 Family and school bonuses appear in their dropdown choices. Required school choices appear directly in Skills or Abilities. Incomplete drafts remain saveable, with missing choices and eligibility messages in the relevant section. Previously saved table approvals remain attached to their sheets. Character rule links open in a popup without navigating away from the editor.
 
