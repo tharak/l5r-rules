@@ -46,6 +46,10 @@ test('bonuses apply to the original pool before the ten-dice conversion',()=>{
   assert.equal(skill.rollBase.rolled,11);
   assert.equal(skill.roll.notation,'10k6');
   assert.equal(D.adjustPool(skill.rollBase,{rolled:1}).notation,'10k7');
+  const initiative=R.calculate({modifiers:{initiativeRoll:10}},catalog).combat;
+  assert.equal(initiative.initiativeBase.rolled,13);
+  assert.equal(initiative.initiative.notation,'10k3');
+  assert.equal(D.adjustPool(initiative.initiativeBase,{rolled:1}).notation,'10k4');
 });
 
 test('zero dice and negative bonuses are valid, invalid die values are rejected, and random draws stay within d10',()=>{

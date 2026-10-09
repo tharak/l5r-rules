@@ -160,6 +160,7 @@
   .creator-value-tiles { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; border: 0; margin: 0; padding: 10px; }
   .creator-value-tiles > div { display: flex; align-items: baseline; padding: 8px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 12px; }
   .creator-value-tiles > div > strong { color: var(--ink); font-size: 12px; }
+  .creator-combat .creator-roll-skill { display: flex; align-items: baseline; gap: 4px; }
   .creator-wounds.creator-value-tiles > div > strong { margin-inline-start: .35em; }
   .creator-roll-wounds .creator-wounds [aria-current="true"] { background: var(--trait-heading); font-weight: 700; }
   .creator-roll-combat { margin-top: 18px; }
@@ -192,8 +193,9 @@
   #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
   #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
-  #creator-rolls .creator-ring-grid { grid-template-columns: repeat(auto-fit,minmax(min(44px,100%),1fr)); align-items: start; overflow-x: visible; padding-bottom: 0; }
+  #creator-rolls .creator-ring-grid { display: flex; flex-wrap: wrap; align-items: flex-start; overflow-x: visible; padding-bottom: 0; }
   #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 44px; width: 100%; justify-self: stretch; }
+  #creator-rolls .creator-ring-grid > .creator-ring { flex: 1 1 220px; width: auto; container-type: inline-size; }
   #creator-rolls .creator-ring-traits { display: grid; grid-template-columns: 1fr; align-items: start; }
   #creator-rolls .creator-ring-trait-column { display: grid; grid-template-columns: 124px minmax(0,1fr); min-width: 0; background: var(--trait-heading); }
   #creator-rolls .creator-trait-display { flex-direction: row; flex-wrap: nowrap; align-items: baseline; align-self: start; justify-content: flex-start; gap: 6px; }
@@ -241,8 +243,15 @@
     .creator-roll-dialog .creator-roll-fields output { min-width: 28px; padding: 0 3px; }
     .creator-roll-separator { font-size: 20px; }
   }
-  @media (max-width:700px) {
-    #creator-rolls .creator-ring-trait-column { grid-template-columns: max-content minmax(0,1fr); }
+  @container (max-width:360px) {
+    #creator-rolls .creator-ring-trait-column { grid-template-columns: minmax(0,1fr); }
+  }
+  @container (max-width:180px) {
+    #creator-rolls .creator-ring-head { flex-wrap: wrap; padding: 6px; }
+    #creator-rolls .creator-trait-display { flex-wrap: wrap; padding: 6px; }
+    #creator-rolls .creator-trait-display strong { white-space: normal; overflow-wrap: anywhere; }
+    #creator-rolls .creator-ring-skill-list { padding: 6px; }
+    #creator-rolls .creator-skill-row.creator-skill-compact { grid-template-columns: minmax(0,1fr); padding: 6px; }
   }
   .creator-page .creator-skill-values { flex: 0 1 auto; min-width: 0; max-width: 100%; }
   .creator-page .creator-skill-fixed-trait { width: auto; min-width: 65px; flex: none; }
@@ -288,9 +297,11 @@
   #creator-identity .creator-record-header .creator-summary-kicker { margin: 0; color: var(--red); font: 700 10px/1.4 var(--sans); letter-spacing: .18em; }
   #creator-identity .creator-summary .creator-section-title { justify-content: flex-start; }
   #creator-identity .creator-record-grid { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
-  #creator-identity .creator-record-group { min-width: 0; }
+  #creator-identity .creator-record-group { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; min-width: 0; }
   #creator-identity .creator-record-group > * { margin: 0; }
-  #creator-identity .creator-record-group .creator-standing-fields { margin-top: 18px; }
+  #creator-identity .creator-record-group .creator-xp { flex: 2 1 240px; min-width: 0; }
+  #creator-identity .creator-record-group .creator-standing-fields { display: contents; }
+  #creator-identity .creator-standing-fields > .creator-number-field { flex: 1 1 140px; }
   #creator-identity .creator-record-group .creator-derived, #creator-identity .creator-record-group .creator-summary-rings { display: grid; grid-template-columns: 1fr; }
   #creator-identity .creator-record-group .creator-derived > div { gap: 12px; }
   #creator-identity .creator-summary-rings > div { gap: 12px; }

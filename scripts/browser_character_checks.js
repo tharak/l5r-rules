@@ -34,7 +34,7 @@ async page => {
     check(await p.locator('#creator-summary [data-field="woundsTaken"]').count()===0,'Wounds stepper remains in Character Record');
     check(await p.locator('#creator-summary .creator-ledger-heading').count()===0,'Removed Character Record sections remain');
     check(await p.locator('#creator-rolls > .creator-roll-details > .creator-roll-wounds + .creator-roll-combat .creator-combat').count()===1,'Combat values must follow Wounds in section 00');
-    check((await p.locator('#creator-rolls .creator-combat > div > span').allTextContents()).join(',')==='Initiative roll,Armor TN (equipped),Healing / day,Reduction','Unexpected Combat values remain');
+    check((await p.locator('#creator-rolls .creator-combat > div span').allTextContents()).join(',')==='Initiative roll,Armor TN (equipped),Reduction','Unexpected Combat values remain');
     check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wounds > div').count()===9,'Nine wound statuses must appear below the stepper');
     check(await p.locator('#creator-rolls .creator-roll-wounds .creator-wound-status').innerText()==='Healthy (+0)','Wounds card must show the current status');
     check(await p.locator('#creator-rolls .creator-roll-wounds').evaluate(node=>getComputedStyle(node).getPropertyValue('--wound-hue').trim())==='120','Healthy wounds must use green');
@@ -42,7 +42,7 @@ async page => {
     check(await p.locator('.creator-page > h1,.creator-page > .creator-header').count()===0,'Removed Character heading remains');
     check(await p.locator('.creator-nav [data-action="save-close"],.creator-nav [data-action="export"],.creator-nav [data-action="print"]').count()===3,'Editor actions must be in section navigation');
     check(await p.locator('#creator-rolls .creator-roll-combat.creator-ring .creator-ring-head > strong').innerText()==='Combat values','Combat card header missing');
-    check(await p.locator('#creator-rolls .creator-combat.creator-value-tiles > div').count()===4,'Combat must use four shared value tiles');
+    check(await p.locator('#creator-rolls .creator-combat.creator-value-tiles > div').count()===3,'Combat must use three shared value tiles');
     check(await p.locator('#creator-rolls .creator-roll-wounds .creator-ring-head [data-field="woundsTaken"]').count()===2,'Wounds stepper must be in the header');
     check((await p.locator('#creator-rolls .creator-wounds > div').allTextContents()).join(',')==='Healthy (+0): 10,Nicked (+3): 14,Grazed (+5): 18,Hurt (+10): 22,Injured (+15): 26,Crippled (+20): 30,Down (+40): 34,Out: 38,Dead: 39','Wound penalties or values are missing');
     check(await p.locator('#creator-story .creator-standing-fields,#creator-story #creator-equipment').count()===0,'Story still contains standing or equipment');

@@ -269,7 +269,7 @@
   }
 
   function renderCombat(data) {
-    return `<div class="creator-roll-combat creator-ring"><div class="creator-ring-head"><strong>Combat values</strong></div><div class="creator-combat creator-value-tiles"><div><span>Initiative roll</span>: <strong>${data.combat.initiative.notation}</strong></div><div><span>Armor TN (equipped)</span>: <strong>${data.combat.armorTN}</strong></div><div><span>Healing / day</span>: <strong>${data.combat.healing}</strong></div><div><span>Reduction</span>: <strong>${data.combat.reduction}</strong></div></div></div>`;
+    return `<div class="creator-roll-combat creator-ring"><div class="creator-ring-head"><strong>Combat values</strong></div><div class="creator-combat creator-value-tiles"><div><button type="button" class="creator-roll-skill" data-action="open-roll" data-roll-kind="initiative" data-roll-name="Initiative" aria-label="Roll Initiative"><span>Initiative roll</span>: <strong>${data.combat.initiative.notation}</strong></button></div><div><span>Armor TN (equipped)</span>: <strong>${data.combat.armorTN}</strong></div><div><span>Reduction</span>: <strong>${data.combat.reduction}</strong></div></div></div>`;
   }
 
   function renderSummary(data) {
@@ -529,7 +529,10 @@
       const kind = button.dataset.rollKind, name = button.dataset.rollName;
       const data = build();
       let base, title, explodes = true;
-      if (kind === 'ring' || kind === 'trait') {
+      if (kind === 'initiative') {
+        base = data.combat.initiativeBase;
+        title = 'Initiative';
+      } else if (kind === 'ring' || kind === 'trait') {
         const rank = kind === 'ring' ? data.rings[name] : data.traits[name]?.rank;
         if (!rank) return true;
         base = {rolled:rank,kept:rank,bonus:0};
