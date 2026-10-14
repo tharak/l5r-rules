@@ -78,18 +78,13 @@ Web-only identities: 2. Full names and rule links are in the JSON report.
 
 Explicit title/spelling matches:
 
+- Row 5: Agasha → Agasha Kitsuki.
 - Row 25: Kitsu → Kitus.
 - Row 53: Basso → Basso (Shinmaki Sect].
 
 Differing comparable fields (row counts; prose and list differences require review):
 
-`clan`: 17, `demands`: 17, `description`: 24, `points`: 1.
-
-Value/label differences:
-
-| iOS row / item | Field | iOS | Web |
-| --- | --- | --- | --- |
-| 5 / Agasha | points | [11.0] | [6] |
+`clan`: 17, `demands`: 16, `description`: 24.
 
 ## Armors
 

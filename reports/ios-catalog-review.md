@@ -44,12 +44,37 @@ These are source disagreements or information losses. This comparison does not e
 | Strength Of Purity Style mastery | 4 | 3 |
 | As the Breakers mastery | 5 | 4 |
 | Perceived Honor cost metadata | 2 | 3 |
-| Agasha ancestor cost | 11 | 6 |
 | Riding Armor TN | [4, 12] | 4 |
 | Forest Killers starting Honor | 4.5 | 1.5 |
 | Fudoist Monks starting Honor | 1.5 or 4.5 | 1.5 |
 
 The armor builder explicitly reduces TN arrays to their first value. The current equipment calculation uses that scalar and has no mounted armor branch. Other conditional benefits may be recorded with manual modifiers; the alternative is no longer available as structured armor data.
+
+The initial audit's apparent **Agasha ancestor 11 vs 6** disagreement was an identity-matching error. The iOS row named `Agasha` actually contains Agasha Kitsuki's description and demands. It now maps explicitly to the web's `Agasha Kitsuki` entry, which also costs 11. The real Agasha founder (6, or 10 with Transmute in the web description) is a separate entry. The alias is conditional on the Kitsuki description so it will not remap a correctly labeled Agasha founder row.
+
+## Verification against the core rulebook and errata
+
+After receiving additional source explanations, these values were checked directly in the local `L5R Legend Of The Five Rings 4e - Core Rules.pdf`. Page numbers below are printed book numbers; PDF page positions are three pages later.
+
+| Entry | Directly observed rule | Core page |
+| --- | --- | ---: |
+| Phoenix Agasha family | +1 Perception | 123 |
+| Mantis Kitsune family | +1 Awareness | 120 |
+| Independent Fox Kitsune family | +1 Willpower | 219 |
+| Spider Chuda family | +1 Intelligence | 211 |
+| Original Snake Chuda family | +1 Strength | 224 |
+| Perceived Honor | 2 points per rank | 152 |
+| Strength of Purity Style | Void 4 | 260 |
+| As the Breakers | Water 5 (Atemi), Kharmic **kiho** | 265 |
+| Riding Armor | +4 TN; +12 on horseback | 198 |
+| Agasha Kitsuki ancestor | 11 points; founder of the Kitsuki family | 242 |
+| Forest Killers | Starting Honor 1.5 | 235 |
+
+The supplied explanation for **As the Breakers** conflated that kiho with a differently named kata. Its Water 5 requirement is directly present in the core rulebook and iOS JSON; it is not resolved by a Water 3 kata citation. Similarly, our Perceived Honor label explicitly says **3 points per rank**, so its disagreement with the core's 2 per rank is not a default selection of three ranks.
+
+An [archived reproduction of the 4E errata](https://ffg-forum-archive.entropicdreams.com/topic/247478-rpg-4th-ed-errata/) explicitly preserves the Fox/Mantis Kitsune distinction (core pages 120/219) and changes Intimidation's default Trait to Willpower (core page 145). This is a forum transcription of the errata, rather than the publisher-hosted original; the distinction in evidence is retained. It supports keeping the current Intimidation Trait.
+
+The historical Dragon Agasha explanation, supplementary book/page references for Forest Killers and the Fudoist Order, and the proposed cause of Forest Killers' incorrect value have not been verified against those printed supplements in this review. Forest Killers' Honor 1.5 is verified in the core book itself; the claim about how the iOS value became 4.5 remains an inference. Fudo's low/high Honor option is independently present in both our imported technique text and the iOS source. These observations update the audit; runtime rules are unchanged.
 
 Six school disciplines differ: Tsi Smith (Artisan/Bushi), Shiba Artisan (Artisan/Courtier), Kaiu Engineer (Artisan + Bushi/Bushi), Kakita Artisan (Artisan/Bushi), Kakita Master Artisan (Artisan/Bushi), and Daidoji Harriers (Ninja/Bushi). The builder guesses discipline from keywords in the title, which loses compound disciplines and Artisan designations. This can affect discipline-dependent option pricing.
 

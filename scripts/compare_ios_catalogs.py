@@ -276,6 +276,10 @@ def wiki_evidence(name, pages):
 def match_entry(category, source, targets):
     aliases = ALIASES.get(category, {})
     label = aliases.get(source["name"], source["name"])
+    # The iOS Agasha row actually contains Kitsuki's description and demands.
+    # Scope the correction to that content so a real Agasha row remains distinct.
+    if category == "Ancestors" and source["name"] == "Agasha" and re.search(r"founder of the Kitsuki family", source.get("description", ""), re.I):
+        label = "Agasha Kitsuki"
     # Owl reuses Imperial family names for distinct schools.
     if category == "Schools" and source.get("clan") == "Owl" and source["name"] == "Seppun Shugenja":
         label = "Seppun Shugenja (Owl)"

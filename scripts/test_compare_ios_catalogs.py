@@ -37,6 +37,14 @@ class CatalogAuditTests(unittest.TestCase):
                                        [school("Chuda Shugenja", "Spider")])
         self.assertEqual(matches, [])
 
+    def test_mislabeled_agasha_ancestor_is_matched_by_verified_identity(self):
+        targets = [{"name": name, "id": name} for name in ["Agasha", "Agasha Kitsuki"]]
+        matches, method = audit.match_entry("Ancestors", {"name": "Agasha", "description": "The founder of the Kitsuki family originated the Kitsuki Method."}, targets)
+        self.assertEqual(matches[0]["name"], "Agasha Kitsuki")
+        self.assertEqual(method, "explicit_alias")
+        matches, _ = audit.match_entry("Ancestors", {"name": "Agasha", "description": "The founder of the Agasha family."}, targets)
+        self.assertEqual(matches[0]["name"], "Agasha")
+
     def test_advanced_flag_resolves_path_and_advanced_school_collision(self):
         targets = [school("Disciples of Sun Tao", "Ronin", location=kind) for kind in ["path", "advanced"]]
         targets[0]["anchor"] = "path"

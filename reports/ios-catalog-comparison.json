@@ -2060,8 +2060,7 @@
       "matched_rows_with_differences": 42,
       "difference_counts_by_field": {
         "description": 24,
-        "demands": 17,
-        "points": 1,
+        "demands": 16,
         "clan": 17
       },
       "source_fields": {
@@ -2195,23 +2194,13 @@
           "name": "Agasha",
           "clan": "Dragon",
           "status": "matched",
-          "match_method": "name",
+          "match_method": "explicit_alias",
           "web": {
-            "name": "Agasha",
-            "identity": "ancestor:ancestors:Agasha",
+            "name": "Agasha Kitsuki",
+            "identity": "ancestor:ancestors:Agasha Kitsuki",
             "rule_link": "/#/ancestors#toc2"
           },
           "differences": [
-            {
-              "field": "points",
-              "kind": "value",
-              "ios": [
-                11.0
-              ],
-              "web": [
-                6
-              ]
-            },
             {
               "field": "description",
               "kind": "text",
@@ -2221,16 +2210,10 @@
                 "sha256": "67c718bd742dd5b2d6a5f01088e43364dbc7214e002fbf0e6e2a98e433d43cbf"
               },
               "web": {
-                "excerpt": "The founder of the Agasha family was an isolated researcher who studied the Elements and learned their secrets. Although much of her family joined the Phoenix, she remains loyal to the Dragon and appears only to those of her descendents found within that clan. Agasha's insights into the true nature of the Elements grant you a +1k0 bonus to Spell Casting Rolls with non-Void spells and +1k1 bonus to all Spellcraft Skill Rolls. If you spend spend 10 points on Agasha as an Ancestor, you are one of h",
-                "characters": 568,
-                "sha256": "415cb9e4a5e96c535e9669a51020050621d38aeb9edbcc58a8bee89de5a07810"
+                "excerpt": "The founder of the Kitsuki family originated the concept of the controversial \"Kitsuki Method,\" which uses logical deduction and inference to solve crimes. Those who have his guidance gain the ability to \"read\" others and pick up on subtle, hidden clues in an uncanny, almost supernatural manner that many samurai find disturbing. When you have Kitsuki's guidance, you may use your Perception Trait for any Skill or Trait roll that would normally require you to use your Awareness Trait. Furthermore,",
+                "characters": 637,
+                "sha256": "540876bcd75fe736af725a80a30a749e6bf79fb5204fcfb3a52cea791f41b8d7"
               }
-            },
-            {
-              "field": "demands",
-              "kind": "text",
-              "ios": "Kitsuki requires you to always pursue the truth.\n If you ever accept a solution to a problem, crime, or puzzle that you know or sincerely believe to be false, Kitsuki will abandon you.",
-              "web": "Agasha was a pacifist, and if you ever serve in war she will abandon you. However, she was once kidnapped by goblins, so she will not abandon a descendent who wages war against the Shadowlands (only)."
             }
           ],
           "not_standalone_fields": [],
@@ -3692,8 +3675,8 @@
       ],
       "web_only": [
         {
-          "name": "Agasha Kitsuki",
-          "identity": "ancestor:ancestors:Agasha Kitsuki",
+          "name": "Agasha",
+          "identity": "ancestor:ancestors:Agasha",
           "rule_link": "/#/ancestors#toc2"
         },
         {
