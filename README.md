@@ -91,6 +91,8 @@ The predeploy build copies an explicit web-asset list and sanitizes imported sou
 
 ## Refreshing books
 
+Applicable official fourth-edition errata takes priority over conflicting printed rules, iOS JSON data, and wiki content. Use the latest applicable official correction and retain its reference when reconciling discrepancies, while preserving clan- and era-specific variants.
+
 The [iOS catalog audit](reports/ios-catalog-comparison.md) compares every row in all 14 resource JSON files with the web catalog. [Reviewed findings](reports/ios-catalog-review.md) explain confirmed import defects and source disagreements. To refresh the inventory, run `python3 scripts/compare_ios_catalogs.py --ios-resources /path/to/LegendOfTheFiveRings/Sources/LegendOfTheFiveRings/Resources --source-revision COMMIT_SHA`. Run its checks with `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_compare_ios_catalogs.py`. The audit writes reports and leaves runtime data unchanged.
 
 `scripts/import_wiki.py` refreshes `public/wiki.json` and assets. `scripts/build_character_data.py` derives the creator catalog. Both require Beautiful Soup 4. Pass `--core-resources /path/to/LegendOfTheFiveRings/Sources/LegendOfTheFiveRings/Resources` to refresh reusable weapon, armor, and skill mastery catalogs from the older core library; without this argument the checked-in supplemental catalogs are retained. Calculations were verified against the printed fourth-edition core rules rather than copied from that library. After importing, retain source attribution in `ATTRIBUTION.md`; the build removes source metadata, localizes available article links, and preserves the text of other outbound links. Imported content is a snapshot and does not automatically refresh.

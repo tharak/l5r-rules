@@ -54,6 +54,8 @@ The initial audit's apparent **Agasha ancestor 11 vs 6** disagreement was an ide
 
 ## Verification against the core rulebook and errata
 
+**Source priority:** applicable official fourth-edition errata overrides conflicting printed rules, iOS JSON data, and wiki content. Use the latest applicable official correction and record its reference. A printed core value remains subject to errata; clan- and era-specific variants remain distinct unless an applicable correction says otherwise.
+
 After receiving additional source explanations, these values were checked directly in the local `L5R Legend Of The Five Rings 4e - Core Rules.pdf`. Page numbers below are printed book numbers; PDF page positions are three pages later.
 
 | Entry | Directly observed rule | Core page |
@@ -93,7 +95,7 @@ The source also contains misspellings such as `Mantsi`/`Matnis` for Mantis and `
 ## Suggested reconciliation order
 
 1. Correct demonstrated import boundary/header failures: universal spells, the five Earth kata, The Mending Forge and spelled-out technique ranks. This recovers existing reference content without choosing between conflicting rules.
-2. Compare conflicting bonuses, costs, disciplines and mastery values with the intended edition/source before changing them. Restore conditional values without reducing them to a single scalar.
+2. Resolve conflicting bonuses, costs, disciplines and mastery values using applicable official fourth-edition errata first, then the relevant printed rules where errata does not settle the issue. Record the source and preserve clan/era distinctions. Restore conditional values without reducing them to a single scalar.
 3. Use normalized iOS JSON as an input for supported character catalogs, with explicit conflict decisions, retained source identifiers and web-only supplementary entries.
 4. Handle Name magic, Tsuno systems, nonstandard skills and True Ronin packages according to the character builder's intended scope, rather than treating every missing selector as the same kind of defect.
 
