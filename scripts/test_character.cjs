@@ -527,6 +527,32 @@ test('macro skill popup buys separate catalog and custom subskills, avoids dupli
   assert.equal((await (await c.reload()).data()).derived.skills['Lore: Local legends'].rank,1);
 });
 
+test('section 03 filters independently hide rank zero and macro skills, retain trained skills, and persist',async()=>{
+  const c=await character({skills:{Courtier:2,'Lore: History':1,Kenjutsu:1}});
+  const before=await c.data(),rolls=sectionHtml(c,'rolls');
+  const rows=()=>sectionHtml(c,'skills');
+  const has=name=>rows().includes(`data-skill-name="${name}"`);
+  const toggle=(macro,checked)=>c.root.onchange({target:{dataset:{skillFilterView:'skills',[macro?'hideZeroMacroSkills':'hideZeroSkills']:''},checked}});
+  assert.match(rows(),/data-hide-zero-skills="true">Hide 0 rank skills/);
+  assert.match(rows(),/data-hide-zero-macro-skills="true">Hide macro-skills 0/);
+  for(const [hideZero,hideMacro] of [[false,true],[true,false],[true,true],[false,false]]) {
+    toggle(false,hideZero);toggle(true,hideMacro);
+    for(const name of ['Courtier','Lore','Lore: History','Kenjutsu'])assert.ok(has(name),name);
+    assert.equal(has('Defense'),!hideZero);
+    for(const name of ['Craft','Weapons','Heavy Weapons'])assert.equal(has(name),!hideZero&&!hideMacro,name);
+    assert.equal(sectionHtml(c,'rolls'),rolls);
+  }
+  toggle(false,true);toggle(true,true);
+  const reloaded=await c.reload();
+  assert.match(sectionHtml(reloaded,'skills'),/data-hide-zero-skills="true" checked/);
+  assert.match(sectionHtml(reloaded,'skills'),/data-hide-zero-macro-skills="true" checked/);
+  assert.deepEqual((await reloaded.data()).character,before.character);
+  assert.deepEqual((await reloaded.data()).derived,before.derived);
+  const empty=await character();
+  empty.root.onchange({target:{dataset:{skillFilterView:'skills',hideZeroSkills:''},checked:true}});
+  assert.match(sectionHtml(empty,'skills'),/No skills match these filters/);
+});
+
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
   const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
   let d=(await c.data()).derived;

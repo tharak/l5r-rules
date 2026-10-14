@@ -20,6 +20,10 @@
   let remoteRefreshPending = false;
   let hideRankZeroSkills = true;
   let hideRankZeroMacroSkills = true;
+  let hideRankZeroEditorSkills = false;
+  let hideRankZeroEditorMacroSkills = false;
+  const EDITOR_SKILL_FILTER_KEY = 'l5r-rules-character-skills-hide-rank-zero-v1';
+  const EDITOR_MACRO_SKILL_FILTER_KEY = 'l5r-rules-character-skills-hide-zero-macro-skills-v1';
   // Start the updated filters checked, then retain subsequent user choices.
   const SKILL_FILTER_KEY = 'l5r-rules-character-rolls-hide-rank-zero-v2';
   const MACRO_SKILL_FILTER_KEY = 'l5r-rules-character-rolls-hide-zero-macro-skills-v1';
@@ -166,8 +170,9 @@
     return UI.recordRow({attrs:{'class':'creator-skill-row','data-ring':ring,'data-skill-name':name},bodyHtml:`<div><div class="creator-skill-label">${renderSkillName(name,skill)}${detail?`<small>${escapeHtml(detail)}</small>`:''}</div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.length?UI.disclosure({attrs:{class:'creator-skill-masteries',id:`skill-masteries-${encodeURIComponent(name)}`},titleHtml:'Mastery benefits',bodyHtml:skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}):''}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}${UI.button({text:'+emphasis',size:'compact',attrs:{'class':'creator-add-emphasis','data-action':'open-emphases','data-skill-view':view,'data-skill':name,'aria-label':`Add emphasis for ${name}`,'disabled':!(skill.rank)}})}</div>`});
   }
 
-  function renderSkillFilter() {
-    return `<div class="creator-skill-filters">${UI.checkbox({label:'Hide 0 rank skills',attrs:{'type':'checkbox','data-hide-zero-skills':true,'checked':hideRankZeroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}${UI.checkbox({label:'Hide macro-skills 0',attrs:{'type':'checkbox','data-hide-zero-macro-skills':true,'checked':hideRankZeroMacroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}</div>`;
+  function renderSkillFilter(view = 'rolls') {
+    const editor = view === 'skills', attrs = editor ? {'data-skill-filter-view':'skills'} : {};
+    return `<div class="creator-skill-filters">${UI.checkbox({label:'Hide 0 rank skills',attrs:{'type':'checkbox',...attrs,'data-hide-zero-skills':true,'checked':editor?hideRankZeroEditorSkills:hideRankZeroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}${UI.checkbox({label:'Hide macro-skills 0',attrs:{'type':'checkbox',...attrs,'data-hide-zero-macro-skills':true,'checked':editor?hideRankZeroEditorMacroSkills:hideRankZeroMacroSkills},labelAttrs:{'class':'creator-check creator-skill-filter'}})}</div>`;
   }
 
   function isMacroSkill(name) {
@@ -188,10 +193,13 @@
   function renderSkills(data) {
     const {suggestions} = skillOptions();
     const skills = R.calculate(sheet,catalog,{untrainedSkills:catalog.skills.map(skill=>skill.name).filter(name=>!C.requiresSkillSubtype(name))}).skills;
-    const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>!C.requiresSkillSubtype(name)||C.MACRO_SKILLS.includes(name)).sort((a,b)=>a.localeCompare(b));
+    const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>{
+      const trained = skills[name]?.rank > 0 || (C.requiresSkillSubtype(name) && Object.entries(skills).some(([subskill,skill])=>subskill.startsWith(name+': ') && skill.rank > 0));
+      return trained || (!hideRankZeroEditorSkills && !(hideRankZeroEditorMacroSkills && isMacroSkill(name)));
+    }).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
     const choicesComplete = choices.every((choice,index) => sheet.schoolChoices[index]?.trim() && !data.skillChoiceErrors[index]);
-    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">No skills match these filters. Uncheck a filter to show more skills.</div>'}`});
   }
 
   function renderMacroSkill(name) {
@@ -737,6 +745,15 @@
 
   function onChange(event) {
     if (event.target.id === 'new-skill') return;
+    if (event.target.dataset.skillFilterView === 'skills') {
+      const macro = event.target.dataset.hideZeroMacroSkills !== undefined;
+      if (macro) hideRankZeroEditorMacroSkills = event.target.checked;
+      else hideRankZeroEditorSkills = event.target.checked;
+      try { localStorage.setItem(macro?EDITOR_MACRO_SKILL_FILTER_KEY:EDITOR_SKILL_FILTER_KEY,String(event.target.checked)); } catch {}
+      render();
+      root.querySelector(`#creator-skills [data-hide-zero-${macro?'macro-skills':'skills'}]`)?.focus();
+      return;
+    }
     if (event.target.dataset.hideZeroMacroSkills !== undefined) {
       hideRankZeroMacroSkills = event.target.checked;
       try { localStorage.setItem(MACRO_SKILL_FILTER_KEY,String(hideRankZeroMacroSkills)); } catch {}
@@ -789,6 +806,12 @@
 
   async function mount(element, shared = null) {
     remoteRefreshPending = false;
+    hideRankZeroEditorSkills = false;
+    hideRankZeroEditorMacroSkills = false;
+    try {
+      hideRankZeroEditorSkills = localStorage.getItem(EDITOR_SKILL_FILTER_KEY) === 'true';
+      hideRankZeroEditorMacroSkills = localStorage.getItem(EDITOR_MACRO_SKILL_FILTER_KEY) === 'true';
+    } catch {}
     hideRankZeroSkills = true;
     try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
     hideRankZeroMacroSkills = true;

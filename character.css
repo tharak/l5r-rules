@@ -332,6 +332,7 @@
 }
 
 @media screen {
+  #creator-skills .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
   #creator-skills .creator-skill-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(280px,100%),1fr)); gap: 8px; border: 0; background: transparent; }
   #creator-skills .creator-skill-grid .creator-skill-row { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 3px; }
   #creator-skills .creator-skill-grid .creator-skill-row > div:first-child { flex: none; max-width: 100%; }

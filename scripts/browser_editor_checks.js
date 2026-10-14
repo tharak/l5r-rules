@@ -57,6 +57,18 @@ async page => {
     await p.getByRole('button',{name:'Choose Lore subskill',exact:true}).click();
     await p.keyboard.press('Escape');
     check(await p.getByRole('button',{name:'Choose Lore subskill',exact:true}).evaluate(node=>node===document.activeElement),'Escape did not restore popup trigger focus');
+    const zeroFilter=p.locator('#creator-skills').getByRole('checkbox',{name:'Hide 0 rank skills',exact:true});
+    const macroFilter=p.locator('#creator-skills').getByRole('checkbox',{name:'Hide macro-skills 0',exact:true});
+    await macroFilter.check();
+    check(await p.locator('#creator-skills [data-skill-name="Craft"]').count()===0,'Macro filter leaves untrained macro skills visible');
+    check(await p.locator('#creator-skills [data-skill-name="Defense"]').count()===1,'Macro filter hides ordinary skills');
+    check(await p.getByRole('button',{name:'Choose Lore subskill',exact:true}).count()===1,'Macro filter hides a trained category picker');
+    await zeroFilter.check();
+    check(await zeroFilter.evaluate(node=>node===document.activeElement),'Toggling the filter lost keyboard focus');
+    check(await p.locator('#creator-skills [data-skill-name="Defense"]').count()===0,'Rank zero filter leaves untrained skills visible');
+    check(await p.locator('#creator-skills [data-skill-name="Courtier"]').count()===1,'Rank zero filter hides trained skills');
+    check(await p.locator('#creator-rolls [data-hide-zero-skills]').isChecked(),'Section 03 changed the Rolls filter');
+    await zeroFilter.uncheck();await macroFilter.uncheck();
     for (const width of [1440,390]) {
       await p.setViewportSize({width,height:1000});
       const layout=await p.locator('.creator-skill-grid').evaluate(node=>({columns:getComputedStyle(node).gridTemplateColumns.split(' ').length,overflow:document.documentElement.scrollWidth>innerWidth}));
