@@ -12,10 +12,12 @@
   const blank = () => R.normalize();
   let uiError = '';
   let emphasisSkill = '';
+  let macroSkill = '';
   let emphasisView = 'skills';
   let rollState = null;
   let xpAward = 0;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
+  let remoteRefreshPending = false;
   let hideRankZeroSkills = true;
   let hideRankZeroMacroSkills = true;
   // Start the updated filters checked, then retain subsequent user choices.
@@ -144,7 +146,7 @@
   }
 
   function renderSkillRank(name,skill) {
-    const control = UI.stepper({value:skill.rank,attrs:{'aria-label':`${name} rank`},outputAttrs:{'aria-label':`${name} rank`},decrease:{'data-action':'skill','data-skill':name,'data-delta':'-1','disabled':skill.rank <= skill.base,'aria-label':`Decrease ${name}`},increase:{'data-action':'skill','data-skill':name,'data-delta':'1','aria-label':`Increase ${name} for ${skill.rank + 1} XP`}});
+    const control = UI.stepper({value:skill.rank,size:'compact',attrs:{'aria-label':`${name} rank`},outputAttrs:{'aria-label':`${name} rank`},decrease:{'data-action':'skill','data-skill':name,'data-delta':'-1','disabled':skill.rank <= skill.base,'aria-label':`Decrease ${name}`},increase:{'data-action':'skill','data-skill':name,'data-delta':'1','aria-label':`Increase ${name} for ${skill.rank + 1} XP`}});
     return control;
   }
 
@@ -161,7 +163,7 @@
     if (view === 'rings') return renderCompactSkillRow(name,skill);
     const ring = TRAIT_GROUPS.find(group=>group.traits.includes(skill.trait))?.ring || '';
     const detail=[skill.base?'':skill.rank?'Purchased skill':'Untrained · Rank 0',skill.cost?`${skill.cost} XP spent`:'',skill.notes || ''].filter(Boolean).join(' · ');
-    return UI.recordRow({attrs:{'class':'creator-skill-row','data-ring':ring,'data-skill-name':name},bodyHtml:`<div><div class="creator-skill-label">${renderSkillName(name,skill)}${detail?`<small>${escapeHtml(detail)}</small>`:''}</div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}${UI.button({text:'+emphasis',attrs:{'class':'creator-add-emphasis','data-action':'open-emphases','data-skill-view':view,'data-skill':name,'aria-label':`Add emphasis for ${name}`,'disabled':!(skill.rank)}})}</div>`});
+    return UI.recordRow({attrs:{'class':'creator-skill-row','data-ring':ring,'data-skill-name':name},bodyHtml:`<div><div class="creator-skill-label">${renderSkillName(name,skill)}${detail?`<small>${escapeHtml(detail)}</small>`:''}</div>${skill.emphases.length ? `<p class="creator-skill-emphases">Emphasis: ${escapeHtml(skill.emphases.join(', '))}</p>` : ''}${skill.masteries.length?UI.disclosure({attrs:{class:'creator-skill-masteries',id:`skill-masteries-${encodeURIComponent(name)}`},titleHtml:'Mastery benefits',bodyHtml:skill.masteries.map(m=>`<p class="creator-mastery">Rank ${m.rank}: ${escapeHtml(m.description)}</p>`).join('')}):''}</div><div class="creator-skill-values">${renderSkillRoll(name,skill,view)}${renderSkillRank(name,skill)}${UI.button({text:'+emphasis',size:'compact',attrs:{'class':'creator-add-emphasis','data-action':'open-emphases','data-skill-view':view,'data-skill':name,'aria-label':`Add emphasis for ${name}`,'disabled':!(skill.rank)}})}</div>`});
   }
 
   function renderSkillFilter() {
@@ -185,11 +187,28 @@
 
   function renderSkills(data) {
     const {suggestions} = skillOptions();
-    const skills = data.skills;
-    const names = Object.keys(skills).sort((a,b)=>a.localeCompare(b));
+    const skills = R.calculate(sheet,catalog,{untrainedSkills:catalog.skills.map(skill=>skill.name).filter(name=>!C.requiresSkillSubtype(name))}).skills;
+    const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>!C.requiresSkillSubtype(name)||C.MACRO_SKILLS.includes(name)).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
     const choicesComplete = choices.every((choice,index) => sheet.schoolChoices[index]?.trim() && !data.skillChoiceErrors[index]);
-    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${names.length ? `<div class="creator-skill-list"><div class="creator-skill-table-head"><span>Skill name</span><span>Trait · Roll · Rank</span></div>${names.map(name=>renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin.</div>'}`});
+  }
+
+  function renderMacroSkill(name) {
+    return UI.recordRow({attrs:{class:'creator-skill-row creator-macro-skill','data-skill-name':name},bodyHtml:`<div class="creator-skill-label"><strong>${escapeHtml(name)}</strong><small>Each subskill has its own rank.</small></div>${UI.button({text:'Choose subskill',variant:'secondary',attrs:{'data-action':'open-subskills','data-skill':name,'aria-label':`Choose ${name} subskill`}})}`});
+  }
+
+  function renderSubskills() {
+    const skills = build().skills;
+    const names = skillOptions().suggestions.filter(name=>name.startsWith(macroSkill+': '));
+    return UI.dialog({title:`${macroSkill} · Choose subskill`,titleId:'subskill-dialog-title',attrs:{class:'creator-subskill-dialog'},bodyClass:'creator-subskill-body',bodyHtml:`<p>Choose a subskill to buy Rank 1 for 1 XP.</p><div class="creator-subskill-choices">${names.map(name=>UI.button({text:`${name.slice(macroSkill.length+2)}${skills[name]?.rank?` · Rank ${skills[name].rank}`:''}`,variant:'secondary',attrs:{'data-action':'choose-subskill','data-skill':name,disabled:!!skills[name]?.rank}})).join('')}</div>${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:`${UI.field({label:'Custom subskill',attrs:{id:'custom-subskill',placeholder:`Another ${macroSkill.toLowerCase()} subskill`}})}${UI.button({text:'Add subskill · 1 XP',attrs:{'data-action':'choose-subskill'}})}`})}`,footerHtml:UI.button({text:'Close',variant:'secondary',attrs:{'data-action':'close-subskills','aria-label':'Close subskill choices'}})});
+  }
+
+  function closeSubskills() {
+    const name = macroSkill;
+    macroSkill = '';
+    render();
+    root.querySelector(`[data-action="open-subskills"][data-skill=${JSON.stringify(name)}]`)?.focus();
   }
 
   function renderOptionChoice(kind,entry,index) {
@@ -478,9 +497,14 @@
 
   function render() {
     if (!root?.isConnected || !catalog || (!external && !editorRoute())) return;
-    const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
+    const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.id || d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
-    root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${rollState?renderRollDialog():''}</div>`;
+    root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${macroSkill?renderSubskills():''}${rollState?renderRollDialog():''}</div>`;
+    const subskillDialog = root.querySelector('.creator-subskill-dialog');
+    if (subskillDialog) {
+      subskillDialog.oncancel = event => { event.preventDefault(); closeSubskills(); };
+      subskillDialog.showModal();
+    }
     const rollDialog = root.querySelector('.creator-roll-dialog');
     if (rollDialog) {
       rollDialog.oncancel = event => { event.preventDefault(); closeRoll(); };
@@ -491,7 +515,7 @@
       emphasisDialog.oncancel = event => { event.preventDefault(); closeEmphases(); };
       emphasisDialog.showModal();
     }
-    if (root.querySelectorAll) for (const details of root.querySelectorAll('details')) if(openDetails.includes(details.querySelector('summary')?.textContent?.split(' ·')[0])) details.open=true;
+    if (root.querySelectorAll) for (const details of root.querySelectorAll('details')) if(openDetails.includes(details.id || details.querySelector('summary')?.textContent?.split(' ·')[0])) details.open=true;
     const visibility = window.SheetSharing?.visibility(sheet) || sheet.visibility;
     if (visibility && root.querySelectorAll) {
       const ids = {identity:'creator-identity',traits:'creator-traits',skills:'creator-skills',options:'creator-options',story:'creator-story',summary:'creator-summary',abilities:'creator-abilities'};
@@ -592,6 +616,18 @@
     if (!button) return;
     const action = button.dataset.action;
     if (handleRollAction(action,button)) return;
+    if (action === 'open-subskills') {
+      if (!C.MACRO_SKILLS.includes(button.dataset.skill)) return;
+      macroSkill = button.dataset.skill; uiError = ''; render(); return;
+    }
+    if (action === 'close-subskills') { closeSubskills(); return; }
+    if (action === 'choose-subskill') {
+      if (!macroSkill) return;
+      const name = skillIdentity(button.dataset.skill || `${macroSkill}: ${read('#custom-subskill')}`).name;
+      if (!name.startsWith(macroSkill+': ') || C.requiresSkillSubtype(name)) return;
+      if (!build().skills[name]?.rank) sheet.skills[name] = 1;
+      save(); closeSubskills(); return;
+    }
     if (action === 'xp-award-step') {
       const delta=Number(button.dataset.delta), next=xpAward+delta;
       if (!Number.isSafeInteger(delta) || !Number.isSafeInteger(next)) return;
@@ -641,7 +677,8 @@
       if (Number(button.dataset.delta) > 0) sheet.traitBuys[trait] = (Number(sheet.traitBuys[trait]) || 0) + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) sheet.traitBuys[trait] = Math.max(0,(Number(sheet.traitBuys[trait]) || 0) - 1);
     } else if (action === 'skill') {
-      const name = button.dataset.skill, current = build().skills[name];
+      const name = button.dataset.skill, current = R.calculate(sheet,catalog,{untrainedSkills:[name]}).skills[name];
+      if (C.requiresSkillSubtype(name)) return;
       if (!current) return;
       if (Number(button.dataset.delta) > 0) sheet.skills[name] = current.rank + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) {
@@ -656,12 +693,7 @@
       const name = skillIdentity(root.querySelector('#new-skill').value).name;
       if (!name) return;
       if (C.requiresSkillSubtype(name)) {
-        uiError = 'Choose a macro-skill subtype, such as Lore: History or Games: Go.';
-        render();
-        const input = root.querySelector('#new-skill');
-        input.value = name;
-        input.focus?.();
-        return;
+        macroSkill = name.split(':')[0].trim(); render(); return;
       }
       if (build().skills[name]) return;
       sheet.skills[name] = Math.max(1, Number(sheet.skills[name]) || 0);
@@ -756,6 +788,7 @@
   }
 
   async function mount(element, shared = null) {
+    remoteRefreshPending = false;
     hideRankZeroSkills = true;
     try { hideRankZeroSkills = localStorage.getItem(SKILL_FILTER_KEY) !== 'false'; } catch {}
     hideRankZeroMacroSkills = true;
@@ -769,12 +802,17 @@
     } catch {}
     external = shared;
     emphasisSkill = '';
+    macroSkill = '';
     rollState = null;
     xpAward = 0;
     root = element;
     root.onclick = onClick;
     root.onchange = onChange;
     root.oninput = onInput;
+    root.onfocusout = () => {
+      // Wait for focus to reach the next control before applying a remote update.
+      if (remoteRefreshPending) setTimeout(refreshRemoteSheet,0);
+    };
     sheet = R.normalize(shared ? shared.sheet : loadSheet());
     try {
       catalogPromise ||= fetch('public/character-data.json').then(response => {
@@ -805,12 +843,27 @@
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
   window.CharacterBuilder = { mount, list, create, open, remove, read:readRecord, sections, normalize:R.normalize };
-  window.addEventListener?.('characters-remote-changed', () => {
-    if (root?.isConnected && editorRoute()) {
-      if (!roster().some(record => record.id === activeId)) { location.hash = '#/start'; return; }
-      if (external) return;
-      sheet = loadSheet(); render();
+  const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
+  function refreshRemoteSheet() {
+    if (!root?.isConnected || !editorRoute() || external) return;
+    const record = roster().find(record => record.id === activeId);
+    if (!record) { remoteRefreshPending = false; location.hash = '#/start'; return; }
+    const next = R.normalize(record.sheet);
+    // Cloud echoes can reorder object keys or update another character. Neither
+    // should replace the editor, its unsaved picker values, or the focused field.
+    if (sheetFingerprint(next) === sheetFingerprint(sheet)) { remoteRefreshPending = false; return; }
+    const focused = document.activeElement;
+    if (focused && root.contains?.(focused) && ['INPUT','TEXTAREA','SELECT'].includes(focused.tagName)) {
+      remoteRefreshPending = true;
+      return;
     }
+    remoteRefreshPending = false;
+    sheet = next;
+    render();
+  }
+  window.addEventListener?.('characters-remote-changed', () => {
+    refreshRemoteSheet();
     window.dispatchEvent(new Event('characters-changed'));
   });
   window.addEventListener?.('campaigns-changed', () => {

@@ -16,21 +16,33 @@ async function character(saved,preferences = {}) {
   }
   const inputs = {};
   const root = {isConnected:true, innerHTML:'', querySelector:selector => inputs[selector]};
+  let renders = 0, html = '';
+  Object.defineProperty(root,'innerHTML',{get:()=>html,set:value=>{html=value;renders++;}});
+  root.contains = node => Object.values(inputs).includes(node);
   let exported;
-  const window = {dispatchEvent(){}};
+  const listeners = {}, timers = [];
+  const window = {addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent:event=>listeners[event.type]?.(event)};
+  const document = {activeElement:null,createElement:() => ({click(){}})};
   const context = vm.createContext({window, console, Event, Blob,
     localStorage:{getItem:key => storage.get(key) || null, setItem:(key,value) => storage.set(key,value)},
     location:{hash:'#/create-character'},
     fetch:async () => ({ok:true, json:async () => catalog}),
     URL:{createObjectURL(blob){exported = blob; return 'blob:test';}, revokeObjectURL(){}},
-    document:{createElement:() => ({click(){}})}, setTimeout(){}});
+    document, setTimeout:fn=>timers.push(fn)});
   for (const file of ['ui-components.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
   const change = (dataset,value) => root.onchange({target:{dataset,value}});
   const click = dataset => root.onclick({target:{closest:() => ({dataset})}});
   return {
-    root, inputs, change, click, window,
+    root, inputs, change, click, window, document,
+    renders:()=>renders,
+    records:()=>JSON.parse(storage.get('l5r-rules-characters-v1')),
+    remote(records) {
+      storage.set('l5r-rules-characters-v1',JSON.stringify(records));
+      window.dispatchEvent(new Event('characters-remote-changed'));
+    },
+    focusout() {root.onfocusout();while(timers.length)timers.shift()();},
     route:() => context.location.hash,
     school(clan,name) {
       change({field:'clan'},clan);
@@ -45,6 +57,52 @@ async function character(saved,preferences = {}) {
     }
   };
 }
+
+test('save echoes and updates to other characters leave the editor and picker drafts intact',async()=>{
+  const c=await character({name:'Active'});
+  const count=c.renders();
+  const records=c.records();
+  // Firestore returns visibility maps in a different property order.
+  records[0].sheet.visibility={abilities:false,identity:true,options:false,skills:false,story:false,summary:false,traits:false};
+  records[0].updatedAt='2026-10-14T20:00:00Z';
+  records.push({id:'other',sheet:{name:'Another PC'}});
+  c.inputs['#new-skill']={tagName:'INPUT',value:'Lore: Unfinished'};
+  c.document.activeElement=c.inputs['#new-skill'];
+  c.remote(records);
+  assert.equal(c.renders(),count);
+  c.document.activeElement=null;c.focusout();
+  assert.equal(c.renders(),count);
+  assert.equal(c.inputs['#new-skill'].value,'Lore: Unfinished');
+});
+
+test('remote sheet changes wait until editing finishes, then show the latest saved sheet',async()=>{
+  const c=await character({name:'Active'}),count=c.renders();
+  const input={tagName:'TEXTAREA',value:'Typing notes',selectionStart:3,selectionEnd:8};
+  c.inputs['[data-field="notes"]']=input;c.document.activeElement=input;
+  const records=c.records();records[0].sheet.name='Remote name';c.remote(records);
+  assert.equal(c.renders(),count);
+  assert.equal(c.document.activeElement,input);
+  assert.equal(input.selectionStart,3);assert.equal(input.selectionEnd,8);
+  const next={tagName:'INPUT',value:'Unfinished equipment'};
+  c.inputs['#new-equipment']=next;c.document.activeElement=next;c.focusout();
+  assert.equal(c.renders(),count);
+  c.document.activeElement=null;c.focusout();
+  assert.equal(c.renders(),count+1);
+  assert.match(c.root.innerHTML,/value="Remote name"/);
+});
+
+test('a local edit supersedes a deferred remote refresh and remote deletion still closes the editor',async()=>{
+  const c=await character({name:'Active'}),count=c.renders();
+  const input={tagName:'INPUT',dataset:{field:'name'},value:'Local name'};
+  c.inputs['[data-field="name"]']=input;c.inputs['.creator-print-sheet']={outerHTML:''};c.document.activeElement=input;
+  const records=c.records();records[0].sheet.name='Remote name';c.remote(records);
+  c.root.oninput({target:input});
+  c.document.activeElement=null;c.focusout();
+  assert.equal(c.renders(),count);
+  assert.equal(c.records()[0].sheet.name,'Local name');
+  c.document.activeElement=input;c.remote([]);
+  assert.equal(c.route(),'#/start');
+});
 
 test('Save PC preserves personal edits and closes the sheet to Characters',async()=>{
   const c=await character();
@@ -421,7 +479,9 @@ test('macro-skills require a nonempty subtype while ordinary and custom skills r
   for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons','lore: ','Games :']) {
     c.inputs['#new-skill']={value:name};c.click({action:'add-skill'});
     assert.deepEqual((await c.data()).character.skills,{});
-    assert.match(c.root.innerHTML,/Choose a macro-skill subtype/);
+    assert.match(c.root.innerHTML,/Choose subskill/);
+    assert.match(c.root.innerHTML,/creator-subskill-dialog/);
+    c.click({action:'close-subskills'});
   }
   const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];
   for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons'])assert.ok(!suggestions.includes(`value="${name}"`),name);
@@ -432,6 +492,39 @@ test('macro-skills require a nonempty subtype while ordinary and custom skills r
   for(const name of ['Lore: History','Games: Go','Artisan: Custom art','Craft: Custom craft','Perform: Custom performance','Courtier','Custom skill','Games: Shogi','Weapons: Crossbow'])assert.equal(d.skills[name].rank,1,name);
   const legacy=await character({skills:{Lore:2}});
   assert.match(sectionHtml(legacy,'skills'),/Lore requires a subtype/);
+});
+
+test('section 03 lists every skill without charging XP and rank zero controls can purchase a rank',async()=>{
+  const c=await character(),html=sectionHtml(c,'skills');
+  assert.match(html,/creator-skill-grid/);
+  for(const skill of catalog.skills)assert.ok(html.includes(`data-skill-name="${skill.name}"`),skill.name);
+  let data=await c.data();
+  assert.deepEqual(data.character.skills,{});assert.equal(data.derived.xpSpent,0);
+  c.click({action:'skill',skill:'Courtier',delta:'1'});
+  data=await c.data();assert.equal(data.derived.skills.Courtier.rank,1);assert.equal(data.derived.xpSpent,1);
+  c.click({action:'skill',skill:'Courtier',delta:'-1'});
+  data=await c.data();assert.equal(data.derived.xpSpent,0);
+  assert.ok(sectionHtml(c,'skills').includes('data-skill-name="Courtier"'));
+});
+
+test('macro skill popup buys separate catalog and custom subskills, avoids duplicates, and persists them',async()=>{
+  const c=await character();
+  c.click({action:'open-subskills',skill:'Lore'});
+  assert.match(c.root.innerHTML,/data-skill="Lore: History"/);
+  c.click({action:'choose-subskill',skill:'Lore: History'});
+  assert.doesNotMatch(c.root.innerHTML,/creator-subskill-dialog/);
+  c.click({action:'open-subskills',skill:'Lore'});
+  assert.match(c.root.innerHTML,/data-skill="Lore: History" disabled/);
+  c.inputs['#custom-subskill']={value:'Local legends'};
+  c.click({action:'choose-subskill'});
+  c.click({action:'open-subskills',skill:'Lore'});
+  c.inputs['#custom-subskill']={value:'  '};c.click({action:'choose-subskill'});
+  assert.match(c.root.innerHTML,/creator-subskill-dialog/);
+  c.inputs['#custom-subskill']={value:'History'};c.click({action:'choose-subskill'});
+  const data=await c.data();
+  assert.deepEqual(data.character.skills,{'Lore: History':1,'Lore: Local legends':1});
+  assert.equal(data.derived.xpSpent,2);
+  assert.equal((await (await c.reload()).data()).derived.skills['Lore: Local legends'].rank,1);
 });
 
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
