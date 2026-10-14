@@ -86,12 +86,13 @@ def parse_skills(raw):
     raw = raw.replace("Courtier (Manipulation, Defense", "Courtier (Manipulation), Defense")
     raw = raw.replace("Spellcraft: any", "Spellcraft, any")
     raw = raw.replace("Stealth (Sneaking) any", "Stealth (Sneaking), any")
+    raw = raw.replace("Jiujutsu (Improved Weapons)", "Jiujutsu (Improvised Weapons)")
     raw = re.sub(r"(High|Bugei|Merchant|Low),\s*(?=(?:or\s+)?(?:High|Bugei|Merchant|Low)\b)", r"\1 / ", raw)
     parts = split_items(raw)
     skills, choices = [], []
     aliases = {"Mediation": "Meditation", "Knivs": "Knives", "Jiujustu": "Jiujutsu",
                "Kyujustu": "Kyujutsu", "Defenses": "Defense", "Stealthy": "Stealth",
-               "War Fans": "War Fan", "Theology": "Lore: Theology", "Jijutsu": "Jiujutsu"}
+               "War Fans": "War Fan", "Theology": "Lore: Theology", "Jijutsu": "Jiujutsu", "Kenjustu": "Kenjutsu"}
     for index, part in enumerate(parts):
         part = re.sub(r"^and\s+(?=\w)", "", part, flags=re.I)
         selection = part if re.search(r"\b(pick|either)\b", part, re.I) else re.sub(r"\([^)]*\)", "", part)
@@ -142,15 +143,20 @@ def school_info(heading, slug):
             break
         if not getattr(sibling, "select", None):
             continue
-        for li in sibling.select("li"):
-            text = li.get_text(" ", strip=True)
+        paragraphs = [sibling] if sibling.name == "p" else sibling.select("p")
+        field_texts = [li.get_text(" ", strip=True) for li in sibling.select("li")]
+        # Some schools put their stats in a paragraph separated by line breaks.
+        for paragraph in paragraphs:
+            field_texts.extend(BeautifulSoup(line, "html.parser").get_text(" ", strip=True)
+                               for line in re.split(r"<br\s*/?>", paragraph.decode_contents(), flags=re.I))
+        for text in field_texts:
             field_match = re.match(r"^(Benefit|(?:Starting |School )?Skills|(?:Starting )?Honor|Outfit|Devotion|Requirements|School Rank|Replaces|Affinity\s*/\s*Deficiency|Spells|Technique)\s*:\s*\*?\*?\s*(.*)", text, re.I)
             if field_match:
                 label = field_match.group(1).lower()
                 if label.endswith("skills"):
                     label = "skills"
                 fields[label] = field_match.group(2)
-        for paragraph in [sibling] if sibling.name == "p" else sibling.select("p"):
+        for paragraph in paragraphs:
             for strong in paragraph.find_all("strong"):
                 title = strong.get_text(" ", strip=True)
                 if re.match(r"Rank\s+\d+\s*:", title, re.I):

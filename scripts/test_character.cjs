@@ -203,6 +203,32 @@ test('trait choices respect fixed catalog traits and specialties, with choices f
   assert.equal(options('Custom skill').length,9);
 });
 
+test('paragraph-formatted schools appear in starting and later school picks with their grants', async () => {
+  const c = await character(); c.change({field:'clan'},'Mantis');
+  assert.match(c.root.innerHTML,/<option value="scmantis#toc6">Yoritomo Bushi · \+1 Strength<\/option>/);
+  assert.match(c.root.innerHTML,/<option value="Yoritomo Bushi · basic">/);
+  assert.match(c.root.innerHTML,/<option value="scmantis#toc2">Mantis Brawler · \+1 Agility<\/option>/);
+  c.school('Mantis','Yoritomo Bushi');
+  const {derived:d} = await c.data();
+  assert.equal(d.traits.Strength.base,3);
+  assert.equal(d.school.honor,3.5);
+  for (const name of ['Commerce','Defense','Jiujutsu','Kenjutsu','Knives','Sailing']) assert.equal(d.skills[name].rank,1,name);
+  assert.deepEqual(d.skills.Jiujutsu.emphases,['Improvised Weapons']);
+  assert.deepEqual(d.skills.Knives.emphases,['Kama']);
+  assert.equal(d.school.skillChoices.length,1);
+  assert.equal(d.money.koku,10);
+  assert.ok(d.equipment.some(entry => entry.name === 'Light Armor'));
+  assert.ok(d.equipment.some(entry => entry.name === 'Daisho'));
+  assert.deepEqual(d.school.techniques.map(t => t.rank),[1,2,3,4,5]);
+  assert.match(d.techniques[0].name,/The Way of the Mantis/);
+  assert.equal(d.xpRemaining,40);
+  assert.equal((await (await c.reload()).data()).derived.school.name,'Yoritomo Bushi');
+  c.change({field:'clan'},'Dragon');
+  assert.match(c.root.innerHTML,/<option value="scdragon#toc7">The Hitomi Kikage Zumi Order · \+1 Reflexes<\/option>/);
+  c.change({field:'clan'},'Firefly');
+  assert.match(c.root.innerHTML,/<option value="sclost#toc14">Hotaru Bushi School · \+1 Awareness<\/option>/);
+});
+
 test('school skill ranks, emphases, trait, honor, outfit and training are free grants', async () => {
   const c = await character(); c.school('Crab','Hida Pragmatist');
   const {derived:d} = await c.data();
