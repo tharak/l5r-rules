@@ -122,17 +122,17 @@ test('editable starting XP defaults to 40 and preserves awards and current purch
  assert.equal(R.normalize({startingXP:-5}).startingXP,0);
 });
 test('section resets preserve identity, privacy and unrelated purchases while recalculating school grants',()=>{
- const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.notes='Keep my notes';s.traitBuys.Strength=1;s.skills.Defense=3;
+ const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.journal=[{id:'j1',text:'Keep my notes',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}];s.traitBuys.Strength=1;s.skills.Defense=3;
  s.advantages=[{id:'large',name:'Large',baseCost:4}];s.purchases=[{id:'custom',name:'Other purchase',cost:2}];s.abilities=[{id:'power',kind:'custom',name:'Custom power',cost:3}];
  s.exceptions=[{id:'trait-approval',code:'rank:trait:Strength',explanation:'Old trait approval'},{id:'power-approval',code:'ability:power',explanation:'Keep power approval'}];
  const original=JSON.stringify(s),visibility=plain(s.visibility);
- const traits=R.resetSection(s,'traits',catalog);assert.equal(calc(traits).traits.Strength.rank,3);assert.equal(calc(traits).xpSpent,calc(s).xpSpent-16);assert.equal(traits.notes,s.notes);assert.equal(traits.skills.Defense,3);assert.deepEqual(plain(traits.exceptions),[plain(s.exceptions[1])]);
+ const traits=R.resetSection(s,'traits',catalog);assert.equal(calc(traits).traits.Strength.rank,3);assert.equal(calc(traits).xpSpent,calc(s).xpSpent-16);assert.deepEqual(plain(traits.journal),plain(s.journal));assert.equal(traits.skills.Defense,3);assert.deepEqual(plain(traits.exceptions),[plain(s.exceptions[1])]);
  const skills=R.resetSection(s,'skills',catalog);assert.equal(calc(skills).skills.Defense.rank,1);assert.equal(calc(skills).skills['Heavy Weapons'].rank,1);assert.equal(calc(skills).xpSpent,calc(s).xpSpent-5);assert.equal(skills.traitBuys.Strength,1);
  const options=R.resetSection(s,'options',catalog);assert.equal(calc(options).xpSpent,calc(s).xpSpent-3);assert.equal(options.purchases[0].name,'Other purchase');
- const abilities=R.resetSection(s,'abilities',catalog);assert.equal(abilities.abilities.length,0);assert.equal(calc(abilities).xpSpent,calc(s).xpSpent-3);assert.equal(abilities.notes,s.notes);
- const story=R.resetSection(s,'story',catalog);assert.equal(story.notes,'');assert.equal(story.purchases.length,0);assert.equal(story.startingXP,80);assert.ok(calc(story).equipment.some(e=>e.source==='school'));
- const identity=R.resetSection(s,'identity',catalog);assert.equal(identity.school,'');assert.equal(identity.notes,s.notes);assert.equal(identity.skills.Defense,3);
- const summary=R.resetSection(s,'summary',catalog);assert.equal(summary.startingXP,40);assert.equal(summary.notes,s.notes);assert.equal(summary.school,s.school);
+ const abilities=R.resetSection(s,'abilities',catalog);assert.equal(abilities.abilities.length,0);assert.equal(calc(abilities).xpSpent,calc(s).xpSpent-3);assert.deepEqual(plain(abilities.journal),plain(s.journal));
+ const story=R.resetSection(s,'story',catalog);assert.equal(story.concept,'');assert.deepEqual(plain(story.journal),plain(s.journal));assert.equal(story.purchases.length,0);assert.equal(story.startingXP,80);assert.ok(calc(story).equipment.some(e=>e.source==='school'));
+ const identity=R.resetSection(s,'identity',catalog);assert.equal(identity.school,'');assert.deepEqual(plain(identity.journal),plain(s.journal));assert.equal(identity.skills.Defense,3);
+ const summary=R.resetSection(s,'summary',catalog);assert.equal(summary.startingXP,40);assert.deepEqual(plain(summary.journal),plain(s.journal));assert.equal(summary.school,s.school);
  for(const reset of [traits,skills,options,abilities,story,identity,summary]){assert.equal(reset.id,s.id);assert.deepEqual(plain(reset.visibility),visibility);}
  assert.equal(JSON.stringify(s),original,'Reset mutated the original sheet');
  const nextSchool=starting('Crane','Kakita Bushi');const changed=R.normalize({...s,clan:nextSchool.clan,family:nextSchool.family,school:nextSchool.school});
@@ -263,7 +263,7 @@ test('memorization and school changes recalculate current costs and grants',()=>
 });
 test('legacy migration preserves selections, custom charges, notes and six privacy choices without duplicate costs',()=>{
  const original={name:'Legacy',school:'sccrab#toc1',clan:'Crab',notes:'a\n\nb',skills:{'Lore:Shadowlands':3},schoolChoices:['Battle'],equipmentChoices:['Light Armor','Tetsubo'],purchases:[{name:'Kenjutsu emphasis',cost:2}],visibility:{identity:false,traits:true,skills:false,options:false,story:false,summary:true},customLegacyField:'keep'};
- const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility.abilities,false);assert.equal(s.notes,original.notes);
+ const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility.abilities,false);assert.equal(s.notes,'');assert.deepEqual(plain(s.journal),[{id:'legacy-notes',text:original.notes,createdAt:'',updatedAt:'',public:false}]);
  const p=trained(s);assert.equal(calc(p).xpSpent,calc(s).xpSpent);assert.deepEqual(plain(p.purchases),plain(s.purchases));assert.equal(calc(p).xpSpent,7);
 });
 test('equipment applies armor, weapon skills/masteries, bow strength and arrows without charging XP',()=>{
@@ -482,7 +482,7 @@ test('sheet pictures keep only small inline images and an Identity reset clears 
  assert.equal(R.normalize({portrait:picture}).portrait,picture);
  for(const portrait of [undefined,'javascript:alert(1)','https://example.test/a.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,'+'A'.repeat(120000),42])assert.equal(R.normalize({portrait}).portrait,'');
  const reset=R.resetSection({name:'Ren',portrait:picture,notes:'kept'},'identity',catalog);
- assert.equal(reset.portrait,'');assert.equal(reset.notes,'kept');
+ assert.equal(reset.portrait,'');assert.equal(reset.journal[0].text,'kept');
  assert.equal(R.resetSection({portrait:picture},'story',catalog).portrait,picture);
 });
 
@@ -545,4 +545,15 @@ test('official images link back to their original files on legendofthefiverings.
  assert.deepEqual(plain(C.clanIllustrations('Mantis')),[]);
  for(const f of ['clans','clans-tall'])assert.ok(fs.existsSync(`public/assets/clans/covers/${f}.webp`),f);
  assert.deepEqual(Object.keys(C.OFFICIAL_CLAN_NUMBERS).sort(),[...C.CLAN_COVERS].sort());
+});
+
+test('public flags default to private and older notes move once into a private journal entry',()=>{
+ const s=R.normalize({notes:'Old notes',advantages:[{name:'Allies',cost:2},{name:'Fame',cost:3,public:true}],disadvantages:[{name:'Dark Secret',cost:4,public:'yes'}],publicStats:{glory:true,taint:1}});
+ assert.deepEqual(plain(s.publicStats),{honor:false,glory:true,status:false,taint:false});
+ assert.deepEqual(s.advantages.map(a=>a.public),[false,true]);assert.equal(s.disadvantages[0].public,false);
+ assert.equal(s.notes,'');assert.equal(s.journal.length,1);assert.equal(s.journal[0].public,false);
+ // Normalizing again neither duplicates nor loses the migrated entry.
+ assert.deepEqual(plain(R.normalize(plain(s))),plain(s));
+ const kept=R.normalize({journal:[{id:'a',text:'Hello',createdAt:'2026-11-01',public:true},{id:'bad id!',text:'x'},{id:'b'}]});
+ assert.deepEqual(plain(kept.journal),[{id:'a',text:'Hello',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}]);
 });

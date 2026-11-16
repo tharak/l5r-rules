@@ -380,3 +380,18 @@
   .portrait-creator-grid { grid-template-columns: minmax(0, 1fr); }
   .portrait-creator-preview { position: static; max-width: 360px; width: 100%; margin: 0 auto; }
 }
+
+/* Public flags and the journal. */
+.creator-standing { display: grid; gap: 4px; justify-items: start; }
+.creator-public-check { font-size: 11px !important; color: var(--muted); }
+.creator-option-row .creator-public-check { align-self: center; }
+.creator-journal { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.creator-journal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.creator-journal-head h3 { margin: 0; font: 20px var(--serif); }
+.creator-journal-editor { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+.creator-journal-editor .ui-field-label { display: grid; gap: 6px; }
+.creator-journal-entry { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 3px; background: var(--surface); }
+.creator-journal-entry header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 12px; color: var(--muted); }
+.creator-journal-entry header time { font-weight: 600; color: var(--ink); }
+.creator-journal-visibility { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+.creator-journal-text { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }

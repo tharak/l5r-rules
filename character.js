@@ -15,6 +15,7 @@
   let macroSkill = '';
   let emphasisView = 'skills';
   let rollState = null;
+  let journalDraft = null;
   let xpAward = 0;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let remoteRefreshPending = false;
@@ -251,7 +252,7 @@
       const totalPoints = kind === 'advantage' ? data.advantageTotal : data.disadvantageTotal;
       const limitMessage = kind === 'advantage' ? 'Up to 15 XP.' : 'Up to 10 XP.';
       const id = `${kind}-select`;
-      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} (${totalPoints})</h3><a class="creator-source" data-rule-reference href="${sourceLink(kind === 'advantage' ? 'advantages' : 'disadvantages')}">Read full ${kind === 'advantage' ? 'advantage' : 'disadvantage'} rules ↗</a></div><p class="creator-rule creator-option-limit">${limitMessage}</p>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.map(baseCost=>R.optionCost({name:entry.name,baseCost},sheet,data.school,catalog,kind==='disadvantage')))].join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`}})}</div>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-'+kind,'data-index':index,'aria-label':`Remove ${entry.name}`}})}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : '<div class="creator-empty">None selected.</div>'}</div>`;
+      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} (${totalPoints})</h3><a class="creator-source" data-rule-reference href="${sourceLink(kind === 'advantage' ? 'advantages' : 'disadvantages')}">Read full ${kind === 'advantage' ? 'advantage' : 'disadvantage'} rules ↗</a></div><p class="creator-rule creator-option-limit">${limitMessage}</p>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.map(baseCost=>R.optionCost({name:entry.name,baseCost},sheet,data.school,catalog,kind==='disadvantage')))].join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`}})}</div>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-'+kind,'data-index':index,'aria-label':`Remove ${entry.name}`}})}${publicToggle(`${entry.name} is public`,{'data-option-public':kind,'data-index':index},sheet[kind==='advantage'?'advantages':'disadvantages'][index]?.public)}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : '<div class="creator-empty">None selected.</div>'}</div>`;
     };
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-options'},bodyHtml:`${UI.sectionHeading({step:'04',title:'Advantages & disadvantages'})}${data.disadvantageTotal > 10 ? `<p class="creator-rule">You selected ${data.disadvantageTotal} disadvantage points; only 10 count toward your budget.</p>` : ''}<div class="creator-option-grid">${optionList('advantage')}${optionList('disadvantage')}</div>${renderAncestors(data)}`});
   }
@@ -307,8 +308,40 @@
     const {label,step,min,max=Infinity,action='number-step',size='regular',showLabel=true}=config;
     return `<div class="creator-number-field">${showLabel?`<span>${label}</span>`:''}${UI.stepper({value:step<1?Number(value).toFixed(1):value,size,attrs:{'aria-label':label},outputAttrs:{'aria-label':label},decrease:{'data-action':action,'data-field':key,'data-delta':'-1','aria-label':`Decrease ${label}`,'disabled':value<=min},increase:{'data-action':action,'data-field':key,'data-delta':'1','aria-label':`Increase ${label}`,'disabled':value>=max}})}</div>`;
   }
+  // A small "Public" checkbox: ticked items appear in the character's public view.
+  const publicToggle = (label,attrs,checked) => UI.checkbox({label:'Public',attrs:{type:'checkbox',...attrs,checked:!!checked,'aria-label':label},labelAttrs:{class:'creator-check creator-public-check'}});
+  const journalDate = value => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier notes'; };
+  // The player's journal: newest first; each entry is private unless marked Public.
+  function renderJournal() {
+    const entries = [...sheet.journal].sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const editor = journalDraft ? `<div class="creator-journal-editor">${UI.field({label:journalDraft.id ? 'Edit entry' : 'New entry',kind:'textarea',value:journalDraft.text,attrs:{'data-journal-text':true,rows:5,maxlength:20000,placeholder:'Write to the table: what happened, plans, questions for the GM…'}})}${publicToggle('Entry is public',{'data-journal-draft-public':true},journalDraft.public)}${UI.actionRow({bodyHtml:`${UI.button({text:'Save entry',attrs:{'data-action':'journal-save',disabled:!journalDraft.text.trim()}})}${UI.button({text:'Cancel',variant:'secondary',attrs:{'data-action':'journal-cancel'}})}`})}</div>` : '';
+    const list = entries.map(entry => `<article class="creator-journal-entry" data-journal-id="${escapeHtml(entry.id)}"><header><time${entry.createdAt?` datetime="${escapeHtml(entry.createdAt)}"`:''}>${escapeHtml(journalDate(entry.createdAt))}</time><span class="creator-journal-visibility">${entry.public ? 'Public' : 'Private'}</span>${publicToggle('Entry is public',{'data-journal-public':entry.id},entry.public)}${UI.button({text:'Edit',variant:'quiet',size:'compact',attrs:{'data-action':'journal-edit','data-id':entry.id,'aria-label':'Edit journal entry'}})}${UI.button({text:'Delete',variant:'quiet',size:'compact',attrs:{'data-action':'journal-delete','data-id':entry.id,'aria-label':'Delete journal entry'}})}</header><p class="creator-journal-text">${escapeHtml(entry.text)}</p></article>`).join('');
+    return `<div class="creator-journal"><div class="creator-journal-head"><h3>Journal</h3>${journalDraft ? '' : UI.button({text:'+ Entry',attrs:{'data-action':'journal-new'}})}</div><p class="creator-rule">Notes for you, the GM, and the table. Entries are private unless you tick Public.</p>${editor}${list || (journalDraft ? '' : '<div class="creator-empty">No journal entries yet.</div>')}</div>`;
+  }
+  function handleJournalAction(action,button) {
+    if (!action.startsWith('journal-') || external?.readOnly) return false;
+    const now = new Date().toISOString();
+    if (action === 'journal-new') journalDraft = {id:'',text:'',public:false};
+    else if (action === 'journal-edit') { const entry = sheet.journal.find(item => item.id === button.dataset.id); if (entry) journalDraft = {...entry}; }
+    else if (action === 'journal-cancel') journalDraft = null;
+    else if (action === 'journal-save') {
+      if (!journalDraft?.text.trim()) return true;
+      const existing = sheet.journal.find(item => item.id === journalDraft.id);
+      if (existing) Object.assign(existing,{text:journalDraft.text,public:journalDraft.public,updatedAt:now});
+      else sheet.journal.push({id:makeId(),text:journalDraft.text,createdAt:now,updatedAt:now,public:!!journalDraft.public});
+      journalDraft = null; save();
+    } else if (action === 'journal-delete') {
+      if (!window.confirm('Delete this journal entry?')) return true;
+      sheet.journal = sheet.journal.filter(item => item.id !== button.dataset.id);
+      if (journalDraft?.id === button.dataset.id) journalDraft = null;
+      save();
+    } else return false;
+    render();
+    root.querySelector(action === 'journal-new' || action === 'journal-edit' ? '[data-journal-text]' : '[data-action="journal-new"]')?.focus();
+    return true;
+  }
   function renderStory(data) {
-    return UI.panel({attrs:{'class':'creator-panel','id':'creator-story'},bodyHtml:`${UI.sectionHeading({step:'06',title:'Story'})}<p class="creator-rule">For heritage and detailed background prompts, see <a data-rule-reference href="${sourceLink('heritage')}">Heritage</a> and <a data-rule-reference href="${sourceLink('chargen')}">Character Generation</a>.</p><div class="creator-fields">${UI.field({label:'Character concept',attrs:{'data-field':'concept','type':'text','value':sheet.concept,'placeholder':'A loyal yojimbo, an ambitious courtier…'}})}${UI.field({label:'Notes & heritage',labelAttrs:{'class':'creator-wide'},attrs:{'data-field':'notes','rows':'7','placeholder':'Add your heritage and story notes here.'},kind:'textarea',value:sheet.notes})}${UI.field({label:'Recorded heritage outcome',labelAttrs:{'class':'creator-wide'},attrs:{'data-field':'heritage','rows':'3'},kind:'textarea',value:sheet.heritage})}</div>${renderModifiers(data)}<div class="creator-purchases"><h3>Other XP purchases</h3><p>Record custom purchases with a name and paid XP cost. Use Skills for emphases and Abilities for catalog powers.</p>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'purchase-name','type':'text','placeholder':'Purchase name'}})}${UI.field({attrs:{'id':'purchase-cost','type':'number','min':'0','max':'100','step':'1','placeholder':'XP'}})}${UI.button({text:'Add',attrs:{'data-action':'add-purchase'}})}`})}${sheet.purchases.length ? `<div class="creator-option-list">${sheet.purchases.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><strong>${Number(entry.cost) || 0} XP</strong>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-purchase','data-index':index,'aria-label':`Remove ${entry.name}`}})}`})).join('')}</div>` : ''}</div>`});
+    return UI.panel({attrs:{'class':'creator-panel','id':'creator-story'},bodyHtml:`${UI.sectionHeading({step:'06',title:'Story & journal'})}<p class="creator-rule">For heritage and detailed background prompts, see <a data-rule-reference href="${sourceLink('heritage')}">Heritage</a> and <a data-rule-reference href="${sourceLink('chargen')}">Character Generation</a>.</p><div class="creator-fields">${UI.field({label:'Character concept',attrs:{'data-field':'concept','type':'text','value':sheet.concept,'placeholder':'A loyal yojimbo, an ambitious courtier…'}})}${UI.field({label:'Recorded heritage outcome',labelAttrs:{'class':'creator-wide'},attrs:{'data-field':'heritage','rows':'3'},kind:'textarea',value:sheet.heritage})}</div>${renderJournal()}${renderModifiers(data)}<div class="creator-purchases"><h3>Other XP purchases</h3><p>Record custom purchases with a name and paid XP cost. Use Skills for emphases and Abilities for catalog powers.</p>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'purchase-name','type':'text','placeholder':'Purchase name'}})}${UI.field({attrs:{'id':'purchase-cost','type':'number','min':'0','max':'100','step':'1','placeholder':'XP'}})}${UI.button({text:'Add',attrs:{'data-action':'add-purchase'}})}`})}${sheet.purchases.length ? `<div class="creator-option-list">${sheet.purchases.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><strong>${Number(entry.cost) || 0} XP</strong>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-purchase','data-index':index,'aria-label':`Remove ${entry.name}`}})}`})).join('')}</div>` : ''}</div>`});
   }
 
   function renderWounds(data) {
@@ -326,7 +359,7 @@
     const breakdown=data.insightBreakdown;
     const ringValues=Object.entries(data.rings).map(([ring,rank])=>`${ring} ${rank}`).join(' + ');
     const insightFormula=`(${ringValues}) × 10 + ${breakdown.skills} Skill ranks + ${breakdown.courtier} Courtier bonus + ${breakdown.etiquette} Etiquette bonus${breakdown.modifier?` ${breakdown.modifier>0?'+':'−'} ${Math.abs(breakdown.modifier)} modifier`:''}`;
-    return `<aside class="creator-summary creator-record" id="creator-summary"><div class="creator-summary-inner"><div class="creator-record-header"><h3 class="creator-summary-kicker" id="creator-record-title">CHARACTER RECORD</h3></div><div class="creator-record-grid"><div class="creator-record-group"><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><div class="creator-xp-total"><span>XP:</span><strong>${data.xpRemaining}</strong></div><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small>${renderXPControls()}</div><div class="creator-standing-fields">${['honor','glory','status','taint'].map(key=>renderNumber(key,Number(data[key] ?? sheet[key]) || 0)).join('')}</div></div><div class="creator-xp creator-insight"><div class="creator-xp-total"><span>Insight:</span><strong>${data.insight}</strong></div><small>${escapeHtml(insightFormula)}</small></div></div><div class="creator-summary-links"><a data-rule-reference href="${sourceLink('chargen')}">Creation rules ↗</a><a data-rule-reference href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
+    return `<aside class="creator-summary creator-record" id="creator-summary"><div class="creator-summary-inner"><div class="creator-record-header"><h3 class="creator-summary-kicker" id="creator-record-title">CHARACTER RECORD</h3></div><div class="creator-record-grid"><div class="creator-record-group"><div class="creator-xp ${data.xpRemaining < 0 ? 'over-budget' : ''}"><div class="creator-xp-total"><span>XP:</span><strong>${data.xpRemaining}</strong></div><small>${data.startingXP} starting + ${data.xpEarned} disadvantage + ${data.xpAwards} awarded − ${data.xpSpent} paid</small>${renderXPControls()}</div><div class="creator-standing-fields">${['honor','glory','status','taint'].map(key=>`<div class="creator-standing">${renderNumber(key,Number(data[key] ?? sheet[key]) || 0)}${publicToggle(`${numericFields[key].label} is public`,{'data-public-stat':key},sheet.publicStats[key])}</div>`).join('')}</div></div><div class="creator-xp creator-insight"><div class="creator-xp-total"><span>Insight:</span><strong>${data.insight}</strong></div><small>${escapeHtml(insightFormula)}</small></div></div><div class="creator-summary-links"><a data-rule-reference href="${sourceLink('chargen')}">Creation rules ↗</a><a data-rule-reference href="${sourceLink('families')}">Families ↗</a></div></div></aside>`;
   }
 
   function renderPrintSheet(data) {
@@ -642,6 +675,7 @@
     if (!button) return;
     const action = button.dataset.action;
     if (handleRollAction(action,button)) return;
+    if (handleJournalAction(action,button)) return;
     if (action === 'open-subskills') {
       if (!C.MACRO_SKILLS.includes(button.dataset.skill)) return;
       macroSkill = button.dataset.skill; uiError = ''; render(); return;
@@ -816,6 +850,11 @@
       return;
     }
     uiError = '';
+    const flags = event.target.dataset;
+    if (flags.publicStat && flags.publicStat in sheet.publicStats) { sheet.publicStats[flags.publicStat] = event.target.checked; commitEdit(); return; }
+    if (flags.optionPublic) { const entry = sheet[flags.optionPublic === 'advantage' ? 'advantages' : 'disadvantages'][Number(flags.index)]; if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
+    if (flags.journalPublic) { const entry = sheet.journal.find(item => item.id === flags.journalPublic); if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
+    if (flags.journalDraftPublic !== undefined) { if (journalDraft) journalDraft.public = event.target.checked; return; }
     if (event.target.dataset.portrait !== undefined) {
       const file = event.target.files?.[0];
       // Clear the input so choosing the same file again still opens the cropper.
@@ -851,7 +890,8 @@
     if(kind){const select=root.querySelector('#'+kind+'-select');for(const option of select.options)option.hidden=!!option.value && !option.textContent.toLowerCase().includes(event.target.value.toLowerCase());return;}
     if(event.target.dataset.optionDetail){if(event.target.tagName==='SELECT')return;const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;save();}return;}
     const field = event.target.dataset.field;
-    if (!['name','concept','notes','heritage'].includes(field)) return;
+    if (event.target.dataset.journalText !== undefined) { if (journalDraft) journalDraft.text = event.target.value; const saveButton = root.querySelector('[data-action="journal-save"]'); if (saveButton) saveButton.disabled = !event.target.value.trim(); return; }
+    if (!['name','concept','heritage'].includes(field)) return;
     sheet[field] = event.target.value;
     save();
     root.querySelector('.creator-print-sheet').outerHTML = renderPrintSheet(build());
@@ -876,6 +916,7 @@
     emphasisSkill = '';
     macroSkill = '';
     rollState = null;
+    journalDraft = null;
     xpAward = 0;
     root = element;
     root.onclick = onClick;

@@ -108,13 +108,13 @@ test('Save PC preserves personal edits and closes the sheet to Characters',async
   const c=await character();
   c.inputs['.creator-print-sheet']={outerHTML:''};
   c.root.oninput({target:{dataset:{field:'name'},value:'Saved PC'}});
-  c.root.oninput({target:{dataset:{field:'notes'},value:'Personal notes'}});
+  c.root.oninput({target:{dataset:{field:'concept'},value:'Personal concept'}});
   c.click({action:'save-close'});
   assert.equal(c.route(),'#/characters');
   const restored=await c.reload();
   const data=await restored.data();
   assert.equal(data.character.name,'Saved PC');
-  assert.equal(data.character.notes,'Personal notes');
+  assert.equal(data.character.concept,'Personal concept');
 });
 
 test('family selector includes orders, monks and vassals, and persists the selectable physical benefit',async()=>{
@@ -378,7 +378,7 @@ test('saved legacy ranks merge with canonical school skill names and survive rel
   const loaded = await c.reload(); d = (await loaded.data()).derived;
   assert.equal(d.skills['Heavy Weapons'].rank,2);
   assert.equal(d.equipment[0].name,'Light Armor');
-  assert.equal((await loaded.data()).character.notes,'My heritage');
+  assert.equal((await loaded.data()).character.journal[0].text,'My heritage');
   assert.match(loaded.root.innerHTML,/print-second-page/);
   assert.match(loaded.root.innerHTML,/The Way of the Crab/);
 });
@@ -624,6 +624,32 @@ test('Create picture hands the sheet to the portrait creator and saves its pictu
   assert.equal(c.window.CharacterBuilder.setPortrait(c.window.CharacterBuilder.list()[0].id,'javascript:alert(1)'),false);
   c.click({action:'remove-portrait'});
   assert.equal((await c.data()).character.portraitRecipe,null);
+});
+
+test('Public checkboxes and the journal save to the sheet; entries start private',async()=>{
+  const c=await character({name:'Ren',advantages:[{name:'Fame',cost:3}],disadvantages:[{name:'Dark Secret',cost:4}]});
+  const html=()=>c.root.innerHTML;
+  assert.match(html(),/data-public-stat="glory"/);assert.match(html(),/data-option-public="advantage"/);
+  c.root.onchange({target:{dataset:{publicStat:'glory'},checked:true}});
+  c.root.onchange({target:{dataset:{optionPublic:'advantage',index:'0'},checked:true}});
+  c.click({action:'journal-new'});
+  assert.match(html(),/data-journal-text/);
+  c.root.oninput({target:{dataset:{journalText:''},value:'We reached Kyuden Doji.'}});
+  c.click({action:'journal-save'});
+  let sheet=(await c.data()).character;
+  assert.equal(sheet.publicStats.glory,true);assert.equal(sheet.publicStats.taint,false);
+  assert.equal(sheet.advantages[0].public,true);assert.equal(sheet.disadvantages[0].public,false);
+  assert.equal(sheet.journal.length,1);assert.equal(sheet.journal[0].text,'We reached Kyuden Doji.');assert.equal(sheet.journal[0].public,false);
+  const id=sheet.journal[0].id;
+  c.root.onchange({target:{dataset:{journalPublic:id},checked:true}});
+  c.click({action:'journal-edit',id});
+  c.root.oninput({target:{dataset:{journalText:''},value:'Edited entry'}});
+  c.click({action:'journal-save'});
+  sheet=(await c.data()).character;
+  assert.equal(sheet.journal.length,1);assert.equal(sheet.journal[0].text,'Edited entry');assert.equal(sheet.journal[0].public,true);
+  c.window.confirm=()=>true;c.click({action:'journal-delete',id});
+  assert.equal((await c.data()).character.journal.length,0);
+  assert.match(html(),/No journal entries yet/);
 });
 
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{

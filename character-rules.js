@@ -15,6 +15,15 @@
     for (const [slot,option] of Object.entries(value.layers || {}).slice(0,20)) if (RECIPE_ID.test(slot) && RECIPE_ID.test(option || '')) recipe.layers[slot] = option;
     return recipe;
   }
+  // The player's journal: dated entries, each private unless marked public.
+  const JOURNAL_ID = /^[A-Za-z0-9_-]{1,80}$/;
+  function journal(input) {
+    const entries = (Array.isArray(input.journal) ? input.journal : []).filter(entry => entry && JOURNAL_ID.test(entry.id || '') && typeof entry.text === 'string')
+      .map(entry => ({id:entry.id,text:entry.text.slice(0,20000),createdAt:String(entry.createdAt || ''),updatedAt:String(entry.updatedAt || entry.createdAt || ''),public:entry.public === true}));
+    const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
+    if (notes && !entries.some(entry => entry.id === 'legacy-notes')) entries.unshift({id:'legacy-notes',text:notes,createdAt:'',updatedAt:'',public:false});
+    return entries;
+  }
   function normalize(input = {}) {
     const s = {...input,version:2};
     delete s.phase;
@@ -30,6 +39,13 @@
     s.money = input.money == null ? null : {...input.money};
     s.portrait = portrait(input.portrait);
     s.portraitRecipe = portraitRecipe(input.portraitRecipe);
+    // Public flags: Honor, Glory, Status and Taint, and each advantage and disadvantage, are
+    // private unless their owner ticks Public. Everything else private stays private.
+    s.publicStats = Object.fromEntries(['honor','glory','status','taint'].map(key => [key,input.publicStats?.[key] === true]));
+    for (const key of ['advantages','disadvantages']) s[key] = s[key].map(entry => ({...entry,public:entry.public === true}));
+    s.journal = journal(input);
+    // Older sheets kept free-form notes; they become the first (private) journal entry.
+    s.notes = '';
     s.progression = {...input.progression,history:(input.progression?.history || []).map(e => ({...e}))};
     return s;
   }
