@@ -520,7 +520,10 @@ test('family art maps catalog families to bundled images and marks uncertain mat
  assert.equal(C.familyArt('Dragon','Togashi'),'public/assets/clans/families/dragon-b.webp');
  assert.equal(C.familyArt('Crab','Toritaka'),'');assert.equal(C.familyArt('Mantis','Yoritomo'),'');assert.equal(C.familyArt('Scorpion',''),'');
  assert.equal(C.familyArtList('Crab').some(item=>item.guess),false);
- assert.equal(C.familyArtList('Scorpion').find(item=>item.letter==='c').guess,true);
+ // Scorpion a–d were identified by the user; e is still unknown.
+ assert.equal(C.familyArt('Scorpion','Yogo'),'public/assets/clans/families/scorpion-a.webp');
+ assert.equal(C.familyArt('Scorpion','Bayushi'),'public/assets/clans/families/scorpion-c.webp');
+ assert.deepEqual(plain(C.familyArtList('Scorpion').map(item=>[item.letter,item.family,item.guess])),[['a','Yogo',false],['b','Shosuro',false],['c','Bayushi',false],['d','Soshi',false],['e','',true]]);
  // Every named family exists in the catalog, except Kaito (Phoenix on the official site only).
  for(const [clan,map] of Object.entries(C.FAMILY_ART))for(const family of Object.values(map).filter(Boolean))
   if(family!=='Kaito')assert.ok(catalog.clans.find(c=>c.name===clan).families.some(f=>f.name===family),clan+' '+family);

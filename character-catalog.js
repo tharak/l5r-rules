@@ -138,10 +138,10 @@
     Dragon:{a:'Mirumoto',b:'Togashi',c:'Kitsuki',d:'Agasha'},
     Lion:{a:'Matsu',b:'Kitsu',c:'Akodo',d:'Ikoma'},
     Phoenix:{a:'Shiba',b:'Isawa',c:'Kaito',d:'Asako'},
-    Scorpion:{a:'Shosuro',b:'Bayushi',c:'',d:'Soshi',e:'Yogo'},
+    Scorpion:{a:'Yogo',b:'Shosuro',c:'Bayushi',d:'Soshi',e:''},
     Unicorn:{a:'Shinjo',b:'Utaku',c:'Moto',d:'Iuchi'}
   };
-  const FAMILY_ART_GUESSES = {Crane:['Doji','Kakita','Asahina'],Lion:['Matsu','Akodo','Ikoma'],Phoenix:['Shiba','Kaito'],Scorpion:['Shosuro','Bayushi','Soshi'],Unicorn:['Utaku','Moto']};
+  const FAMILY_ART_GUESSES = {Crane:['Doji','Kakita','Asahina'],Lion:['Matsu','Akodo','Ikoma'],Phoenix:['Shiba','Kaito'],Unicorn:['Utaku','Moto']};
   const familyArtFile = (clan,letter) => `public/assets/clans/families/${clan.toLowerCase()}-${letter}.webp`;
   const familyArt = (clan,family) => {
     const letter = Object.entries(FAMILY_ART[clan] || {}).find(([,name]) => name && name === family)?.[0];
