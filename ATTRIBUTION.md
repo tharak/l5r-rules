@@ -8,7 +8,7 @@ The seven Great Clan mons in `public/assets/clans/` (Crab, Crane, Dragon, Lion, 
 
 The Mantis, Spider, and Imperial Family mons in `public/assets/clans/` come from [l5r.wiki](https://l5r.wiki/clans) (`/mons/mon_mantis.gif`, `/mons/mon_spider.gif`, `/mons/mon_w_imperial_family.png`), whose content is licensed [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/). They were recoloured (Mantis green, Spider black, Imperial gold), trimmed, and resized to 192px; the modified files are shared under the same license.
 
-The Badger, Bat, Boar, Dragonfly, Falcon, Fox, Hare, Monkey, Ox, Raven, Sparrow, Tiger, and Tortoise mons in `public/assets/clans/` were cut from ["The Clans of Rokugan"](https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095) by Shin-Ian (© 2017 Shin-Ian), a black-and-white mandala of clan mons. Each mon was masked from the mandala, made transparent, inked dark brown, and resized to 192px. The artwork's mons are unlabelled; the Badger, Hare, Sparrow, and Tiger identifications are best guesses.
+The Badger, Bat, Boar, Dragonfly, Falcon, Fox, Hare, Monkey, Ox, Raven, Snake, Sparrow, Tiger, and Tortoise mons, plus the Nezumi mon and an alternative Mantis mon (`nezumi.webp`, `mantis-mandala.webp`), in `public/assets/clans/` were cut from ["The Clans of Rokugan"](https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095) by Shin-Ian (© 2017 Shin-Ian), a black-and-white mandala of clan mons. Each mon was masked from the mandala, made transparent, inked dark brown, and resized to 192px. The artwork's mons are unlabelled; the Badger, Hare, Sparrow, and Tiger identifications are best guesses.
 
 Source pages:
 

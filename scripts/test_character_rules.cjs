@@ -487,13 +487,13 @@ test('sheet pictures keep only small inline images and an Identity reset clears 
 });
 
 test('clans with bundled mons map to their images; other clans have none',()=>{
- for(const clan of ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial','Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Sparrow','Tiger','Tortoise','Raven']) {
+ for(const clan of ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial','Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Snake','Sparrow','Tiger','Tortoise','Raven']) {
   const mon=C.clanMon(clan);
   assert.equal(mon,`public/assets/clans/${clan.toLowerCase()}.webp`);
   assert.ok(fs.existsSync(mon),mon);
   assert.ok(catalog.clans.some(c=>c.name===clan),clan);
  }
- for(const clan of ['Oriole','Snake','Ronin','Brotherhood of Shinsei','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
+ for(const clan of ['Oriole','Nezumi','Ronin','Brotherhood of Shinsei','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
 });
 
 test('portrait creator recipes keep only short ids and are cleared with the picture by an Identity reset',()=>{
@@ -504,4 +504,8 @@ test('portrait creator recipes keep only short ids and are cleared with the pict
  const dirty=R.normalize({portraitRecipe:{gender:'<b>',age:'adult',layers:{hair:'a b','../x':'y',ok:'fine'},extra:'drop'}}).portraitRecipe;
  assert.deepEqual(plain(dirty),{layers:{ok:'fine'},mon:true,age:'adult'});
  assert.equal(R.resetSection({portraitRecipe:recipe},'identity',catalog).portraitRecipe,null);
+});
+
+test('extra mandala mons point at bundled images',()=>{
+ for(const mon of C.EXTRA_MONS)assert.ok(fs.existsSync(mon.src),mon.src);
 });

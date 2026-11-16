@@ -140,10 +140,10 @@ async function mountClanMons(element) {
   const assigned = clans.map(clan => ({clan,info:C.clanMonInfo(clan.name)})).filter(item => item.info);
   const group = kind => assigned.filter(item => item.info.kind === kind).map(({clan,info}) => card({src:info.src,title:clan.name,flag:info.guess,lines:[esc(clan.group),info.position?`Mandala position: ${info.position}`:'',info.guess?'<strong>Best guess</strong>':'',source(info)]})).join('');
   const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({title:clan.name,lines:[esc(clan.group),'No mon']})).join('');
-  const unassigned = C.UNASSIGNED_MONS.map((mon,index) => card({src:mon.src,title:`Unassigned ${index+1}`,flag:true,lines:[`Mandala position: ${mon.position}`,mon.note ? esc(mon.note) : 'Not identified']})).join('');
+  const extras = C.EXTRA_MONS.map(mon => card({src:mon.src,title:mon.name,lines:[`Mandala position: ${mon.position}`,esc(mon.note)]})).join('');
   element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image is assigned to each clan. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
     <h2>From the DeviantArt mandala</h2><div class="mon-debug-grid">${group('mandala')}</div>
-    <h2>Not assigned (mandala)</h2><div class="mon-debug-grid">${unassigned}</div>
+    <h2>Other mandala mons</h2><div class="mon-debug-grid">${extras}</div>
     <h2>Official site</h2><div class="mon-debug-grid">${group('official')}</div>
     <h2>l5r.wiki</h2><div class="mon-debug-grid">${group('wiki')}</div>
     <h2>Clans without a mon</h2><div class="mon-debug-grid">${missing}</div></div>`;
