@@ -129,7 +129,7 @@
   function renderTraits(data,rolling = false) {
     const groups = rolling ? ['Void','Earth','Water','Air','Fire'].map(ring=>TRAIT_GROUPS.find(group=>group.ring===ring)) : TRAIT_GROUPS;
     const skills = rolling ? (hideRankZeroSkills ? data.skills : R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills) : {};
-    const skillNames = Object.keys(skills).filter(name=>skills[name].rank>0 || (!hideRankZeroSkills && !(hideRankZeroMacroSkills && isMacroSkill(name)))).sort((a,b)=>a.localeCompare(b));
+    const skillNames = Object.keys(skills).filter(name=>isSkillVisible(name,skills,{hideZero:hideRankZeroSkills,hideMacro:hideRankZeroMacroSkills})).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
       const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
       const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span>${UI.stepper({value:item.rank,size:'compact',attrs:{'aria-label':`${trait} rank`},outputAttrs:{'aria-label':`${trait} rank`},decrease:{'data-action':'trait','data-trait':trait,'data-delta':'-1','disabled':item.rank <= item.base,'aria-label':`Decrease ${trait}`},increase:{'data-action':'trait','data-trait':trait,'data-delta':'1','aria-label':`Increase ${trait} for ${cost} XP`}})}</div>`;
@@ -180,6 +180,17 @@
     return C.MACRO_SKILLS.includes(category) || C.WEAPON_SKILLS.includes(category);
   }
 
+  // A macro category such as Lore counts as trained once any of its subskills has a rank.
+  function isSkillTrained(name,skills) {
+    if (skills[name]?.rank > 0) return true;
+    return C.requiresSkillSubtype(name) && Object.entries(skills).some(([subskill,skill])=>subskill.startsWith(name+': ') && skill.rank > 0);
+  }
+
+  // Shared by the Rolls view and section 03 so both filters follow one rule.
+  function isSkillVisible(name,skills,{hideZero,hideMacro}) {
+    return isSkillTrained(name,skills) || (!hideZero && !(hideMacro && isMacroSkill(name)));
+  }
+
   function skillOptions() {
     const specialties = catalog.skills.flatMap(skill => [...new Set([...(skill.specialties || []), ...Object.keys(skill.specialtyTraits || {})])].map(specialty => `${skill.name}: ${specialty}`));
     const suggestions = [...new Set([...catalog.skills.map(skill => skill.name), ...specialties, ...catalog.clans.flatMap(clan => clan.schools.flatMap(school => school.skills.map(skill => skill.name))), 'Lore: Gaijin'])].filter(name=>!C.requiresSkillSubtype(name)).sort((a,b) => a.localeCompare(b));
@@ -193,10 +204,7 @@
   function renderSkills(data) {
     const {suggestions} = skillOptions();
     const skills = R.calculate(sheet,catalog,{untrainedSkills:catalog.skills.map(skill=>skill.name).filter(name=>!C.requiresSkillSubtype(name))}).skills;
-    const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>{
-      const trained = skills[name]?.rank > 0 || (C.requiresSkillSubtype(name) && Object.entries(skills).some(([subskill,skill])=>subskill.startsWith(name+': ') && skill.rank > 0));
-      return trained || (!hideRankZeroEditorSkills && !(hideRankZeroEditorMacroSkills && isMacroSkill(name)));
-    }).sort((a,b)=>a.localeCompare(b));
+    const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>isSkillVisible(name,skills,{hideZero:hideRankZeroEditorSkills,hideMacro:hideRankZeroEditorMacroSkills})).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
     const choicesComplete = choices.every((choice,index) => sheet.schoolChoices[index]?.trim() && !data.skillChoiceErrors[index]);
     return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',description:'Rolls use Skill + Trait, keeping Trait. Choose the trait used for each task.'})}<p class="creator-rule">A Skill costs XP equal to its new rank. A new Skill at Rank 1 costs 1 XP. Creation limit: Rank 4. Maximum: Rank 10.</p>${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">No skills match these filters. Uncheck a filter to show more skills.</div>'}`});
