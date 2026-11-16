@@ -505,3 +505,11 @@ test('clan mons come from the highest-priority source that has one, and every li
  for(const clan of ['','  ',undefined,null])assert.equal(C.clanMon(clan),'',String(clan));
  for(const name of C.CLAN_MONS)for(const candidate of C.clanMonCandidates(name))assert.ok(fs.existsSync(candidate.src),candidate.src);
 });
+
+test('the seven Great Clans have wide and tall cover art; other clans have none',()=>{
+ for(const clan of C.CLAN_COVERS) {
+  assert.equal(C.clanCover(clan),`public/assets/clans/covers/${clan.toLowerCase()}.webp`);
+  for(const tall of [false,true])assert.ok(fs.existsSync(C.clanCover(clan,{tall})),clan+(tall?' tall':''));
+ }
+ for(const clan of ['Mantis','Ronin','',undefined])assert.equal(C.clanCover(clan),'',String(clan));
+});

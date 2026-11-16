@@ -124,11 +124,15 @@
   // logo and favicon); no clan, no mon.
   const DEFAULT_MON = 'public/assets/l5r-mark.webp';
   const clanMon = name => clanMonCandidates(name)[0]?.src || (typeof name === 'string' && name.trim() ? DEFAULT_MON : '');
+  // Official clan cover art from legendofthefiverings.com: a wide image (1200×1125) and a
+  // tall one (780×2000) per Great Clan; other clans have none.
+  const CLAN_COVERS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'];
+  const clanCover = (name,{tall = false} = {}) => CLAN_COVERS.includes(name) ? `public/assets/clans/covers/${name.toLowerCase()}${tall ? '-tall' : ''}.webp` : '';
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
     const [chosen,...alternatives] = clanMonCandidates(name);
     return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

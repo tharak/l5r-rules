@@ -264,3 +264,7 @@
 .mon-debug-flag { border-color: var(--red); border-left-width: 3px; }
 .mon-debug-alt { display: inline-block !important; width: 20px !important; height: 20px !important; vertical-align: middle; margin-right: 3px; background: none !important; }
 .mon-debug-priority { margin: 0 0 8px; color: var(--muted); }
+.mon-debug-covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.mon-debug-covers figure { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+.mon-debug-covers img { width: 100%; height: 150px; object-fit: cover; border-radius: 2px; }
+.mon-debug-covers figcaption { grid-column: 1 / -1; font: 16px var(--serif); }

@@ -150,6 +150,7 @@ async function mountClanMons(element) {
   element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image each clan uses. Sources are used in priority order: the official site, l5r.wiki, the mandala, then l5r.fandom.com. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
     <p class="mon-debug-priority">Priority: ${C.MON_PRIORITY.map(kind => esc(C.MON_SOURCES[kind].label)).join(' → ')}</p>
     ${sections}
+    <h2>Clan cover art (legendofthefiverings.com)</h2><div class="mon-debug-covers">${C.CLAN_COVERS.map(name => `<figure><img src="${C.clanCover(name)}" alt="${esc(name)} Clan cover art" loading="lazy"><img src="${C.clanCover(name,{tall:true})}" alt="${esc(name)} Clan tall cover art" loading="lazy"><figcaption>${esc(name)}</figcaption></figure>`).join('')}</div>
     <h2>Clans without a mon (default five-rings mon)</h2><div class="mon-debug-grid">${missing}</div></div>`;
 }
 
