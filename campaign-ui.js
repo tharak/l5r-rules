@@ -299,11 +299,13 @@
   document.addEventListener('change',async event=>{
     if (event.target.dataset?.npcPortrait === undefined) return;
     const file=event.target.files?.[0], editing=npcDraft || npcId;
+    // Clear the input so choosing the same file again still opens the cropper.
+    event.target.value='';
     if (!file) return;
     try {
       const url=await UI.readPortrait(file);
-      // Ignore a picture that finishes loading after another NPC was opened.
-      if ((npcDraft || npcId) !== editing) return;
+      // Ignore a picture chosen after another NPC was opened; Cancel keeps the current one.
+      if (!url || (npcDraft || npcId) !== editing) return;
       setNPCPortrait(url);
     } catch (err) { error=err.message || 'This picture could not be read.'; }
     changed();

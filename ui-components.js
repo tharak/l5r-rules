@@ -112,22 +112,103 @@
     const remove = src ? button({text:'Remove picture',variant:'quiet',size:'compact',attrs:removeAttrs}) : '';
     return element('div',{...attrs,class:classes('ui-portrait',attrs.class)},image+element('div',{class:'ui-portrait-actions'},pick+remove));
   }
-  // Shrink a chosen image to at most 256px on its longest side and re-encode it
-  // as JPEG, lowering quality until it fits the stored size limit.
-  async function readPortrait(file,{size=256} = {}) {
-    if (!file || !/^image\//.test(file.type)) throw new Error('Choose an image file.');
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1,size/Math.max(bitmap.width,bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1,Math.round(bitmap.width*scale)); canvas.height = Math.max(1,Math.round(bitmap.height*scale));
-    const context = canvas.getContext('2d');
-    context.fillStyle = '#fff'; context.fillRect(0,0,canvas.width,canvas.height);
-    context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close?.();
-    for (const quality of [0.85,0.7,0.55,0.4]) {
-      const url = canvas.toDataURL('image/jpeg',quality);
-      if (isPortrait(url)) return url;
-    }
-    throw new Error('This picture is too detailed to store. Try a simpler or smaller image.');
+  // Square cropper geometry, kept pure so it can be tested. `view` is the frame's
+  // side in CSS pixels; zoom 1 is the smallest scale that still fills the frame.
+  // x/y are the image's top-left offset inside the frame and are clamped so the
+  // image always covers the frame. `source` is the square to copy from the image.
+  const MAX_ZOOM = 4;
+  function cropGeometry({width,height,view,zoom=1,x,y}) {
+    zoom = Math.min(Math.max(Number(zoom) || 1,1),MAX_ZOOM);
+    const scale = Math.max(view/width,view/height)*zoom, w = width*scale, h = height*scale;
+    const clamp = (value,min) => Math.min(0,Math.max(min,value));
+    x = clamp(x ?? (view-w)/2,view-w); y = clamp(y ?? (view-h)/2,view-h);
+    return {zoom,scale,x,y,w,h,source:{x:-x/scale,y:-y/scale,size:view/scale}};
   }
-  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,isPortrait,PORTRAIT_MAX_LENGTH};
+  // Keep the image point under (px,py) fixed while changing zoom.
+  function zoomGeometry(current,{width,height,view},zoom,px = view/2,py = view/2) {
+    const next = cropGeometry({width,height,view,zoom,x:0,y:0});
+    const ratio = next.scale/current.scale;
+    return cropGeometry({width,height,view,zoom:next.zoom,x:px-(px-current.x)*ratio,y:py-(py-current.y)*ratio});
+  }
+  // Open a modal where the viewer drags and zooms the chosen image inside a
+  // square, then save that square as a JPEG of at most `size` pixels.
+  // Resolves with the picture, or null when the viewer cancels.
+  function readPortrait(file,{size=256} = {}) {
+    if (!file || !/^image\//.test(file.type)) return Promise.reject(new Error('Choose an image file.'));
+    return new Promise((resolve,reject) => {
+      const url = URL.createObjectURL(file), image = new Image();
+      image.alt = '';
+      image.className = 'ui-cropper-image';
+      image.draggable = false;
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('This picture could not be read.')); };
+      image.onload = () => {
+        const holder = document.createElement('div');
+        holder.innerHTML = dialog({title:'Position picture',titleId:'ui-cropper-title',attrs:{class:'ui-cropper'},bodyClass:'ui-cropper-body',
+          bodyHtml:`<p class="ui-cropper-help">Drag the picture to position it. Zoom with the slider, the mouse wheel, a pinch, or the + and − keys. Arrow keys move it.</p>${element('div',{class:'ui-cropper-frame',tabindex:0,role:'group','aria-label':'Picture position'},'')}${field({label:'Zoom',type:'range',attrs:{class:'ui-cropper-zoom',min:1,max:MAX_ZOOM,step:0.01,value:1}})}`,
+          footerHtml:button({text:'Cancel',variant:'secondary',attrs:{'data-cropper':'cancel'}})+button({text:'Use picture',attrs:{'data-cropper':'use'}})});
+        document.body.append(holder);
+        const box = holder.querySelector('dialog'), frame = box.querySelector('.ui-cropper-frame'), slider = box.querySelector('.ui-cropper-zoom');
+        frame.append(image);
+        box.showModal();
+        const natural = {width:image.naturalWidth,height:image.naturalHeight,view:frame.clientWidth || 256};
+        let geometry = cropGeometry(natural);
+        const apply = next => {
+          geometry = next;
+          Object.assign(image.style,{width:`${next.w}px`,height:`${next.h}px`,transform:`translate(${next.x}px,${next.y}px)`});
+          slider.value = String(next.zoom);
+        };
+        const move = (dx,dy) => apply(cropGeometry({...natural,zoom:geometry.zoom,x:geometry.x+dx,y:geometry.y+dy}));
+        const zoomTo = (zoom,px,py) => apply(zoomGeometry(geometry,natural,zoom,px,py));
+        const local = event => { const r = frame.getBoundingClientRect(); return [event.clientX-r.left,event.clientY-r.top]; };
+        apply(geometry);
+        // One pointer drags; two pointers pinch-zoom around their midpoint.
+        const pointers = new Map();
+        let pinch = null;
+        frame.addEventListener('pointerdown',event => {
+          frame.setPointerCapture(event.pointerId); pointers.set(event.pointerId,local(event)); frame.focus();
+          if (pointers.size === 2) { const [a,b] = [...pointers.values()]; pinch = {distance:Math.hypot(a[0]-b[0],a[1]-b[1]) || 1,zoom:geometry.zoom}; }
+        });
+        frame.addEventListener('pointermove',event => {
+          const previous = pointers.get(event.pointerId);
+          if (!previous) return;
+          const point = local(event); pointers.set(event.pointerId,point);
+          if (pointers.size === 1) move(point[0]-previous[0],point[1]-previous[1]);
+          else if (pinch) { const [a,b] = [...pointers.values()]; zoomTo(pinch.zoom*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.distance,(a[0]+b[0])/2,(a[1]+b[1])/2); }
+        });
+        const release = event => { pointers.delete(event.pointerId); if (pointers.size < 2) pinch = null; };
+        frame.addEventListener('pointerup',release); frame.addEventListener('pointercancel',release);
+        frame.addEventListener('wheel',event => { event.preventDefault(); zoomTo(geometry.zoom*Math.exp(-event.deltaY*0.0015),...local(event)); },{passive:false});
+        frame.addEventListener('keydown',event => {
+          const step = event.shiftKey ? 40 : 10;
+          const moves = {ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]};
+          if (moves[event.key]) move(...moves[event.key]);
+          else if (['+','='].includes(event.key)) zoomTo(geometry.zoom*1.1);
+          else if (['-','_'].includes(event.key)) zoomTo(geometry.zoom/1.1);
+          else return;
+          event.preventDefault();
+        });
+        slider.addEventListener('input',() => zoomTo(Number(slider.value)));
+        const finish = result => { box.close(); holder.remove(); URL.revokeObjectURL(url); resolve(result); };
+        box.addEventListener('cancel',event => { event.preventDefault(); finish(null); });
+        box.querySelector('[data-cropper="cancel"]').addEventListener('click',() => finish(null));
+        box.querySelector('[data-cropper="use"]').addEventListener('click',() => {
+          const {source} = geometry, side = Math.max(1,Math.min(size,Math.round(source.size)));
+          const canvas = document.createElement('canvas');
+          canvas.width = canvas.height = side;
+          const context = canvas.getContext('2d');
+          context.fillStyle = '#fff'; context.fillRect(0,0,side,side);
+          context.drawImage(image,source.x,source.y,source.size,source.size,0,0,side,side);
+          for (const quality of [0.85,0.7,0.55,0.4]) {
+            const picture = canvas.toDataURL('image/jpeg',quality);
+            if (isPortrait(picture)) { finish(picture); return; }
+          }
+          box.close(); holder.remove(); URL.revokeObjectURL(url);
+          reject(new Error('This picture is too detailed to store. Try a simpler or smaller image.'));
+        });
+        frame.focus();
+      };
+      image.src = url;
+    });
+  }
+  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

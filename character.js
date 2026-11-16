@@ -774,8 +774,10 @@
     const editing = sheet;
     try {
       const url = await UI.readPortrait(file);
-      // Ignore a picture that finishes loading after another character was opened.
+      // Ignore a picture chosen after another character was opened.
       if (sheet !== editing) return;
+      // Cancelling the cropper keeps the current picture.
+      if (!url) { root.querySelector('[data-portrait]')?.focus(); return; }
       sheet.portrait = url;
       save();
     } catch (error) { uiError = error.message || 'This picture could not be read.'; }
@@ -796,7 +798,12 @@
       return;
     }
     uiError = '';
-    if (event.target.dataset.portrait !== undefined) { setPortrait(event.target.files?.[0]); return; }
+    if (event.target.dataset.portrait !== undefined) {
+      const file = event.target.files?.[0];
+      // Clear the input so choosing the same file again still opens the cropper.
+      event.target.value = '';
+      setPortrait(file); return;
+    }
     if (handleExtendedChange(event)) return;
     const field = event.target.dataset.field;
     if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }

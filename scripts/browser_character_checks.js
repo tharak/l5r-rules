@@ -22,13 +22,30 @@ async page => {
     check(await p.locator('.creator-roll-dice li').count()===2,'Default Trait roll did not run');
     await p.keyboard.press('Escape');
     check(await p.locator('[data-public]').count()===0,'Paused section privacy controls are still shown');
-    // A large PNG is shrunk to a small inline JPEG, kept across reloads, and removable.
-    const png=await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');x.fillStyle='#7a3';x.fillRect(0,0,1200,800);return c.toDataURL('image/png').split(',')[1];});
-    await p.locator('#creator-identity [data-portrait]').setInputFiles({name:'portrait.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+    // Choosing a picture opens a square cropper; dragging and zooming choose what is saved.
+    // The test image is red on its left half and blue on its right half.
+    const png=await p.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');x.fillStyle='#f00';x.fillRect(0,0,600,800);x.fillStyle='#00f';x.fillRect(600,0,600,800);return c.toDataURL('image/png').split(',')[1];});
+    const choose=()=>p.locator('#creator-identity [data-portrait]').setInputFiles({name:'portrait.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+    await choose();
+    const cropper=p.getByRole('dialog',{name:'Position picture',exact:true});
+    await cropper.waitFor();
+    await cropper.getByRole('button',{name:'Cancel',exact:true}).click();
+    check(await p.locator('#creator-identity img.ui-portrait-image').count()===0,'Cancelling the cropper saved a picture');
+    await choose();await cropper.waitFor();
+    const frame=cropper.locator('.ui-cropper-frame'),box=await frame.boundingBox();
+    check(Math.abs(box.width-box.height)<1,'Cropper frame is not square');
+    await cropper.getByRole('slider',{name:'Zoom',exact:true}).fill('2');
+    // Drag the picture right as far as it goes, so only its red left edge stays in the frame.
+    await p.mouse.move(box.x+box.width/2,box.y+box.height/2);await p.mouse.down();
+    await p.mouse.move(box.x+box.width*3,box.y+box.height/2,{steps:8});await p.mouse.up();
+    await cropper.getByRole('button',{name:'Use picture',exact:true}).click();
     await p.locator('#creator-identity img.ui-portrait-image').waitFor();
+    check(await cropper.count()===0,'Cropper stayed open after Use picture');
     const stored=await p.evaluate(()=>CharacterBuilder.read(CharacterBuilder.list()[0].id).portrait);
-    check(stored.startsWith('data:image/jpeg;base64,')&&stored.length<=120000,'Picture was not shrunk to a small JPEG');
-    check(await p.locator('#creator-identity img.ui-portrait-image').evaluate(img=>img.naturalWidth===256&&img.naturalHeight===171),'Picture was not resized to 256px');
+    check(stored.startsWith('data:image/jpeg;base64,')&&stored.length<=120000,'Picture was not saved as a small JPEG');
+    const saved=await p.locator('#creator-identity img.ui-portrait-image').evaluate(img=>{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d');x.drawImage(img,0,0);const [r,,b]=x.getImageData(c.width-2,c.height/2,1,1).data;return {width:img.naturalWidth,height:img.naturalHeight,r,b};});
+    check(saved.width===256&&saved.height===256,'Saved picture is not a 256px square: '+JSON.stringify(saved));
+    check(saved.r>200&&saved.b<60,'Dragging did not change the saved crop: '+JSON.stringify(saved));
     await p.reload();await p.locator('#creator-identity img.ui-portrait-image').waitFor();
     await p.getByRole('button',{name:'Remove character picture',exact:true}).click();
     check(await p.locator('#creator-identity img.ui-portrait-image').count()===0,'Picture was not removed');

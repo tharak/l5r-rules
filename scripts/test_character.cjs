@@ -590,6 +590,13 @@ test('a character picture is added, kept across reloads, removed, and cleared by
   assert.equal((await c.data()).character.portrait,picture);
   const reloaded=await c.reload();
   assert.match(sectionHtml(reloaded,'identity'),/<img class="ui-portrait-image" src="data:image\/png;base64,/);
+  // Cancelling the cropper keeps the current picture.
+  reloaded.window.UI.readPortrait=async()=>null;
+  const input={dataset:{portrait:''},files:[{type:'image/png'}],value:'C:\\fakepath\\a.png'};
+  await reloaded.root.onchange({target:input});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await reloaded.data()).character.portrait,picture);
+  assert.equal(input.value,'','the file input is cleared so the same file can be chosen again');
   reloaded.click({action:'remove-portrait'});
   assert.equal((await reloaded.data()).character.portrait,'');
   c.window.UI.readPortrait=async()=>{throw new Error('Choose an image file.');};

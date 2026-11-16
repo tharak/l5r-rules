@@ -68,3 +68,25 @@ test('portraits render only small inline images and offer Remove only when a pic
     assert.ok(!UI.portrait({src}).includes('<img'),src.slice(0,40));
   }
 });
+
+test('the square cropper fills the frame, stays inside the image, and zooms around a point',()=>{
+  const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,`${a} ≠ ${b}`);
+  // A 400×200 landscape picture in a 100px frame starts centred at the smallest covering scale.
+  const start=UI.cropGeometry({width:400,height:200,view:100});
+  near(start.scale,0.5);near(start.x,-50);near(start.y,0);
+  near(start.source.x,100);near(start.source.y,0);near(start.source.size,200);
+  // Dragging past an edge stops at that edge; the frame is never left uncovered.
+  const left=UI.cropGeometry({width:400,height:200,view:100,x:500,y:30});
+  near(left.x,0);near(left.y,0);near(left.source.x,0);
+  const right=UI.cropGeometry({width:400,height:200,view:100,x:-1000});
+  near(right.x,-100);near(right.source.x+right.source.size,400);
+  // Zoom is limited to 1×–4×.
+  near(UI.cropGeometry({width:400,height:200,view:100,zoom:0.2}).zoom,1);
+  near(UI.cropGeometry({width:400,height:200,view:100,zoom:9}).zoom,4);
+  // Zooming keeps the image point under the cursor in place.
+  const zoomed=UI.zoomGeometry(start,{width:400,height:200,view:100},2,25,50);
+  near(zoomed.scale,1);
+  near((25-start.x)/start.scale,(25-zoomed.x)/zoomed.scale);
+  near((50-start.y)/start.scale,(50-zoomed.y)/zoomed.scale);
+  near(zoomed.source.size,100);
+});

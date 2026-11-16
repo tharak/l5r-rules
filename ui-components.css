@@ -59,3 +59,20 @@
 .ui-portrait-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .ui-portrait-pick:has(.ui-portrait-input:disabled) { opacity: .5; cursor: not-allowed; }
 @media print { .ui-portrait-actions { display: none; } .ui-portrait-image { width: 72px; height: 72px; } }
+
+/* Square picture cropper: the image is positioned inside a fixed square frame;
+   only the part inside the frame is saved. */
+.ui-cropper { width: min(400px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #b9aa8d; border-radius: 3px; background: var(--surface, #fffbf2); color: var(--ink); }
+.ui-cropper[open] { display: flex; flex-direction: column; }
+.ui-cropper::backdrop { background: #252622b8; }
+.ui-cropper header { padding: 16px; border-bottom: 1px solid #b9aa8d; }
+.ui-cropper h2 { margin: 0; font: 22px var(--serif, Georgia, serif); }
+.ui-cropper-body { display: grid; justify-items: center; gap: 12px; min-height: 0; overflow: auto; padding: 16px; }
+.ui-cropper-help { margin: 0; font-size: 12px; text-align: center; }
+.ui-cropper-frame { position: relative; width: min(256px, calc(100vw - 96px)); aspect-ratio: 1; overflow: hidden; border: 1px solid #b9aa8d; background: var(--wash); cursor: grab; touch-action: none; user-select: none; }
+.ui-cropper-frame:active { cursor: grabbing; }
+.ui-cropper-frame:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.ui-cropper-image { position: absolute; top: 0; left: 0; max-width: none!important; transform-origin: 0 0; pointer-events: none; user-select: none; }
+.ui-cropper-body .ui-field-label { display: grid; gap: 4px; width: min(256px, 100%); font-size: 12px; }
+.ui-cropper-zoom.ui-field { padding: 0; border: 0; background: transparent; accent-color: var(--red); }
+.ui-cropper footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
