@@ -128,6 +128,27 @@ function characterAvatar(character) {
   return `<span class="character-avatar" aria-hidden="true">${esc((character.name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
 }
 
+// Debug page (#/clan-mons): every catalog clan with the mon assigned to it, its source,
+// and the mandala mons that were not matched, so assignments can be checked by eye.
+async function mountClanMons(element) {
+  const C = window.CharacterCatalog;
+  let clans = [];
+  try { clans = (await (await fetch('public/character-data.json')).json()).clans; } catch { element.innerHTML = '<p>The clan list could not be loaded.</p>'; return; }
+  if (currentSlug() !== 'clan-mons') return;
+  const card = ({src,title,lines,flag}) => `<article class="mon-debug-card${flag?' mon-debug-flag':''}">${src?`<img src="${src}" alt="">`:'<span class="mon-debug-none" aria-hidden="true">—</span>'}<div><h3>${esc(title)}</h3>${lines.filter(Boolean).map(line=>`<p>${line}</p>`).join('')}</div></article>`;
+  const source = info => `<a href="${info.source.href}" target="_blank" rel="noopener">${esc(info.source.label)}</a>`;
+  const assigned = clans.map(clan => ({clan,info:C.clanMonInfo(clan.name)})).filter(item => item.info);
+  const group = kind => assigned.filter(item => item.info.kind === kind).map(({clan,info}) => card({src:info.src,title:clan.name,flag:info.guess,lines:[esc(clan.group),info.position?`Mandala position: ${info.position}`:'',info.guess?'<strong>Best guess</strong>':'',source(info)]})).join('');
+  const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({title:clan.name,lines:[esc(clan.group),'No mon']})).join('');
+  const unassigned = C.UNASSIGNED_MONS.map((mon,index) => card({src:mon.src,title:`Unassigned ${index+1}`,flag:true,lines:[`Mandala position: ${mon.position}`,mon.note ? esc(mon.note) : 'Not identified']})).join('');
+  element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image is assigned to each clan. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
+    <h2>From the DeviantArt mandala</h2><div class="mon-debug-grid">${group('mandala')}</div>
+    <h2>Not assigned (mandala)</h2><div class="mon-debug-grid">${unassigned}</div>
+    <h2>Official site</h2><div class="mon-debug-grid">${group('official')}</div>
+    <h2>l5r.wiki</h2><div class="mon-debug-grid">${group('wiki')}</div>
+    <h2>Clans without a mon</h2><div class="mon-debug-grid">${missing}</div></div>`;
+}
+
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
   return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Create PC',attrs:{'data-dashboard':'new'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2><button type="button" class="character-open" data-dashboard="open" data-id="${esc(c.id)}">${esc(c.name || 'Unnamed PC')}</button></h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
@@ -223,17 +244,19 @@ function render() {
   const characterEditor = slug === 'create-character';
   const designGuide = slug === 'design-guideline';
   const portraitCreator = slug === 'portrait-creator';
+  const clanMons = slug === 'clan-mons';
   document.body.dataset.overview = ['campaigns', 'characters', 'books'].includes(slug);
-  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
-  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
   if (characterEditor) window.CharacterBuilder.mount($('#app'));
   if (portraitCreator) window.PortraitCreator.mount($('#app'));
+  if (clanMons) mountClanMons($('#app'));
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
   const fragment = location.hash.split('#').slice(2).join('#');

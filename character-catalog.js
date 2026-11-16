@@ -100,6 +100,22 @@
   const CLAN_MONS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial',
     'Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Sparrow','Tiger','Tortoise','Raven'];
   const clanMon = name => CLAN_MONS.includes(name) ? `public/assets/clans/${name.toLowerCase()}.webp` : '';
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, clanMon, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  // Where each bundled mon came from, for the #/clan-mons debug page. Mandala mons note
+  // their clock position in Shin-Ian's artwork; `guess` marks uncertain identifications.
+  const MON_SOURCES = {
+    official:{label:'legendofthefiverings.com',href:'https://www.legendofthefiverings.com/lore/clans/the-crane-clan/'},
+    wiki:{label:'l5r.wiki (recoloured)',href:'https://l5r.wiki/clans'},
+    mandala:{label:'Shin-Ian, "The Clans of Rokugan" (DeviantArt)',href:'https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095'}
+  };
+  const MANDALA = {Raven:'11:30',Dragonfly:'12:30',Tortoise:'1:00',Monkey:'2:00',Tiger:'2:30',Bat:'3:30',Badger:'5:00',Falcon:'5:30',Hare:'8:00',Sparrow:'8:30',Boar:'9:30',Ox:'10:00',Fox:'11:00'};
+  const MON_GUESSES = ['Badger','Hare','Sparrow','Tiger'];
+  // Mandala mons that were not matched to a clan; shown on the debug page for identification.
+  const UNASSIGNED_MONS = [{src:'public/assets/clans/unassigned/unassigned-1.webp',position:'4:00'},{src:'public/assets/clans/unassigned/unassigned-2.webp',position:'6:30',note:'Looks like a rat (Nezumi?)'},{src:'public/assets/clans/unassigned/unassigned-3.webp',position:'7:00',note:'Coiled snake (Snake clan or Naga?)'}];
+  function clanMonInfo(name) {
+    if (!CLAN_MONS.includes(name)) return null;
+    const kind = MANDALA[name] ? 'mandala' : ['Mantis','Spider','Imperial'].includes(name) ? 'wiki' : 'official';
+    return {src:clanMon(name),kind,source:MON_SOURCES[kind],position:MANDALA[name] || '',guess:MON_GUESSES.includes(name)};
+  }
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, clanMon, clanMonInfo, UNASSIGNED_MONS, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

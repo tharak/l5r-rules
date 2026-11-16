@@ -251,3 +251,12 @@
   }
 }
 @media print { .setting-banner { display: none !important; } }
+
+/* Clan mon debug page (#/clan-mons). */
+.mon-debug h2 { margin: 28px 0 10px; font: 20px var(--serif); }
+.mon-debug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.mon-debug-card { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+.mon-debug-card img, .mon-debug-none { width: 72px; height: 72px; flex: none; object-fit: contain; display: grid; place-items: center; color: var(--muted); font-size: 24px; background: var(--wash); border-radius: 3px; }
+.mon-debug-card h3 { margin: 0 0 4px; font: 17px var(--serif); }
+.mon-debug-card p { margin: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.mon-debug-flag { border-color: var(--red); border-left-width: 3px; }
