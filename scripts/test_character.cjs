@@ -553,7 +553,7 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   assert.ok(!sectionHtml(unarmed,'skills').includes('data-skill-name="Weapons"'),'Weapons shows without a trained weapon skill');
   const empty=await character();
   empty.root.onchange({target:{dataset:{skillFilterView:'skills',hideZeroSkills:''},checked:true}});
-  assert.match(sectionHtml(empty,'skills'),/No skills match these filters/);
+  assert.match(sectionHtml(empty,'skills'),/Choose a school or add a skill to begin/);
 });
 
 test('both sets of skill filter checkboxes keep keyboard focus after re-rendering',async()=>{
