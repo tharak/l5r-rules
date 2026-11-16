@@ -119,10 +119,12 @@ function iconFor(title) {
   return icons[title] || '◈';
 }
 
-// The saved picture, or the name's first letter when there is none. The name
-// follows in the tile, so the picture itself is decorative.
+// The saved picture, else the clan's mon, else the name's first letter. The name
+// and clan follow in the tile, so the image itself is decorative.
 function characterAvatar(character) {
   if (UI.isPortrait(character.portrait)) return `<img class="character-avatar" src="${character.portrait}" alt="">`;
+  const mon = window.CharacterCatalog?.clanMon(character.clan);
+  if (mon) return `<img class="character-avatar character-avatar-mon" src="${mon}" alt="">`;
   return `<span class="character-avatar" aria-hidden="true">${esc((character.name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
 }
 

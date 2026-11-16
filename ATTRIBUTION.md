@@ -4,6 +4,8 @@ The rules snapshot was imported from [Last Haiku](https://lasthaiku.wikidot.com/
 
 Structured weapon and armor statistics and skill mastery descriptions reuse the resource catalogs in the user's [LegendOfTheFiveRings core library](https://github.com/tharak/LegendOfTheFiveRings/tree/main/Sources/LegendOfTheFiveRings/Resources). Ability, ancestor, and supplementary school descriptions come from the source pages below. Rules calculations were checked against the fourth-edition printed core rulebook; the source PDF is excluded from deployment.
 
+The seven Great Clan mons in `public/assets/clans/` (Crab, Crane, Dragon, Lion, Phoenix, Scorpion, Unicorn) are official artwork from the clan pages of [legendofthefiverings.com](https://www.legendofthefiverings.com/lore/clans/the-crane-clan/) (© Legend of the Five Rings, published by Fantasy Flight Games / Asmodee; all rights reserved). They are used for non-commercial fan purposes, resized to 192px from the site's `05a_Clan_Icon` images on `cdn.svc.asmodee.net`, and are not covered by the CC BY-SA license above.
+
 Source pages:
 
 - Start: https://lasthaiku.wikidot.com/start

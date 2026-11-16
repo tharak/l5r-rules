@@ -94,6 +94,10 @@
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  // Official mons from legendofthefiverings.com (see ATTRIBUTION.md). Only these
+  // seven Great Clans have one; every other clan returns ''.
+  const CLAN_MONS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'];
+  const clanMon = name => CLAN_MONS.includes(name) ? `public/assets/clans/${name.toLowerCase()}.webp` : '';
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, clanMon, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

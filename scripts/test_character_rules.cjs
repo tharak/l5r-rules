@@ -485,3 +485,13 @@ test('sheet pictures keep only small inline images and an Identity reset clears 
  assert.equal(reset.portrait,'');assert.equal(reset.notes,'kept');
  assert.equal(R.resetSection({portrait:picture},'story',catalog).portrait,picture);
 });
+
+test('the seven Great Clans with official mons map to bundled images; other clans have none',()=>{
+ for(const clan of ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn']) {
+  const mon=C.clanMon(clan);
+  assert.equal(mon,`public/assets/clans/${clan.toLowerCase()}.webp`);
+  assert.ok(fs.existsSync(mon),mon);
+  assert.ok(catalog.clans.some(c=>c.name===clan),clan);
+ }
+ for(const clan of ['Mantis','Spider','Fox','Ronin','Imperial','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
+});
