@@ -15,13 +15,6 @@ service cloud.firestore {
       return data.ownerUid == u && data.characterId == id && member(c,u)
         && data.membershipId == get(/databases/$(database)/documents/campaigns/$(c)/members/$(u)).data.membershipId;
     }
-    function granted(u,id,full) {
-      let grantId = (full ? 'full_' : 'public_') + request.auth.uid;
-      let grant = get(/databases/$(database)/documents/users/$(u)/characters/$(id)/grants/$(grantId)).data;
-      return signed() && joined(grant.campaignId)
-        && grant.membershipId == get(/databases/$(database)/documents/campaigns/$(grant.campaignId)/members/$(request.auth.uid)).data.membershipId && validPC(grant.campaignId,grant.pcId,u,id)
-        && (!full || gm(grant.campaignId));
-    }
     function mask(v) {
       return v is map && v.keys().hasAll(['identity','traits','skills','options','story','summary'])
         && v.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
@@ -58,17 +51,12 @@ service cloud.firestore {
         && (('abilities' in f.visibility) == ('abilities' in f.sections))
         && sectionShape(f.sections) && projection(f,p);
     }
-    function unchangedMask(a,b) {
-      return a.identity == b.identity && a.traits == b.traits && a.skills == b.skills
-        && a.options == b.options && a.story == b.story && a.summary == b.summary
-        && a.get('abilities',false) == b.get('abilities',false);
-    }
+    // Privacy is paused: anyone can read a character sheet by its path, and only its
+    // creator writes it. Listing stays owner-only so sheets cannot be enumerated.
     match /users/{u}/characters/{id} {
       allow list: if owner(u);
-      allow get: if owner(u) || granted(u,id,true);
-      allow create: if owner(u) && validFull(u,id);
-      allow update: if validFull(u,id) && (owner(u) || (granted(u,id,true)
-        && unchangedMask(request.resource.data.visibility,resource.data.visibility)));
+      allow get: if true;
+      allow create, update: if owner(u) && validFull(u,id);
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id));
       match /grants/{viewer} {
         allow get: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
@@ -81,8 +69,8 @@ service cloud.firestore {
     }
     match /users/{u}/publicCharacters/{id} {
       allow list: if owner(u);
-      allow get: if owner(u) || granted(u,id,false);
-      allow create, update: if (owner(u) || granted(u,id,true))
+      allow get: if true;
+      allow create, update: if owner(u)
         && projection(getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data,request.resource.data);
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/characters/$(id));
     }
@@ -152,10 +140,7 @@ service cloud.firestore {
           return kind == 'plots' || (m.targetKind in ['sessions','pcs','npcs','plots']
             && exists(/databases/$(database)/documents/campaigns/$(c)/$(m.targetKind)/$(m.targetId))
             && (m.targetKind != 'npcs' || gm(c))
-            && (m.targetKind != 'plots' || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == m.targetCreatorUid)
-            && (m.targetKind != 'plots'
-              || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.public
-              || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == request.auth.uid || gm(c)));
+            && (m.targetKind != 'plots' || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == m.targetCreatorUid));
         }
         function validMetadata() {
           let m = request.resource.data;
@@ -199,8 +184,8 @@ service cloud.firestore {
               && b.revision == m.revision
               && (kind != 'plots' || (b.title is string && b.title.size() > 0 && b.title.size() <= 200));
           }
-          allow get: if entryKind() && bodyId == 'body' && joined(c) && targetReadable(metadata())
-            && (metadata().public || metadata().creatorUid == request.auth.uid || gm(c));
+          // Privacy is paused: every campaign member reads every plot and note body.
+          allow get: if entryKind() && bodyId == 'body' && joined(c) && targetReadable(metadata());
           allow create, update: if entryKind() && bodyId == 'body' && joined(c) && validBody();
           allow delete: if entryKind() && bodyId == 'body' && joined(c)
             && (metadata().creatorUid == request.auth.uid || gm(c) || parentOwner(metadata()));

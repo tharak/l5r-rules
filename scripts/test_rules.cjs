@@ -29,20 +29,23 @@ test('owner full access and atomic projection writes; hidden sections never ente
  await assertFails(batch(d,[['users/alice/characters/pc',{...full,revision:'forged',sections:{...sections,identity:{...sections.identity,notes:'SECRET'}}}],['users/alice/publicCharacters/pc',{revision:'forged',sections:{identity:{...sections.identity,notes:'SECRET'}}}]]));
  const publicData=(await getDoc(r(d,'users/alice/publicCharacters/pc'))).data();assert.ok(!JSON.stringify(publicData).includes('SECRET'));
 });
-test('GM and player grants, outsiders, anonymous reads, forged grants, and visibility changes',async()=>{
- for(const u of ['gm','bob'])await assertSucceeds(setDoc(r(db(u),`users/alice/characters/pc/grants/${u==='gm'?'full_gm':'public_bob'}`),{campaignId:'c',pcId:'alice_pc',membershipId:u+'-membership'}));
- await assertSucceeds(getDoc(r(db('gm'),'users/alice/characters/pc')));
- await assertSucceeds(getDoc(r(db('bob'),'users/alice/publicCharacters/pc')));
- await assertFails(getDoc(r(db('bob'),'users/alice/characters/pc')));
- await assertFails(getDocs(collection(db('bob'),'users/alice/publicCharacters')));
- for(const u of ['outsider',null]){await assertFails(getDoc(r(db(u),'users/alice/publicCharacters/pc')));await assertFails(getDoc(r(db(u),'campaigns/c')));}
+test('privacy is paused: anyone reads a sheet by its path, only its owner writes it, nobody lists it',async()=>{
+ for(const u of ['gm','bob','outsider',null]) {
+  await assertSucceeds(getDoc(r(db(u),'users/alice/characters/pc')));
+  await assertSucceeds(getDoc(r(db(u),'users/alice/publicCharacters/pc')));
+  await assertFails(getDocs(collection(db(u),'users/alice/characters')));
+  await assertFails(getDocs(collection(db(u),'users/alice/publicCharacters')));
+ }
+ for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c')));
+ // Older clients still request grants; forged grants stay rejected.
+ await assertSucceeds(setDoc(r(db('bob'),'users/alice/characters/pc/grants/public_bob'),{campaignId:'c',pcId:'alice_pc',membershipId:'bob-membership'}));
+ await assertFails(setDoc(r(db('bob'),'users/alice/characters/pc/grants/full_bob'),{campaignId:'c',pcId:'alice_pc',membershipId:'bob-membership'}));
  await assertFails(setDoc(r(db('outsider'),'users/alice/characters/pc/grants/public_outsider'),{campaignId:'c',pcId:'alice_pc',membershipId:'outsider-membership'}));
  await assertFails(setDoc(r(db('bob'),'users/alice/characters/pc/grants/public_outsider'),{campaignId:'c',pcId:'alice_pc',membershipId:'bob-membership'}));
  await assertFails(setDoc(r(db('bob'),'users/alice/characters/pc/grants/public_bob'),{campaignId:'c',pcId:'missing',membershipId:'bob-membership'}));
- const changed={...full,revision:'r3',sheetJson:'{"notes":"GM edit"}'};
- await assertSucceeds(batch(db('gm'),[['users/alice/characters/pc',changed],['users/alice/publicCharacters/pc',{...projection,revision:'r3'}]]));
- const forged={...changed,revision:'r4',visibility:{...mask,story:true}};
- await assertFails(batch(db('gm'),[['users/alice/characters/pc',forged],['users/alice/publicCharacters/pc',{revision:'r4',sections:{identity:sections.identity,story:sections.story}}]]));
+ const changed={...full,revision:'r3',sheetJson:'{"notes":"Someone else edit"}'};
+ for(const u of ['gm','bob','outsider',null])await assertFails(batch(db(u),[['users/alice/characters/pc',changed],['users/alice/publicCharacters/pc',{...projection,revision:'r3'}]]));
+ await assertSucceeds(batch(db('alice'),[['users/alice/characters/pc',changed],['users/alice/publicCharacters/pc',{...projection,revision:'r3'}]]));
 });
 test('all 128 seven-section masks exclude hidden abilities from player responses and reject private metadata in public sections',async()=>{
  const allSections={...sections,abilities:{abilities:[{name:'SECRET POWER',kind:'custom',description:'private ability'}]}};
@@ -61,20 +64,16 @@ test('all 128 seven-section masks exclude hidden abilities from player responses
   assert.ok(!JSON.stringify(response).includes('PRIVATE APPROVAL'));
   assert.equal(Object.keys(response.sections).length,Object.values(visibility).filter(Boolean).length);
  }
- await assertFails(getDoc(r(db('bob'),'users/alice/characters/masks')));
+ await assertSucceeds(getDoc(r(db('bob'),'users/alice/characters/masks')));
  const bad={...full,revision:'private-fields',visibility:{...mask,abilities:true},sections:{...allSections,abilities:{abilities:[],exceptions:['PRIVATE']}}};
  await assertFails(batch(db('alice'),[['users/alice/characters/bad',bad],['users/alice/publicCharacters/bad',{revision:bad.revision,sections:{identity:sections.identity,abilities:bad.sections.abilities}}]]));
 });
-test('legacy six-section documents accept GM migration with Abilities private; only owners can publish Abilities',async()=>{
+test('legacy six-section documents are upgraded to Abilities only by their owner',async()=>{
  await assertSucceeds(batch(db('alice'),[['users/alice/characters/legacy7',full],['users/alice/publicCharacters/legacy7',projection]]));
- await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/pcs/legacy7_pc'),{ownerUid:'alice',characterId:'legacy7',membershipId:'alice-membership'}));
- await assertSucceeds(setDoc(r(db('gm'),'users/alice/characters/legacy7/grants/full_gm'),{campaignId:'c',pcId:'legacy7_pc',membershipId:'gm-membership'}));
- const next={...full,revision:'v2',visibility:{...mask,abilities:false},sections:{...sections,abilities:{abilities:[{name:'Secret'}]}}};
- await assertSucceeds(batch(db('gm'),[['users/alice/characters/legacy7',next],['users/alice/publicCharacters/legacy7',{...projection,revision:'v2'}]]));
- const published={...next,revision:'v3',visibility:{...next.visibility,abilities:true}},p={revision:'v3',sections:{...projection.sections,abilities:next.sections.abilities}};
- await assertFails(batch(db('gm'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
- await assertFails(batch(db('bob'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
- await assertSucceeds(batch(db('alice'),[['users/alice/characters/legacy7',published],['users/alice/publicCharacters/legacy7',p]]));
+ const next={...full,revision:'v2',visibility:{...mask,abilities:true},sections:{...sections,abilities:{abilities:[{name:'Ability'}]}}};
+ const p={revision:'v2',sections:{...projection.sections,abilities:next.sections.abilities}};
+ for(const u of ['gm','bob'])await assertFails(batch(db(u),[['users/alice/characters/legacy7',next],['users/alice/publicCharacters/legacy7',p]]));
+ await assertSucceeds(batch(db('alice'),[['users/alice/characters/legacy7',next],['users/alice/publicCharacters/legacy7',p]]));
 });
 test('campaign, session, NPC and membership permissions',async()=>{
  for(const u of ['alice','bob']){await assertSucceeds(getDoc(r(db(u),'campaigns/c/sessions/s')));await assertFails(getDoc(r(db(u),'campaigns/c/npcs/n')));await assertFails(setDoc(r(db(u),'campaigns/c/sessions/s'),{title:'Forged',text:'',updatedAt:'now'}));}
@@ -98,59 +97,49 @@ test('members publish only their own display names without changing membership a
  await assertFails(updateDoc(own,{displayName:'Alice',inviteToken:'forged'}));
  await assertFails(updateDoc(own,{displayName:'Alice',email:'private@example.test'}));
 });
-test('plots and attached notes protect text, creator controls, target access and revocation',async()=>{
+test('plots and attached notes are readable by every member and writable only by their creator',async()=>{
  const metadata=(creatorUid,isPublic,revision,extra={})=>({creatorUid,public:isPublic,revision,createdAt:'now',updatedAt:'now',...extra});
- const writeEntry=(u,kind,id,m,text='SECRET',title='Secret plot')=>batch(db(u),[
+ const writeEntry=(u,kind,id,m,text='TEXT',title='A plot')=>batch(db(u),[
   [`campaigns/c/${kind}/${id}`,m],
   [`campaigns/c/${kind}/${id}/content/body`,{text,revision:m.revision,...(kind==='plots'?{title}:{})}]
  ]);
- const plotPath='campaigns/c/plots/private_plot',bodyPath=plotPath+'/content/body';
+ const plotPath='campaigns/c/plots/alice_plot',bodyPath=plotPath+'/content/body';
+ // An entry saved as private before privacy was paused is shared with every member too.
  const m=metadata('alice',false,'p1');
- await assertSucceeds(writeEntry('alice','plots','private_plot',m));
- for(const u of ['alice','gm'])await assertSucceeds(getDoc(r(db(u),bodyPath)));
- for(const u of ['bob','outsider',null])await assertFails(getDoc(r(db(u),bodyPath)));
+ await assertSucceeds(writeEntry('alice','plots','alice_plot',m));
+ for(const u of ['alice','gm','bob'])await assertSucceeds(getDoc(r(db(u),bodyPath)));
+ for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),bodyPath)));
  const catalog=(await getDocs(collection(db('bob'),'campaigns/c/plots'))).docs.map(d=>d.data());
- assert.ok(!JSON.stringify(catalog).includes('SECRET'));assert.ok(!JSON.stringify(catalog).includes('Secret plot'));
+ assert.ok(!JSON.stringify(catalog).includes('TEXT'));
  await assertFails(getDocs(collection(db('bob'),plotPath+'/content')));
- await assertFails(writeEntry('bob','plots','private_plot',{...m,public:true,revision:'forged'}));
- await assertFails(writeEntry('gm','plots','private_plot',{...m,creatorUid:'gm',public:true,revision:'forged'}));
+ await assertFails(writeEntry('bob','plots','alice_plot',{...m,public:true,revision:'forged'}));
+ await assertFails(writeEntry('gm','plots','alice_plot',{...m,creatorUid:'gm',public:true,revision:'forged'}));
  await assertFails(writeEntry('alice','plots','forged_owner',{...m,creatorUid:'bob'}));
  await assertFails(setDoc(r(db('alice'),plotPath),{...m,title:'Leaked title'}));
  await assertFails(setDoc(r(db('alice'),plotPath),{...m,revision:'not-atomic'}));
- await assertSucceeds(writeEntry('alice','plots','private_plot',{...m,public:true,revision:'p2'},'PUBLIC','Public plot'));
- await assertSucceeds(getDoc(r(db('bob'),bodyPath)));
- const target={targetKind:'plots',targetId:'private_plot',targetCreatorUid:'alice'};
- await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',false,'n1',target)));
+ await assertSucceeds(writeEntry('alice','plots','alice_plot',{...m,public:true,revision:'p2'},'UPDATED','Updated plot'));
+ const target={targetKind:'plots',targetId:'alice_plot',targetCreatorUid:'alice'};
+ await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n1',target)));
  const notePath='campaigns/c/notes/bob_plot_note/content/body';
- for(const u of ['bob','gm'])await assertSucceeds(getDoc(r(db(u),notePath)));
- await assertFails(getDoc(r(db('alice'),notePath)));
- await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n2',target),'PUBLIC NOTE'));
- await assertSucceeds(getDoc(r(db('alice'),notePath)));
- await assertFails(writeEntry('alice','notes','bob_plot_note',metadata('bob',false,'n3',target)));
- await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n3',{targetKind:'sessions',targetId:'s'})));
- await assertSucceeds(writeEntry('alice','plots','private_plot',{...m,revision:'p3'}));
- // Even the note's creator loses access if the parent plot becomes private to someone else.
- await assertFails(getDoc(r(db('bob'),notePath)));
- await assertSucceeds(getDoc(r(db('gm'),notePath)));
- await assertFails(writeEntry('bob','notes','private_target',metadata('bob',true,'n1',target)));
+ for(const u of ['alice','bob','gm'])await assertSucceeds(getDoc(r(db(u),notePath)));
+ await assertFails(writeEntry('alice','notes','bob_plot_note',metadata('bob',true,'n2',target)));
+ await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n2',{targetKind:'sessions',targetId:'s'})));
  for(const [targetKind,targetId] of [['sessions','s'],['pcs','alice_pc']]) {
-  const id='note_'+targetKind,extra={targetKind,targetId};
-  await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',false,'n1',extra)));
-  await assertFails(getDoc(r(db('bob'),`campaigns/c/notes/${id}/content/body`)));
-  await assertSucceeds(getDoc(r(db('gm'),`campaigns/c/notes/${id}/content/body`)));
-  await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',true,'n2',extra),'PUBLIC'));
-  await assertSucceeds(getDoc(r(db('bob'),`campaigns/c/notes/${id}/content/body`)));
+  const id='note_'+targetKind;
+  await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',true,'n1',{targetKind,targetId})));
+  for(const u of ['bob','gm'])await assertSucceeds(getDoc(r(db(u),`campaigns/c/notes/${id}/content/body`)));
  }
+ // NPCs stay a GM-only section, so their notes do too.
  await assertSucceeds(writeEntry('gm','notes','npc_note',metadata('gm',true,'n1',{targetKind:'npcs',targetId:'n'})));
  await assertFails(getDoc(r(db('alice'),'campaigns/c/notes/npc_note/content/body')));
- await assertFails(writeEntry('alice','notes','npc_attack',metadata('alice',false,'n1',{targetKind:'npcs',targetId:'n'})));
- await assertFails(writeEntry('alice','notes','missing_target',metadata('alice',false,'n1',{targetKind:'sessions',targetId:'missing'})));
+ await assertFails(writeEntry('alice','notes','npc_attack',metadata('alice',true,'n1',{targetKind:'npcs',targetId:'n'})));
+ await assertFails(writeEntry('alice','notes','missing_target',metadata('alice',true,'n1',{targetKind:'sessions',targetId:'missing'})));
  await assertFails(writeEntry('outsider','plots','outside',metadata('outsider',true,'p1')));
  await assertFails(deleteDoc(r(db('alice'),plotPath)));
  await assertSucceeds(batch(db('alice'),[[bodyPath,null],[plotPath,null]]));
  await assertFails(getDoc(r(db('gm'),notePath)));
- // A different member cannot revive attached public notes by reusing a deleted private plot ID.
- await assertSucceeds(writeEntry('bob','plots','private_plot',metadata('bob',true,'replacement')));
+ // A different member cannot revive attached notes by reusing a deleted plot ID.
+ await assertSucceeds(writeEntry('bob','plots','alice_plot',metadata('bob',true,'replacement')));
  await assertFails(getDoc(r(db('bob'),notePath)));
  await env.withSecurityRulesDisabled(c=>deleteDoc(r(c.firestore(),'campaigns/c/members/alice')));
  await assertFails(getDoc(r(db('alice'),'campaigns/c/notes/note_sessions/content/body')));
@@ -171,13 +160,13 @@ test('invitations require explicit joining, expire after seven days, and revoke 
  await assertFails(getDoc(r(db('late'),'invites/expired')));
  await assertFails(batch(db('late'),[['campaigns/c/members/late',{gmUid:'gm',membershipId:'late',inviteToken:'expired'}],['users/late/campaigns/c',{gmUid:'gm',membershipId:'late'}]]));
 });
-test('removing membership or PC associations invalidates stale grants, including after rejoining',async()=>{
+test('leaving a campaign or unlinking a PC removes campaign access but not shared sheet reads',async()=>{
  await assertSucceeds(batch(db('gm'),[['campaigns/c/members/bob',null],['users/bob/campaigns/c',null]]));
- await assertFails(getDoc(r(db('bob'),'users/alice/publicCharacters/pc')));
+ await assertFails(getDoc(r(db('bob'),'campaigns/c')));
+ await assertSucceeds(getDoc(r(db('bob'),'users/alice/publicCharacters/pc')));
  await env.withSecurityRulesDisabled(c=>batch(c.firestore(),[['campaigns/c/members/bob',{gmUid:'gm',membershipId:'bob-new',inviteToken:''}],['users/bob/campaigns/c',{gmUid:'gm',membershipId:'bob-new'}]]));
- await assertFails(getDoc(r(db('bob'),'users/alice/publicCharacters/pc')));
  await assertSucceeds(deleteDoc(r(db('alice'),'campaigns/c/pcs/alice_pc')));
- await assertFails(getDoc(r(db('gm'),'users/alice/characters/pc')));
+ await assertSucceeds(getDoc(r(db('gm'),'users/alice/characters/pc')));
  await assertSucceeds(getDoc(r(db('alice'),'users/alice/characters/pc')));
 });
 test('campaign creation makes sole GM and index atomically, players cannot forge PC ownership',async()=>{
