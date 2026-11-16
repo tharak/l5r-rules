@@ -688,6 +688,7 @@
       const name = button.dataset.skill, current = R.calculate(sheet,catalog,{untrainedSkills:[name]}).skills[name];
       if (C.requiresSkillSubtype(name)) return;
       if (!current) return;
+      const nextRow = button.closest?.('[data-skill-name]')?.nextElementSibling?.dataset?.skillName || '';
       if (Number(button.dataset.delta) > 0) sheet.skills[name] = current.rank + 1;
       if (Number(button.dataset.delta) < 0 && current.rank > current.base) {
         if (current.rank - 1) sheet.skills[name] = current.rank - 1;
@@ -697,6 +698,9 @@
           delete sheet.legacyEmphases[name];
         }
       }
+      commitEdit();
+      focusSkillStepper(name,button.dataset.delta,nextRow);
+      return;
     } else if (action === 'add-skill') {
       const name = skillIdentity(root.querySelector('#new-skill').value).name;
       if (!name) return;
@@ -741,6 +745,17 @@
       if (external) sheet.visibility = visibility;
     } else return;
     commitEdit();
+  }
+
+  // A rank change re-renders the page; keep keyboard focus on the same stepper,
+  // or on the next skill when the filters removed the changed row.
+  function focusSkillStepper(name,delta,nextRow) {
+    const stepper = (skill,step) => root.querySelector(`#creator-skills [data-action="skill"][data-skill=${JSON.stringify(skill)}][data-delta="${step}"]`);
+    const other = delta === '1' ? '-1' : '1';
+    const target = [stepper(name,delta),stepper(name,other),nextRow && stepper(nextRow,'-1'),nextRow && stepper(nextRow,'1')].find(node=>node && !node.disabled)
+      || (nextRow && root.querySelector(`#creator-skills [data-skill-name=${JSON.stringify(nextRow)}] button:not([disabled])`))
+      || root.querySelector('#creator-skills [data-hide-zero-skills]');
+    target?.focus();
   }
 
   function onChange(event) {

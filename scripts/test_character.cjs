@@ -553,6 +553,23 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   assert.match(sectionHtml(empty,'skills'),/No skills match these filters/);
 });
 
+test('skill rank steppers keep keyboard focus, even when the filters remove the changed row',async()=>{
+  const c=await character({skills:{Defense:1}});
+  let focused='';
+  const target=(name,attrs={})=>({...attrs,focus(){focused=name;}});
+  const step=delta=>`#creator-skills [data-action="skill"][data-skill="Defense"][data-delta="${delta}"]`;
+  c.inputs[step('1')]=target('increase');
+  c.click({action:'skill',skill:'Defense',delta:'1'});
+  assert.equal(focused,'increase');
+  c.root.onchange({target:{dataset:{skillFilterView:'skills',hideZeroSkills:''},checked:true}});
+  delete c.inputs[step('1')];
+  c.inputs['#creator-skills [data-hide-zero-skills]']=target('filter');
+  c.click({action:'skill',skill:'Defense',delta:'-1'});
+  c.click({action:'skill',skill:'Defense',delta:'-1'});
+  assert.equal((await c.data()).derived.skills.Defense,undefined);
+  assert.equal(focused,'filter');
+});
+
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
   const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
   let d=(await c.data()).derived;
