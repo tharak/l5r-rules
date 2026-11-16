@@ -652,6 +652,31 @@ test('Public checkboxes and the journal save to the sheet; entries start private
   assert.match(html(),/No journal entries yet/);
 });
 
+test('the GM sees the player\'s journal read-only and adds, edits and deletes only their own entries',async()=>{
+  const c=await character();
+  let receive,writes=[];
+  c.window.SheetJournal={watch:(owner,id,options,callback)=>{assert.equal(owner,'alice');assert.equal(id,'pc');receive=callback;return()=>{};},write:async(owner,id,entryId,data)=>{writes.push([entryId,data]);},user:{uid:'gm',name:'Game Master'}};
+  let html='';const root={isConnected:true,querySelector:()=>null,get innerHTML(){return html;},set innerHTML(value){html=value;}};
+  await c.window.CharacterBuilder.mount(root,{sheet:{name:'Alice PC',journal:[{id:'p',text:'Player entry',createdAt:'2026-11-01',public:false}]},readOnly:true,journal:{owner:'alice',characterId:'pc'},save(){},close(){}});
+  receive([{id:'g',authorUid:'gm',authorName:'Game Master',text:'GM entry',public:false,createdAt:'2026-11-02',updatedAt:'2026-11-02'},{id:'o',authorUid:'other',authorName:'Other',text:'Other GM',public:true,createdAt:'2026-11-03'}]);
+  // The fake root has no journal panel to patch in place, so re-render through Cancel.
+  root.onclick({target:{closest:()=>({dataset:{action:'journal-cancel',journalGm:''}})}});
+  assert.match(html,/Player entry/);assert.match(html,/GM entry/);
+  assert.ok(html.indexOf('GM entry')<html.indexOf('Player entry'),'newest first');
+  // Only the GM's own entry has controls; the player's entry and another author's do not.
+  const controls=[...html.matchAll(/data-action="journal-(edit|delete)" data-id="([^"]+)"/g)].map(m=>m[2]);
+  assert.deepEqual([...new Set(controls)],['g']);
+  root.onclick({target:{closest:()=>({dataset:{action:'journal-new',journalGm:''}})}});
+  root.oninput({target:{dataset:{journalText:'',journalGm:''},value:'New GM note'}});
+  root.onclick({target:{closest:()=>({dataset:{action:'journal-save',journalGm:''}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(writes.length,1);assert.equal(writes[0][1].authorUid,'gm');assert.equal(writes[0][1].text,'New GM note');assert.equal(writes[0][1].public,false);
+  c.window.confirm=()=>true;
+  root.onclick({target:{closest:()=>({dataset:{action:'journal-delete',id:'g',journalSource:'gm',journalGm:''}})}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(writes[1],['g',null]);
+});
+
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
   const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
   let d=(await c.data()).derived;

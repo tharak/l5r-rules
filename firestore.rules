@@ -55,6 +55,24 @@ service cloud.firestore {
           && validPC(request.resource.data.campaignId,request.resource.data.pcId,u,id);
         allow delete: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
       }
+      // GM journal entries (the player's own entries live in the sheet). Anyone reads an entry
+      // marked public; the owner and the GM read every entry. Only the GM writes them, each
+      // author edits only their own, and the sheet owner may delete any.
+      match /journal/{entry} {
+        function entryShape(d) {
+          return d.keys().hasAll(['authorUid','authorName','text','public','createdAt','updatedAt'])
+            && d.keys().hasOnly(['authorUid','authorName','text','public','createdAt','updatedAt'])
+            && d.authorUid is string && d.authorName is string && d.authorName.size() <= 200
+            && d.text is string && d.text.size() > 0 && d.text.size() <= 20000 && d.public is bool
+            && d.createdAt is string && d.createdAt.size() <= 40 && d.updatedAt is string && d.updatedAt.size() <= 40;
+        }
+        allow get, list: if resource.data.public == true || owner(u) || granted(u,id);
+        allow create: if granted(u,id) && request.resource.data.authorUid == request.auth.uid && entryShape(request.resource.data);
+        allow update: if granted(u,id) && resource.data.authorUid == request.auth.uid
+          && request.resource.data.authorUid == resource.data.authorUid && request.resource.data.createdAt == resource.data.createdAt
+          && entryShape(request.resource.data);
+        allow delete: if owner(u) || (signed() && resource.data.authorUid == request.auth.uid);
+      }
     }
     // The public profile: anyone with the link reads it; it always mirrors the full sheet's.
     match /users/{u}/publicCharacters/{id} {

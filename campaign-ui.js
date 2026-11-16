@@ -167,7 +167,7 @@
     const item = sheets.get(sheetId+':full');
     if (!item?.data) { target.textContent = 'Loading full sheet…'; return; }
     // Only a sheet's creator edits it; the GM gets a read-only copy of the full sheet.
-    window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,returnHref:`#/campaigns/${active}`,save(){},close(){sheetId='';editor=null;changed();}});
+    window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,journal:{owner:item.pc.ownerUid,characterId:item.pc.characterId},returnHref:`#/campaigns/${active}`,save(){},close(){sheetId='';editor=null;changed();}});
     editor = item.data.revision;
   }
   function refresh(renderPage) {

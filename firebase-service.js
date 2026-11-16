@@ -47,6 +47,20 @@ try {
   window.PublicSheets = {
     watch(owner,id,receive,fail) { return dbSDK.onSnapshot(dbSDK.doc(db,'users',owner,'publicCharacters',id),snapshot => receive(snapshot.exists() ? snapshot.data() : null),fail); }
   };
+  // GM journal entries live beside the sheet, because only its owner can write the sheet.
+  // Anyone may read entries marked public; the owner and the GM read them all.
+  window.SheetJournal = {
+    watch(owner,id,{publicOnly = false} = {},receive,fail = () => {}) {
+      const entries = dbSDK.collection(db,'users',owner,'characters',id,'journal');
+      const source = publicOnly ? dbSDK.query(entries,dbSDK.where('public','==',true)) : entries;
+      return dbSDK.onSnapshot(source,snapshot => receive(snapshot.docs.map(entry => ({id:entry.id,...entry.data()}))),fail);
+    },
+    write(owner,id,entryId,data) {
+      const ref = dbSDK.doc(db,'users',owner,'characters',id,'journal',entryId);
+      return data ? dbSDK.setDoc(ref,data) : dbSDK.deleteDoc(ref);
+    },
+    get user() { const account = auth.currentUser; return account ? {uid:account.uid,name:account.displayName || 'GM'} : null; }
+  };
   window.dispatchEvent(new Event('public-sheets-ready'));
   window.addEventListener('character-sync-changed', update);
   authSDK.onAuthStateChanged(auth, account => {

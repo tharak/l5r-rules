@@ -4,7 +4,7 @@
 (() => {
   const UI = window.UI, esc = UI.escape;
   const STAT_LABELS = {honor:'Honor',glory:'Glory',status:'Status',taint:'Taint'};
-  let stop = null, root = null;
+  let stop = null, stopJournal = null, root = null;
   const date = value => {
     const parsed = value ? new Date(value) : null;
     return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier notes';
@@ -30,14 +30,18 @@
       ${journal([...(p.journal || []),...extraJournal])}
     </div>`;
   }
-  function unmount() { stop?.(); stop = null; root = null; }
+  function unmount() { stop?.(); stopJournal?.(); stop = stopJournal = null; root = null; }
   function mount(element,owner,id) {
     unmount(); root = element;
     element.innerHTML = '<p class="workspace">Loading character…</p>';
     const start = () => {
       if (root !== element) return true;
       if (!window.PublicSheets) return false;
-      stop = window.PublicSheets.watch(owner,id,data => { if (root === element) element.innerHTML = page(data); },() => { if (root === element) element.innerHTML = page(null); });
+      // The profile and the GM's public journal entries arrive separately; render both.
+      let data, gm = [], loaded = false;
+      const show = () => { if (root === element && loaded) element.innerHTML = page(data,gm); };
+      stop = window.PublicSheets.watch(owner,id,next => { data = next; loaded = true; show(); },() => { data = null; loaded = true; show(); });
+      stopJournal = window.SheetJournal?.watch(owner,id,{publicOnly:true},entries => { gm = entries.map(entry => ({id:entry.id,text:entry.text,createdAt:entry.createdAt,authorName:entry.authorName || 'GM'})); show(); },() => {}) || null;
       return true;
     };
     if (!start()) window.addEventListener('public-sheets-ready',start,{once:true});

@@ -158,3 +158,30 @@ test('campaign creation makes sole GM and index atomically, players cannot forge
  await assertSucceeds(batch(d,[['campaigns/new/members/creator',null],['users/creator/campaigns/new',null],['campaigns/new',null]]));
  await assertSucceeds(getDoc(r(db('alice'),'users/alice/characters/pc')));
 });
+test('GM journal entries: public ones are readable by anyone, private ones by the owner and GM only',async()=>{
+ await env.withSecurityRulesDisabled(c=>batch(c.firestore(),[
+  ['campaigns/c/pcs/journal_pc',{ownerUid:'alice',characterId:'journaled',membershipId:'alice-membership'}],
+  ['users/alice/characters/journaled',{...full,revision:'j1'}],['users/alice/publicCharacters/journaled',{...projection,revision:'j1'}],
+  ['users/alice/characters/journaled/grants/full_gm',{campaignId:'c',pcId:'journal_pc',membershipId:'gm-membership'}]]));
+ const entry=(text,isPublic,author='gm')=>({authorUid:author,authorName:'Game Master',text,public:isPublic,createdAt:'2026-11-16',updatedAt:'2026-11-16'});
+ const path=id=>`users/alice/characters/journaled/journal/${id}`;
+ await assertSucceeds(setDoc(r(db('gm'),path('private')),entry('PRIVATE NOTE',false)));
+ await assertSucceeds(setDoc(r(db('gm'),path('public')),entry('Public note',true)));
+ for(const u of ['bob','outsider'])await assertFails(setDoc(r(db(u),path('forged')),entry('x',true,u)));
+ await assertFails(setDoc(r(db('gm'),path('forged')),entry('x',true,'alice')));
+ await assertFails(setDoc(r(db('gm'),path('extra')),{...entry('x',true),extra:1}));
+ for(const u of ['bob','outsider',null]) {
+  await assertSucceeds(getDoc(r(db(u),path('public'))));
+  await assertFails(getDoc(r(db(u),path('private'))));
+ }
+ for(const u of ['alice','gm'])await assertSucceeds(getDoc(r(db(u),path('private'))));
+ const {query,where}=require('firebase/firestore');
+ await assertSucceeds(getDocs(query(collection(db(null),'users/alice/characters/journaled/journal'),where('public','==',true))));
+ await assertFails(getDocs(collection(db('bob'),'users/alice/characters/journaled/journal')));
+ await assertSucceeds(getDocs(collection(db('alice'),'users/alice/characters/journaled/journal')));
+ await assertSucceeds(updateDoc(r(db('gm'),path('private')),{text:'Edited',public:true,updatedAt:'2026-11-17'}));
+ await assertFails(updateDoc(r(db('alice'),path('public')),{text:'Owner edit',updatedAt:'2026-11-17'}));
+ await assertFails(updateDoc(r(db('gm'),path('public')),{createdAt:'2000-01-01'}));
+ await assertSucceeds(deleteDoc(r(db('alice'),path('public'))));
+ await assertSucceeds(deleteDoc(r(db('gm'),path('private'))));
+});
