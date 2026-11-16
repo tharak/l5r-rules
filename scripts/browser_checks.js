@@ -129,9 +129,12 @@ async page => {
   check(await player.locator('[data-campaign-field="session-text"]').getAttribute('readonly')!==null,'Player can edit sessions');
   await player.getByRole('button',{name:'PC',exact:true}).click();
   check(await player.getByRole('button',{name:'Invite link',exact:true}).count()===0,'Player can create invitations');
-  check(await player.getByRole('button',{name:'View',exact:true}).count()===0,'Removed read-only View action remains');
   check(await player.getByRole('button',{name:'Edit',exact:true}).count()===0,'Player can edit another owner’s PC');
-  check(!(await player.locator('#app').innerText()).includes('HIDDEN OWNER NOTES')&&!(await player.locator('#app').innerText()).includes('HIDDEN OWNER ABILITY'),'Hidden notes or abilities leaked');
+  await player.getByRole('button',{name:'View',exact:true}).click();
+  await player.locator('#campaign-editor [data-field="notes"]').waitFor();
+  check(await player.locator('#campaign-editor [data-field="notes"]').inputValue()==='HIDDEN OWNER NOTES','Player cannot read another PC while privacy is paused');
+  check(await player.locator('#campaign-editor [data-field="notes"]').isDisabled(),'Player can change another owner’s PC');
+  await player.getByRole('button',{name:'Close',exact:true}).click();
   const ownerPC = await page.evaluate(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').find(pc=>pc.ownerUid===CampaignStorage.uid));
   check(ownerPC,'GM PC was not linked');
   await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('GM Personal PC'));
@@ -147,17 +150,13 @@ async page => {
   await page.waitForFunction(()=>document.querySelector('#app').textContent.includes('Player PC')).catch(e=>{throw new Error('GM roster did not update: '+e.message);});
   await page.getByText('Player PC (Player Tester)',{exact:true}).waitFor();
   const row=page.locator('.roster-row').filter({hasText:'Player PC'});
-  await row.getByRole('button',{name:'Edit',exact:true}).click();
+  check(await row.getByRole('button',{name:'Edit',exact:true}).count()===0,'GM can edit another owner’s PC');
+  await row.getByRole('button',{name:'View',exact:true}).click();
   await page.locator('#campaign-editor [data-field="name"]').waitFor();
   check(await page.locator('#campaign-editor [data-field="notes"]').inputValue()==='PLAYER PRIVATE NOTES','GM full sheet unavailable');
-  check(await page.locator('#campaign-editor [data-public]:disabled').count()===7,'GM can change privacy');
-  await page.locator('#campaign-editor [data-field="name"]').fill('Live GM Edit');
-  await page.getByRole('button',{name:'Save PC',exact:true}).click();
-  check(await page.locator('#campaign-editor').count()===0,'Saving GM-edited PC did not close its editor');
-  await page.waitForFunction(()=>window.CampaignStorage.status==='Saved to campaign').catch(e=>{throw new Error('Autosave did not complete: '+e.message);});
-  await player.waitForFunction(()=>window.CharacterBuilder.list().some(c=>c.name==='Live GM Edit')).catch(e=>{throw new Error('GM edit did not reach owner: '+e.message);});
-  await player.getByRole('link',{name:'Characters',exact:true}).click();
-  await player.getByRole('heading',{name:'Live GM Edit',exact:true}).waitFor();
+  check(await page.locator('#campaign-editor [data-field="name"]').isDisabled(),'GM can change another owner’s PC');
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  check(await page.locator('#campaign-editor').count()===0,'Closing the read-only view did not close it');
   await page.goto(campaignURL);
   await page.getByRole('button',{name:'PC',exact:true}).click();
   await page.getByRole('heading',{name:'PCs',exact:true}).waitFor();
@@ -171,7 +170,7 @@ async page => {
   await player.evaluate(()=>window.confirm=()=>true);await player.getByRole('button',{name:'Leave campaign',exact:true}).click();
   await player.getByRole('heading',{name:'Campaigns',exact:true}).waitFor();
   await player.getByRole('link',{name:'Characters',exact:true}).click();
-  await player.getByRole('heading',{name:'Live GM Edit',exact:true}).waitFor();
+  await player.getByRole('heading',{name:'Player PC',exact:true}).waitFor();
   await page.getByRole('link',{name:'Books',exact:true}).click();
   await page.getByRole('heading',{name:'Books',exact:true}).waitFor();
   check(await page.locator('.books-grid > section').count()===5,'Books list missing');
@@ -190,5 +189,5 @@ async page => {
   await page.waitForURL(/#\/campaigns$/);
   check(errors.length===0,'Browser errors: '+errors.join('; '));
   await playerContext.close();
-  return 'Browser checks passed: navigation, books, old articles, mobile, autosave, invites, linking, privacy, removed read-only views, NPCs, GM editing, live updates and leaving.';
+  return 'Browser checks passed: navigation, books, old articles, mobile, autosave, invites, linking, shared sheets, read-only views, NPCs, creator-only editing and leaving.';
 }

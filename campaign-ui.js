@@ -152,30 +152,24 @@
     for (const pc of pcs) if (!own(pc)) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
-    if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
+    if (selectedPC && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({label:'Campaign title',labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[]),['plots','Plots']].map(([value,label])=>({value,label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
       ${section==='sessions'?`${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:`${isGM?button('session-new','+ Session'):''}`})}<div class="session-list">${sessions.map(s=>button('session-open',s.title || 'Untitled session',s.id)).join('')}</div>${s?`${sessionEditor(s,isGM)}${notesFor('sessions',s.id)}`:sessions.length?'':'<p>No sessions yet.</p>'}`:''}
-      ${section==='pcs'?`${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}${pcs.map(pc=>`${UI.recordRow({attrs:{'class':'roster-row'},bodyHtml:`<span>${e(label(pc))} (${e(playerName(pc))})</span>${own(pc)||isGM?button('pc-open','Edit',pc.id):''}${button('pc-notes','Notes',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`})}${pcNotesId===pc.id?`<h3>${e(label(pc))}</h3>${notesFor('pcs',pc.id)}`:''}`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}${invitation?UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}):''}`:''}
+      ${section==='pcs'?`${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}${pcs.map(pc=>`${UI.recordRow({attrs:{'class':'roster-row'},bodyHtml:`<span>${e(label(pc))} (${e(playerName(pc))})</span>${button('pc-open',own(pc)?'Edit':'View',pc.id)}${button('pc-notes','Notes',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`})}${pcNotesId===pc.id?`<h3>${e(label(pc))}</h3>${notesFor('pcs',pc.id)}`:''}`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}${invitation?UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}):''}`:''}
       ${section==='npcs'&&isGM?`${UI.sectionHeading({title:'NPCs',level:2,actionsHtml:`${button('npc-new','+NPC')}`})}<div class="npc-list">${npcs.map(n=>button('npc-open',n.name||'Unnamed NPC',n.id)).join('')}</div>${n?`${npcEditor(n)}${npcId?notesFor('npcs',npcId):''}`:''}`:''}
       ${section==='plots'?renderPlots(plots):''}`})}
-      </div>${section==='pcs'&&selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${section==='pcs'&&selectedPC&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   function mountEditor() {
     const target = document.getElementById('campaign-editor');
     if (!target || !sheetId) return;
     const item = sheets.get(sheetId+':full');
     if (!item?.data) { target.textContent = 'Loading full sheet…'; return; }
-    const data = item.data, pc = item.pc;
-    const pending = store().get(path('sheetEdits',sheetId));
-    const sheet = pending?.sheet || JSON.parse(data.sheetJson); sheet.visibility = data.visibility || window.SheetSharing.visibility(sheet);
-    window.CharacterBuilder.mount(target,{sheet,returnHref:`#/campaigns/${active}`,save(next){
-      // Shared edits use the same durable campaign outbox and atomic sheet writer.
-      const fullPath = path('sheetEdits',sheetId);
-      store().queue(fullPath,{ownerUid:pc.ownerUid,characterId:pc.characterId,sheet:next,updatedAt:new Date().toISOString()});
-    },close(){sheetId='';editor=null;changed();}});
-    editor = data.revision;
+    // Only a sheet's creator edits it; everyone else in the campaign gets a read-only view.
+    window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,returnHref:`#/campaigns/${active}`,save(){},close(){sheetId='';editor=null;changed();}});
+    editor = item.data.revision;
   }
   function refresh(renderPage) {
     renderAgain = renderPage;
@@ -251,7 +245,7 @@
       else if (action==='pc-create') {const campaign=active;const id=window.CharacterBuilder.create();await backend.link(campaign,id);picking=false;creatorCampaign=campaign;location.hash='#/create-character';}
       else if (action==='pc-open') {
         const pc=store().get(path('pcs',id));
-        if(!pc||(!own(pc)&&!gm()))return;
+        if(!pc)return;
         if (own(pc)) {window.CharacterBuilder.open(pc.characterId);creatorCampaign=active;location.hash='#/create-character';}
         else {sheetId=id;editor=null;}
       } else if (action==='pc-remove') {store().queue(path('pcs',id),null);sheetId='';}

@@ -205,7 +205,9 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       const pc = await get(`campaigns/${c}/pcs/${pcId}`);
       if (!pc) throw new Error('This PC is no longer linked.');
       const member = await get(memberPath(c));
-      if (pc.ownerUid !== uid) await commit([[`users/${pc.ownerUid}/characters/${pc.characterId}/grants/${full?'full_':'public_'}${uid}`,{campaignId:c,pcId,membershipId:member.membershipId}]]);
+      // Sheets are readable by anyone while privacy is paused. The grant is only needed by the
+      // older rules (and only the GM may hold a full grant), so a refused grant is not an error.
+      if (pc.ownerUid !== uid) await commit([[`users/${pc.ownerUid}/characters/${pc.characterId}/grants/${full?'full_':'public_'}${uid}`,{campaignId:c,pcId,membershipId:member.membershipId}]]).catch(()=>{});
       const path = `users/${pc.ownerUid}/${full?'characters':'publicCharacters'}/${pc.characterId}`;
       return sdk.onSnapshot(ref(path),{includeMetadataChanges:true},s=>receive(s.exists()?s.data():null,pc,s.metadata),fail);
     }

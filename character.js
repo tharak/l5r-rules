@@ -93,7 +93,7 @@
     } catch { return blank(); }
   }
   function save() {
-    if (external) { external.save(sheet); return true; }
+    if (external) { if (!external.readOnly) external.save(sheet); return true; }
     const records = roster(), record = records.find(item => item.id === activeId);
     if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); return storeRoster(records); }
     return false;
@@ -355,7 +355,7 @@
 
   function renderNavigation() {
     const sections=[['rolls','Rolls'],['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Story'],['equipment','Equipment']];
-    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:'Save PC',attrs:{'data-action':'save-close'}})}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save PC',attrs:{'data-action':'save-close'}})}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
@@ -545,6 +545,10 @@
           row.insertAdjacentHTML('beforeend',UI.button({text:'Reset',variant:'quiet',size:'compact',attrs:{'class':'creator-reset-section','data-action':'reset-section','data-section':key,'aria-label':`Reset ${sectionTitle(key)}`}}));
         }
       }
+    }
+    // A campaign member viewing someone else's PC can browse and roll, but not change it.
+    if (external?.readOnly && root.querySelectorAll) for (const control of root.querySelectorAll(':is(#creator-rolls,.creator-layout) :is(input,select,textarea,button)')) {
+      if (!['open-roll','section'].includes(control.dataset.action) && !control.dataset.skillFilterView) control.disabled = true;
     }
   }
 

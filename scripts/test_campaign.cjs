@@ -100,21 +100,20 @@ function campaignCards() {
  return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value,
   click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
 }
-test('removing read-only sheets retains campaign editing only for owners and the GM',()=>{
+test('only a PC\'s creator edits it; everyone else in the campaign gets a read-only View',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/pcs/alice',{ownerUid:'alice',characterId:'alice-pc'});
  d.data.set('campaigns/c/pcs/bob',{ownerUid:'bob',characterId:'bob-pc'});
- d.window.CampaignUI.render('campaigns/c');d.click('section','pcs');
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- assert.equal((render().match(/data-campaign="pc-open"/g)||[]).length,2);
- assert.doesNotMatch(render(),/pc-view|readonly-sheet/);
- d.store.uid='alice';
+ const buttons=()=>[...render().matchAll(/data-campaign="pc-open" data-id="([^"]+)"[^>]*>([^<]+)</g)].map(m=>m[1]+':'+m[2]);
  render();d.click('section','pcs');
- assert.equal((render().match(/data-campaign="pc-open"/g)||[]).length,1);
- d.click('pc-open','bob');assert.doesNotMatch(render(),/id="campaign-editor"/);
- d.store.uid='other';render();d.click('section','pcs');
- assert.doesNotMatch(render(),/data-campaign="pc-open"|pc-view|readonly-sheet/);
+ assert.deepEqual(buttons(),['alice:View','bob:View']);
+ d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
+ d.click('close-sheet');
+ d.store.uid='alice';render();d.click('section','pcs');
+ assert.deepEqual(buttons(),['alice:Edit','bob:View']);
+ d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
 });
 test('campaign cards display PC - player, escape names, and handle empty and private identities',async()=>{
  const d=campaignCards();
