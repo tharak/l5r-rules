@@ -120,8 +120,9 @@
     kind,src:monFile(kind,name),source:MON_SOURCES[kind],position:kind === 'mandala' ? MANDALA[name] || '' : '',guess:!!MON_GUESSES[kind]?.includes(name)
   }));
   const CLAN_MONS = [...new Set(MON_PRIORITY.flatMap(kind => MON_FILES[kind]))];
-  // Clans without a mon from any source use the site's five-rings seal; no clan, no mon.
-  const DEFAULT_MON = 'public/assets/clans/default/five-rings.svg';
+  // Clans without a mon from any source use the official five-rings mark (also the site
+  // logo and favicon); no clan, no mon.
+  const DEFAULT_MON = 'public/assets/l5r-mark.webp';
   const clanMon = name => clanMonCandidates(name)[0]?.src || (typeof name === 'string' && name.trim() ? DEFAULT_MON : '');
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
