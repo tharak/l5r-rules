@@ -111,7 +111,11 @@ async page => {
     check(await p.locator('.creator-exceptions,.creator-creation-options').count()===0,'Generic exceptions menu remains');
     await p.getByRole('button',{name:'Save PC',exact:true}).click();
     await p.waitForURL(/#\/characters$/);await p.getByRole('heading',{name:'Character browser test',exact:true}).waitFor();
-    await p.getByRole('button',{name:'Edit',exact:true}).click();
+    check(await p.getByRole('button',{name:'Edit',exact:true}).count()===0,'Characters list still shows Edit');
+    const tile=await p.locator('.character-tile').first().boundingBox(),avatar=await p.locator('.character-tile .character-avatar').first().boundingBox();
+    check(Math.abs(tile.height-avatar.height)<=2,'Character tile is taller than its picture square');
+    // Clicking anywhere on the tile (here its right-hand empty area) opens the character.
+    await p.mouse.click(tile.x+tile.width*0.6,tile.y+tile.height/2);
     await p.locator('[data-field="clan"]').selectOption('Crab');
     await p.locator('[data-field="family"]').selectOption('Hida');
     const school=await p.evaluate(async()=>{const c=await(await fetch('public/character-data.json')).json();return c.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');});
@@ -229,7 +233,7 @@ async page => {
     check((await p.locator('.creator-print-sheet').innerText()).includes('OWNER PRIVATE POWER'),'Owner abilities missing from print');
     await p.emulateMedia({media:'screen'});
     await p.getByRole('button',{name:'Save PC',exact:true}).click();await p.waitForURL(/#\/characters$/);
-    await p.reload();await p.getByRole('button',{name:'Edit',exact:true}).click();
+    await p.reload();await p.locator('.character-tile .character-open').first().click();
     await p.goto('http://127.0.0.1:5000/?emulators#/create-character-lab');
     await p.waitForURL(/#\/create-character$/);
     await p.locator('#creator-rolls').waitFor();

@@ -100,6 +100,17 @@
   .character-avatar { border-radius: 3px; }
   img.character-avatar { object-fit: cover; }
   img.character-avatar-mon { object-fit: contain; padding: 3px; background: var(--surface); }
+  /* The tile is exactly as tall as its picture square; the name's button covers the whole
+     tile so a click anywhere opens the character, while Delete stays clickable above it. */
+  .character-tile { position: relative; padding: 0 14px 0 0; gap: 14px; min-height: 0; }
+  .character-tile .character-avatar { width: 64px; height: 64px; border-width: 0 1px 0 0; border-radius: 0; font-size: 26px; }
+  .character-tile .character-info h2 { margin: 0 0 3px; }
+  .character-open { all: unset; cursor: pointer; }
+  .character-open::after { content: ''; position: absolute; inset: 0; }
+  .character-open:focus-visible { outline: none; }
+  .character-tile:has(.character-open:focus-visible) { outline: 2px solid var(--red); outline-offset: 2px; }
+  .character-tile:hover { background: var(--wash); }
+  .character-tile .character-actions { position: relative; z-index: 1; }
   .creator-identity-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .creator-clan-mon { width: 96px; height: 96px; object-fit: contain; flex: none; }
   .books-grid { gap: 24px; align-items: start; }
@@ -231,7 +242,8 @@
     .workspace { padding-top: 18px; }
     .books-grid > .panel { padding: 22px 18px; }
     .books-grid > .panel h2 { font-size: 21px; }
-    .character-tile { padding: 15px; }
+    .character-tile { padding: 0 10px 0 0; gap: 10px; }
+    .character-tile .character-avatar { width: 56px; height: 56px; font-size: 22px; }
     .character-info h2 { font-size: 17px; }
     .site-footer { align-items: flex-start; gap: 10px; }
   }
