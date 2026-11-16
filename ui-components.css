@@ -48,7 +48,7 @@
   :is(.ui-ring-mark, .ring-watermark)[data-ring="Void"] { --ring-symbol: url('public/assets/rings/void.webp'); }
   /* A ring card (sections 00 and 02) carries its ring's symbol as a large, faint background. */
   .ring-watermark { position: relative; isolation: isolate; }
-  .ring-watermark::before { content: ''; position: absolute; right: 10px; bottom: 10px; height: min(150px, calc(100% - 20px)); width: auto; max-width: 70%; aspect-ratio: 1; background: var(--ring-symbol) center / contain no-repeat; opacity: .14; pointer-events: none; z-index: -1; }
+  .ring-watermark::before { content: ''; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); height: min(150px, calc(100% - 20px)); width: auto; max-width: 70%; aspect-ratio: 1; background: var(--ring-symbol) center / contain no-repeat; opacity: .14; pointer-events: none; z-index: -1; }
   /* Rolls rows have solid tints that would hide it, so there it is inked over them instead. */
   #creator-rolls .ring-watermark::before { z-index: 1; mix-blend-mode: multiply; opacity: .2; }
   .creator-ring .ui-ring-mark { background: transparent; border-radius: 0; text-shadow: none; color: var(--ink)!important; }
