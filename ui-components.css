@@ -41,11 +41,16 @@
   /* Each ring's symbol is its own disc, tinted in that ring's colour (Earth tan, Air green,
      Water blue, Fire red, Void violet); the placeholder icon shows until it loads. */
   .ui-ring-mark .creator-ring-symbol { display: block; width: 100%; height: 100%; background: transparent var(--ring-symbol) center / contain no-repeat; }
-  .ui-ring-mark[data-ring="Earth"] { --ring-symbol: url('public/assets/rings/earth.webp'); }
-  .ui-ring-mark[data-ring="Air"] { --ring-symbol: url('public/assets/rings/air.webp'); }
-  .ui-ring-mark[data-ring="Water"] { --ring-symbol: url('public/assets/rings/water.webp'); }
-  .ui-ring-mark[data-ring="Fire"] { --ring-symbol: url('public/assets/rings/fire.webp'); }
-  .ui-ring-mark[data-ring="Void"] { --ring-symbol: url('public/assets/rings/void.webp'); }
+  :is(.ui-ring-mark, .ring-watermark)[data-ring="Earth"] { --ring-symbol: url('public/assets/rings/earth.webp'); }
+  :is(.ui-ring-mark, .ring-watermark)[data-ring="Air"] { --ring-symbol: url('public/assets/rings/air.webp'); }
+  :is(.ui-ring-mark, .ring-watermark)[data-ring="Water"] { --ring-symbol: url('public/assets/rings/water.webp'); }
+  :is(.ui-ring-mark, .ring-watermark)[data-ring="Fire"] { --ring-symbol: url('public/assets/rings/fire.webp'); }
+  :is(.ui-ring-mark, .ring-watermark)[data-ring="Void"] { --ring-symbol: url('public/assets/rings/void.webp'); }
+  /* A ring card (sections 00 and 02) carries its ring's symbol as a large, faint background. */
+  .ring-watermark { position: relative; isolation: isolate; }
+  .ring-watermark::before { content: ''; position: absolute; right: 10px; bottom: 10px; height: min(150px, calc(100% - 20px)); width: auto; max-width: 70%; aspect-ratio: 1; background: var(--ring-symbol) center / contain no-repeat; opacity: .14; pointer-events: none; z-index: -1; }
+  /* Rolls rows have solid tints that would hide it, so there it is inked over them instead. */
+  #creator-rolls .ring-watermark::before { z-index: 1; mix-blend-mode: multiply; opacity: .2; }
   .creator-ring .ui-ring-mark { background: transparent; border-radius: 0; text-shadow: none; color: var(--ink)!important; }
   .ui-ring-mark.book-mark { width: 44px; height: 44px; }
 }
