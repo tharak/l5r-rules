@@ -181,9 +181,11 @@
   }
 
   // A macro category such as Lore counts as trained once any of its subskills has a rank.
+  // Weapon skills (Kenjutsu, Heavy Weapons, …) are named on their own, so they count toward Weapons.
   function isSkillTrained(name,skills) {
     if (skills[name]?.rank > 0) return true;
-    return C.requiresSkillSubtype(name) && Object.entries(skills).some(([subskill,skill])=>subskill.startsWith(name+': ') && skill.rank > 0);
+    if (!C.requiresSkillSubtype(name)) return false;
+    return Object.entries(skills).some(([subskill,skill])=>skill.rank > 0 && (subskill.startsWith(name+': ') || (name === 'Weapons' && C.WEAPON_SKILLS.includes(subskill))));
   }
 
   // Shared by the Rolls view and section 03 so both filters follow one rule.

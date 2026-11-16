@@ -537,9 +537,9 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   assert.match(rows(),/data-hide-zero-macro-skills="true">Hide macro-skills 0/);
   for(const [hideZero,hideMacro] of [[false,true],[true,false],[true,true],[false,false]]) {
     toggle(false,hideZero);toggle(true,hideMacro);
-    for(const name of ['Courtier','Lore','Lore: History','Kenjutsu'])assert.ok(has(name),name);
+    for(const name of ['Courtier','Lore','Lore: History','Kenjutsu','Weapons'])assert.ok(has(name),name);
     assert.equal(has('Defense'),!hideZero);
-    for(const name of ['Craft','Weapons','Heavy Weapons'])assert.equal(has(name),!hideZero&&!hideMacro,name);
+    for(const name of ['Craft','Heavy Weapons'])assert.equal(has(name),!hideZero&&!hideMacro,name);
     assert.equal(sectionHtml(c,'rolls'),rolls);
   }
   toggle(false,true);toggle(true,true);
@@ -548,6 +548,9 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   assert.match(sectionHtml(reloaded,'skills'),/data-hide-zero-macro-skills="true" checked/);
   assert.deepEqual((await reloaded.data()).character,before.character);
   assert.deepEqual((await reloaded.data()).derived,before.derived);
+  const unarmed=await character({skills:{Courtier:1}});
+  unarmed.root.onchange({target:{dataset:{skillFilterView:'skills',hideZeroMacroSkills:''},checked:true}});
+  assert.ok(!sectionHtml(unarmed,'skills').includes('data-skill-name="Weapons"'),'Weapons shows without a trained weapon skill');
   const empty=await character();
   empty.root.onchange({target:{dataset:{skillFilterView:'skills',hideZeroSkills:''},checked:true}});
   assert.match(sectionHtml(empty,'skills'),/No skills match these filters/);
