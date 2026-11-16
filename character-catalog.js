@@ -95,9 +95,10 @@
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
   // Clan mons bundled in public/assets/clans (sources in ATTRIBUTION.md): the seven
-  // official Great Clan mons plus Mantis, Spider and Imperial from l5r.wiki.
-  // Every other clan returns ''.
-  const CLAN_MONS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial'];
+  // official Great Clan mons, Mantis, Spider and Imperial from l5r.wiki, and the
+  // minor clans cut from Shin-Ian's "The Clans of Rokugan". Every other clan returns ''.
+  const CLAN_MONS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial',
+    'Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Sparrow','Tiger','Tortoise','Raven'];
   const clanMon = name => CLAN_MONS.includes(name) ? `public/assets/clans/${name.toLowerCase()}.webp` : '';
   const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, clanMon, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
