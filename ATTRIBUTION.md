@@ -4,11 +4,11 @@ The rules snapshot was imported from [Last Haiku](https://lasthaiku.wikidot.com/
 
 Structured weapon and armor statistics and skill mastery descriptions reuse the resource catalogs in the user's [LegendOfTheFiveRings core library](https://github.com/tharak/LegendOfTheFiveRings/tree/main/Sources/LegendOfTheFiveRings/Resources). Ability, ancestor, and supplementary school descriptions come from the source pages below. Rules calculations were checked against the fourth-edition printed core rulebook; the source PDF is excluded from deployment.
 
-The seven Great Clan mons in `public/assets/clans/` (Crab, Crane, Dragon, Lion, Phoenix, Scorpion, Unicorn) are official artwork from the clan pages of [legendofthefiverings.com](https://www.legendofthefiverings.com/lore/clans/the-crane-clan/) (© Legend of the Five Rings, published by Fantasy Flight Games / Asmodee; all rights reserved). They are used for non-commercial fan purposes, resized to 192px from the site's `05a_Clan_Icon` images on `cdn.svc.asmodee.net`, and are not covered by the CC BY-SA license above.
+The seven Great Clan mons in `public/assets/clans/official/` (Crab, Crane, Dragon, Lion, Phoenix, Scorpion, Unicorn) are official artwork from the clan pages of [legendofthefiverings.com](https://www.legendofthefiverings.com/lore/clans/the-crane-clan/) (© Legend of the Five Rings, published by Fantasy Flight Games / Asmodee; all rights reserved). They are used for non-commercial fan purposes, resized to 192px from the site's `05a_Clan_Icon` images on `cdn.svc.asmodee.net`, and are not covered by the CC BY-SA license above.
 
-The Mantis, Spider, and Imperial Family mons in `public/assets/clans/` come from [l5r.wiki](https://l5r.wiki/clans) (`/mons/mon_mantis.gif`, `/mons/mon_spider.gif`, `/mons/mon_w_imperial_family.png`), whose content is licensed [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/). They were recoloured (Mantis green, Spider black, Imperial gold), trimmed, and resized to 192px; the modified files are shared under the same license.
+The Mantis, Spider, and Imperial Family mons in `public/assets/clans/wiki/` come from [l5r.wiki](https://l5r.wiki/clans) (`/mons/mon_mantis.gif`, `/mons/mon_spider.gif`, `/mons/mon_w_imperial_family.png`), whose content is licensed [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/). They were recoloured (Mantis green, Spider black, Imperial gold), trimmed, and resized to 192px; the modified files are shared under the same license.
 
-The Badger, Bat, Boar, Dragonfly, Falcon, Fox, Hare, Monkey, Ox, Raven, Snake, Sparrow, Tiger, and Tortoise mons, plus the Nezumi mon and an alternative Mantis mon (`nezumi.webp`, `mantis-mandala.webp`), in `public/assets/clans/` were cut from ["The Clans of Rokugan"](https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095) by Shin-Ian (© 2017 Shin-Ian), a black-and-white mandala of clan mons. Each mon was masked from the mandala, made transparent, inked dark brown, and resized to 192px. The artwork's mons are unlabelled; the Badger, Hare, Sparrow, and Tiger identifications are best guesses.
+The Badger, Bat, Boar, Dragonfly, Falcon, Fox, Hare, Monkey, Ox, Raven, Snake, Sparrow, Tiger, and Tortoise mons, plus the Nezumi mon and an alternative Mantis mon (`nezumi.webp`, `mantis.webp`), in `public/assets/clans/` were cut from ["The Clans of Rokugan"](https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095) by Shin-Ian (© 2017 Shin-Ian), a black-and-white mandala of clan mons. Each mon was masked from the mandala, made transparent, inked dark brown, and resized to 192px. The artwork's mons are unlabelled; the Badger, Hare, Sparrow, and Tiger identifications are best guesses.
 
 Source pages:
 
@@ -134,3 +134,5 @@ Source pages:
 - Kagaku: https://lasthaiku.wikidot.com/kagaku
 - Tattoos: https://lasthaiku.wikidot.com/tattoos
 - Dragon Spells: https://lasthaiku.wikidot.com/dragon-spells
+
+When several sources have a mon for the same clan, the app uses them in this order: the official site, l5r.wiki, the mandala, then l5r.fandom.com (`MON_PRIORITY` in `character-catalog.js`).

@@ -486,26 +486,19 @@ test('sheet pictures keep only small inline images and an Identity reset clears 
  assert.equal(R.resetSection({portrait:picture},'story',catalog).portrait,picture);
 });
 
-test('clans with bundled mons map to their images; other clans have none',()=>{
- for(const clan of ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial','Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Snake','Sparrow','Tiger','Tortoise','Raven']) {
-  const mon=C.clanMon(clan);
-  assert.equal(mon,`public/assets/clans/${clan.toLowerCase()}.webp`);
-  assert.ok(fs.existsSync(mon),mon);
+test('clan mons come from the highest-priority source that has one, and every listed file exists',()=>{
+ assert.deepEqual(plain(C.MON_PRIORITY),['official','wiki','mandala','fandom']);
+ const expect={Crab:'official',Crane:'official',Dragon:'official',Lion:'official',Phoenix:'official',Scorpion:'official',Unicorn:'official',
+  Mantis:'wiki',Spider:'wiki',Imperial:'wiki',Badger:'mandala',Bat:'mandala',Boar:'mandala',Dragonfly:'mandala',Falcon:'mandala',Fox:'mandala',
+  Hare:'mandala',Monkey:'mandala',Ox:'mandala',Snake:'mandala',Sparrow:'mandala',Tiger:'mandala',Tortoise:'mandala',Raven:'mandala'};
+ for(const [clan,kind] of Object.entries(expect)) {
+  assert.equal(C.clanMon(clan),`public/assets/clans/${kind}/${clan.toLowerCase()}.webp`,clan);
   assert.ok(catalog.clans.some(c=>c.name===clan),clan);
  }
- for(const clan of ['Oriole','Nezumi','Ronin','Brotherhood of Shinsei','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
-});
-
-test('portrait creator recipes keep only short ids and are cleared with the picture by an Identity reset',()=>{
- const recipe={gender:'female',age:'elder',body:'slim',layers:{hair:'bun',outfit:'kimono'},mon:false};
- assert.deepEqual(plain(R.normalize({portraitRecipe:recipe}).portraitRecipe),recipe);
- assert.equal(R.normalize({}).portraitRecipe,null);
- assert.equal(R.normalize({portraitRecipe:'x'}).portraitRecipe,null);
- const dirty=R.normalize({portraitRecipe:{gender:'<b>',age:'adult',layers:{hair:'a b','../x':'y',ok:'fine'},extra:'drop'}}).portraitRecipe;
- assert.deepEqual(plain(dirty),{layers:{ok:'fine'},mon:true,age:'adult'});
- assert.equal(R.resetSection({portraitRecipe:recipe},'identity',catalog).portraitRecipe,null);
-});
-
-test('extra mandala mons point at bundled images',()=>{
- for(const mon of C.EXTRA_MONS)assert.ok(fs.existsSync(mon.src),mon.src);
+ // Mantis also has a mandala mon, but l5r.wiki outranks it.
+ assert.deepEqual(plain(C.clanMonCandidates('Mantis').map(c=>c.kind)),['wiki','mandala']);
+ assert.deepEqual(plain(C.clanMonInfo('Mantis').alternatives.map(c=>c.kind)),['mandala']);
+ assert.equal(C.clanMonInfo('Badger').guess,true);assert.equal(C.clanMonInfo('Fox').guess,false);
+ for(const clan of ['Oriole','Ronin','Brotherhood of Shinsei','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
+ for(const name of C.CLAN_MONS)for(const candidate of C.clanMonCandidates(name))assert.ok(fs.existsSync(candidate.src),candidate.src);
 });

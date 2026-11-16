@@ -137,15 +137,19 @@ async function mountClanMons(element) {
   if (currentSlug() !== 'clan-mons') return;
   const card = ({src,title,lines,flag}) => `<article class="mon-debug-card${flag?' mon-debug-flag':''}">${src?`<img src="${src}" alt="">`:'<span class="mon-debug-none" aria-hidden="true">—</span>'}<div><h3>${esc(title)}</h3>${lines.filter(Boolean).map(line=>`<p>${line}</p>`).join('')}</div></article>`;
   const source = info => `<a href="${info.source.href}" target="_blank" rel="noopener">${esc(info.source.label)}</a>`;
-  const assigned = clans.map(clan => ({clan,info:C.clanMonInfo(clan.name)})).filter(item => item.info);
-  const group = kind => assigned.filter(item => item.info.kind === kind).map(({clan,info}) => card({src:info.src,title:clan.name,flag:info.guess,lines:[esc(clan.group),info.position?`Mandala position: ${info.position}`:'',info.guess?'<strong>Best guess</strong>':'',source(info)]})).join('');
+  const position = info => info.position ? `Mandala position: ${info.position}` : '';
+  const alternatives = info => info.alternatives.length ? `Also available: ${info.alternatives.map(alt=>`<img class="mon-debug-alt" src="${alt.src}" alt="" title="${esc(alt.source.label)}">${esc(alt.source.label)}${alt.position?` (${alt.position})`:''}`).join(', ')}` : '';
+  const names = new Set(clans.map(clan => clan.name));
+  const entries = [...clans.map(clan => ({name:clan.name,group:clan.group})),...C.CLAN_MONS.filter(name => !names.has(name)).map(name => ({name,group:'Not a catalog clan'}))];
+  const sections = C.MON_PRIORITY.map(kind => {
+    const cards = entries.map(entry => ({entry,info:C.clanMonInfo(entry.name)})).filter(({info}) => info?.kind === kind)
+      .map(({entry,info}) => card({src:info.src,title:entry.name,flag:info.guess,lines:[esc(entry.group),position(info),info.guess?'<strong>Best guess</strong>':'',alternatives(info)]})).join('');
+    return `<h2>${esc(C.MON_SOURCES[kind].label)}</h2>${cards ? `<div class="mon-debug-grid">${cards}</div>` : '<p>No mons used from this source yet.</p>'}`;
+  }).join('');
   const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({title:clan.name,lines:[esc(clan.group),'No mon']})).join('');
-  const extras = C.EXTRA_MONS.map(mon => card({src:mon.src,title:mon.name,lines:[`Mandala position: ${mon.position}`,esc(mon.note)]})).join('');
-  element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image is assigned to each clan. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
-    <h2>From the DeviantArt mandala</h2><div class="mon-debug-grid">${group('mandala')}</div>
-    <h2>Other mandala mons</h2><div class="mon-debug-grid">${extras}</div>
-    <h2>Official site</h2><div class="mon-debug-grid">${group('official')}</div>
-    <h2>l5r.wiki</h2><div class="mon-debug-grid">${group('wiki')}</div>
+  element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image each clan uses. Sources are used in priority order: the official site, l5r.wiki, the mandala, then l5r.fandom.com. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
+    <p class="mon-debug-priority">Priority: ${C.MON_PRIORITY.map(kind => esc(C.MON_SOURCES[kind].label)).join(' → ')}</p>
+    ${sections}
     <h2>Clans without a mon</h2><div class="mon-debug-grid">${missing}</div></div>`;
 }
 

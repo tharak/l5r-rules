@@ -260,3 +260,5 @@
 .mon-debug-card h3 { margin: 0 0 4px; font: 17px var(--serif); }
 .mon-debug-card p { margin: 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .mon-debug-flag { border-color: var(--red); border-left-width: 3px; }
+.mon-debug-alt { display: inline-block !important; width: 20px !important; height: 20px !important; vertical-align: middle; margin-right: 3px; background: none !important; }
+.mon-debug-priority { margin: 0 0 8px; color: var(--muted); }

@@ -94,31 +94,38 @@
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
   const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
-  // Clan mons bundled in public/assets/clans (sources in ATTRIBUTION.md): the seven
-  // official Great Clan mons, Mantis, Spider and Imperial from l5r.wiki, and the
-  // minor clans cut from Shin-Ian's "The Clans of Rokugan". Every other clan returns ''.
-  const CLAN_MONS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn','Mantis','Spider','Imperial',
-    'Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Monkey','Ox','Snake','Sparrow','Tiger','Tortoise','Raven'];
-  const clanMon = name => CLAN_MONS.includes(name) ? `public/assets/clans/${name.toLowerCase()}.webp` : '';
-  // Where each bundled mon came from, for the #/clan-mons debug page. Mandala mons note
-  // their clock position in Shin-Ian's artwork; `guess` marks uncertain identifications.
+  // Clan mons live in public/assets/clans/<source>/<clan>.webp (sources in ATTRIBUTION.md).
+  // A clan uses the highest-priority source that has its mon: the official site, then
+  // l5r.wiki, then Shin-Ian's mandala, then l5r.fandom.com. Add a file to a source by
+  // listing the clan under it; lower sources never override higher ones.
+  const MON_PRIORITY = ['official','wiki','mandala','fandom'];
+  const MON_FILES = {
+    official:['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'],
+    wiki:['Mantis','Spider','Imperial'],
+    mandala:['Badger','Bat','Boar','Dragonfly','Falcon','Fox','Hare','Mantis','Monkey','Nezumi','Ox','Raven','Snake','Sparrow','Tiger','Tortoise'],
+    fandom:[]
+  };
   const MON_SOURCES = {
     official:{label:'legendofthefiverings.com',href:'https://www.legendofthefiverings.com/lore/clans/the-crane-clan/'},
     wiki:{label:'l5r.wiki (recoloured)',href:'https://l5r.wiki/clans'},
-    mandala:{label:'Shin-Ian, "The Clans of Rokugan" (DeviantArt)',href:'https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095'}
+    mandala:{label:'Shin-Ian, "The Clans of Rokugan" (DeviantArt)',href:'https://www.deviantart.com/shin-ian/art/The-Clans-of-Rokugan-721225095'},
+    fandom:{label:'l5r.fandom.com',href:'https://l5r.fandom.com/wiki/Legend_of_the_Five_Rings_Wiki'}
   };
-  const MANDALA = {Raven:'11:30',Dragonfly:'12:30',Tortoise:'1:00',Monkey:'2:00',Tiger:'2:30',Bat:'3:30',Badger:'5:00',Falcon:'5:30',Snake:'7:00',Hare:'8:00',Sparrow:'8:30',Boar:'9:30',Ox:'10:00',Fox:'11:00'};
-  const MON_GUESSES = ['Badger','Hare','Sparrow','Tiger'];
-  // Mandala mons not used as a catalog clan's mon; listed on the debug page.
-  const EXTRA_MONS = [
-    {name:'Nezumi',src:'public/assets/clans/nezumi.webp',position:'6:30',note:'Not a clan in the character catalog'},
-    {name:'Mantis (mandala version)',src:'public/assets/clans/mantis-mandala.webp',position:'4:00',note:'Alternative; Mantis uses the l5r.wiki mon'}
-  ];
+  // Clock positions in the mandala (12:00 at the top), and identifications that are guesses.
+  const MANDALA = {Raven:'11:30',Dragonfly:'12:30',Tortoise:'1:00',Monkey:'2:00',Tiger:'2:30',Bat:'3:30',Mantis:'4:00',Badger:'5:00',Falcon:'5:30',Nezumi:'6:30',Snake:'7:00',Hare:'8:00',Sparrow:'8:30',Boar:'9:30',Ox:'10:00',Fox:'11:00'};
+  const MON_GUESSES = {mandala:['Badger','Hare','Sparrow','Tiger']};
+  const monFile = (kind,name) => `public/assets/clans/${kind}/${name.toLowerCase()}.webp`;
+  // Every available mon for a clan, best first.
+  const clanMonCandidates = name => MON_PRIORITY.filter(kind => MON_FILES[kind].includes(name)).map(kind => ({
+    kind,src:monFile(kind,name),source:MON_SOURCES[kind],position:kind === 'mandala' ? MANDALA[name] || '' : '',guess:!!MON_GUESSES[kind]?.includes(name)
+  }));
+  const CLAN_MONS = [...new Set(MON_PRIORITY.flatMap(kind => MON_FILES[kind]))];
+  const clanMon = name => clanMonCandidates(name)[0]?.src || '';
+  // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
-    if (!CLAN_MONS.includes(name)) return null;
-    const kind = MANDALA[name] ? 'mandala' : ['Mantis','Spider','Imperial'].includes(name) ? 'wiki' : 'official';
-    return {src:clanMon(name),kind,source:MON_SOURCES[kind],position:MANDALA[name] || '',guess:MON_GUESSES.includes(name)};
+    const [chosen,...alternatives] = clanMonCandidates(name);
+    return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, clanMon, clanMonInfo, EXTRA_MONS, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();
