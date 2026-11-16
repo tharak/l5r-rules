@@ -556,6 +556,16 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   assert.match(sectionHtml(empty,'skills'),/No skills match these filters/);
 });
 
+test('both sets of skill filter checkboxes keep keyboard focus after re-rendering',async()=>{
+  const c=await character();
+  let focused='';
+  for(const view of ['rolls','skills'])for(const [kind,attr] of [['zero','hideZeroSkills'],['macro','hideZeroMacroSkills']]){
+    c.inputs[`#creator-${view} [data-hide-zero-${kind==='macro'?'macro-skills':'skills'}]`]={focus(){focused=`${view}-${kind}`;}};
+    c.root.onchange({target:{dataset:{skillFilterView:view,[attr]:''},checked:true}});
+    assert.equal(focused,`${view}-${kind}`);
+  }
+});
+
 test('skill rank steppers keep keyboard focus, even when the filters remove the changed row',async()=>{
   const c=await character({skills:{Defense:1}});
   let focused='';

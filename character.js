@@ -775,7 +775,7 @@
       skillFilters[view][kind] = event.target.checked;
       try { localStorage.setItem(SKILL_FILTERS[view].keys[kind],String(event.target.checked)); } catch {}
       render();
-      if (view === 'skills') root.querySelector(`#creator-skills [data-hide-zero-${kind==='macro'?'macro-skills':'skills'}]`)?.focus();
+      root.querySelector(`#creator-${view} [data-hide-zero-${kind==='macro'?'macro-skills':'skills'}]`)?.focus();
       return;
     }
     uiError = '';
