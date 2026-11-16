@@ -146,11 +146,11 @@ async function mountClanMons(element) {
       .map(({entry,info}) => card({src:info.src,title:entry.name,flag:info.guess,lines:[esc(entry.group),position(info),info.guess?'<strong>Best guess</strong>':'',alternatives(info)]})).join('');
     return `<h2>${esc(C.MON_SOURCES[kind].label)}</h2>${cards ? `<div class="mon-debug-grid">${cards}</div>` : '<p>No mons used from this source yet.</p>'}`;
   }).join('');
-  const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({title:clan.name,lines:[esc(clan.group),'No mon']})).join('');
+  const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({src:C.DEFAULT_MON,title:clan.name,lines:[esc(clan.group),'Default five-rings mon']})).join('');
   element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image each clan uses. Sources are used in priority order: the official site, l5r.wiki, the mandala, then l5r.fandom.com. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
     <p class="mon-debug-priority">Priority: ${C.MON_PRIORITY.map(kind => esc(C.MON_SOURCES[kind].label)).join(' → ')}</p>
     ${sections}
-    <h2>Clans without a mon</h2><div class="mon-debug-grid">${missing}</div></div>`;
+    <h2>Clans without a mon (default five-rings mon)</h2><div class="mon-debug-grid">${missing}</div></div>`;
 }
 
 function renderCharacters() {

@@ -499,6 +499,9 @@ test('clan mons come from the highest-priority source that has one, and every li
  assert.deepEqual(plain(C.clanMonCandidates('Mantis').map(c=>c.kind)),['wiki','mandala']);
  assert.deepEqual(plain(C.clanMonInfo('Mantis').alternatives.map(c=>c.kind)),['mandala']);
  assert.equal(C.clanMonInfo('Badger').guess,true);assert.equal(C.clanMonInfo('Fox').guess,false);
- for(const clan of ['Oriole','Ronin','Brotherhood of Shinsei','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
+ // Clans with no mon from any source fall back to the five-rings seal; no clan means no mon.
+ for(const clan of ['Oriole','Ronin','Brotherhood of Shinsei'])assert.equal(C.clanMon(clan),C.DEFAULT_MON,clan);
+ assert.ok(fs.existsSync(C.DEFAULT_MON));
+ for(const clan of ['','  ',undefined,null])assert.equal(C.clanMon(clan),'',String(clan));
  for(const name of C.CLAN_MONS)for(const candidate of C.clanMonCandidates(name))assert.ok(fs.existsSync(candidate.src),candidate.src);
 });

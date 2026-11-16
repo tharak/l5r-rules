@@ -120,12 +120,14 @@
     kind,src:monFile(kind,name),source:MON_SOURCES[kind],position:kind === 'mandala' ? MANDALA[name] || '' : '',guess:!!MON_GUESSES[kind]?.includes(name)
   }));
   const CLAN_MONS = [...new Set(MON_PRIORITY.flatMap(kind => MON_FILES[kind]))];
-  const clanMon = name => clanMonCandidates(name)[0]?.src || '';
+  // Clans without a mon from any source use the site's five-rings seal; no clan, no mon.
+  const DEFAULT_MON = 'public/assets/clans/default/five-rings.svg';
+  const clanMon = name => clanMonCandidates(name)[0]?.src || (typeof name === 'string' && name.trim() ? DEFAULT_MON : '');
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
     const [chosen,...alternatives] = clanMonCandidates(name);
     return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

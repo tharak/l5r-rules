@@ -136,3 +136,4 @@ Source pages:
 - Dragon Spells: https://lasthaiku.wikidot.com/dragon-spells
 
 When several sources have a mon for the same clan, the app uses them in this order: the official site, l5r.wiki, the mandala, then l5r.fandom.com (`MON_PRIORITY` in `character-catalog.js`).
+Clans with no mon from any source use `public/assets/clans/default/five-rings.svg`, a round version of this site's own five-rings logo.
