@@ -86,7 +86,7 @@ test('built web content has no source branding or source links and omits reposit
 
 function campaignCards() {
  const data=new Map(),watches=[],listeners={},documentListeners={};let characters=[];
- const store={uid:'gm',status:'Connected',get:path=>data.get(path),drafts:()=>({}),
+ const store={uid:'gm',status:'Connected',get:path=>data.get(path),drafts:()=>({}),queue:(path,value)=>value===null?data.delete(path):data.set(path,value),flush:async()=>{},
   list:prefix=>[...data].filter(([path])=>path.startsWith(prefix)&&!path.slice(prefix.length).includes('/')).map(([path,value])=>({id:path.slice(prefix.length),...value}))};
  store.backend={watchSheet:async(campaignId,pcId,full,receive,fail)=>{
   const item={campaignId,pcId,full,receive,fail,stopped:false};watches.push(item);
@@ -95,9 +95,9 @@ function campaignCards() {
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
  vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});
- vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn},location,Event,console,setTimeout});
+ vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null},location,Event,console,setTimeout,crypto:require('node:crypto')});
  const render=()=>window.CampaignUI.render('campaigns');
- return {data,store,watches,window,location,listeners,render,setCharacters:value=>characters=value,
+ return {data,store,watches,window,location,listeners,documentListeners,render,setCharacters:value=>characters=value,
   click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
 }
 test('only a PC\'s creator edits it; everyone else in the campaign gets a read-only View',()=>{
@@ -152,4 +152,30 @@ test('campaign cards share subscriptions, move to surviving associations, and re
  second.receive({sections:{identity:{name:'Old account secret'}}},null,{fromCache:false});assert.doesNotMatch(d.render(),/Old account secret/);
  d.location.hash='#/characters';d.listeners.hashchange();await Promise.resolve();assert.equal(d.watches[2].stopped,true);
  d.store.uid=null;d.store.backend=null;assert.doesNotMatch(d.render(),/campaign-card-pcs/);
+});
+
+test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',async()=>{
+ const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ const pick=()=>d.documentListeners.change({target:{dataset:{npcPortrait:''},files:[{type:'image/png'}]}});
+ d.window.UI.readPortrait=async()=>picture;
+ render();d.click('section','npcs');
+ await d.click('npc-new');
+ assert.match(render(),/Add picture/);
+ await pick();
+ assert.match(render(),/<img class="ui-portrait-image"/);
+ d.documentListeners.input({target:{dataset:{campaignField:'npc-name'},value:'Court messenger'}});
+ await d.click('npc-save');
+ const [id]=[...d.data.keys()].filter(path=>path.startsWith('campaigns/c/npcs/'));
+ assert.equal(d.data.get(id).portrait,picture);
+ await d.click('npc-open',id.split('/').pop());
+ d.documentListeners.input({target:{dataset:{campaignField:'npc-notes'},value:'Carries a sealed letter.'}});
+ assert.equal(d.data.get(id).portrait,picture,'editing notes kept the picture');
+ await d.click('npc-portrait-remove');
+ assert.equal(d.data.get(id).portrait,undefined);
+ assert.equal(d.data.get(id).notes,'Carries a sealed letter.');
+ await pick();
+ assert.equal(d.data.get(id).portrait,picture);
 });

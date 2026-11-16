@@ -7,7 +7,7 @@
   const C = window.CharacterCatalog, R = window.CharacterRules;
   const {TRAIT_GROUPS, TRAIT_NAMES} = C;
   const sectionNames={identity:'Identity & training',traits:'Rings & traits',skills:'Skills',options:'Advantages & disadvantages',abilities:'Abilities',story:'Story & equipment',equipment:'Equipment',summary:'Summary & combat'};
-  const resetDescriptions={identity:'the name, clan, family, school, and training choices',traits:'purchased Trait ranks',skills:'purchased Skills, emphases, Trait choices, and selectable school Skills',options:'advantages, disadvantages, and ancestors',abilities:'selected abilities',story:'story notes, heritage, personal equipment, outfit choices, money, standing, custom purchases, and modifiers',summary:'starting XP to 40, wounds taken, and mechanical modifiers'};
+  const resetDescriptions={identity:'the name, picture, clan, family, school, and training choices',traits:'purchased Trait ranks',skills:'purchased Skills, emphases, Trait choices, and selectable school Skills',options:'advantages, disadvantages, and ancestors',abilities:'selected abilities',story:'story notes, heritage, personal equipment, outfit choices, money, standing, custom purchases, and modifiers',summary:'starting XP to 40, wounds taken, and mechanical modifiers'};
   const escapeHtml = UI.escape;
   const blank = () => R.normalize();
   let uiError = '';
@@ -121,7 +121,7 @@
     const availableSchools=[...(sheet.advantages.some(a=>a.name==='Different School') ? C.schools(catalog) : clan?.schools || [])];
     const currentSchool=selectedSchool();if(currentSchool && !availableSchools.includes(currentSchool))availableSchools.push(currentSchool);
     const schoolOptions = availableSchools.filter(school=>!school.nonhuman || `${school.slug}#${school.anchor}`===sheet.school).map(school => option(`${school.slug}#${school.anchor}`, `${school.name}${school.benefit ? ` · +1 ${school.benefit}` : ''}`, `${school.slug}#${school.anchor}` === sheet.school)).join('');
-    return UI.panel({attrs:{'class':'creator-panel creator-identity','id':'creator-identity'},bodyHtml:`${UI.sectionHeading({step:'01',title:'Identity & training',description:'Choose a clan, family, and starting school.'})}<div class="creator-fields">${UI.field({label:'Name',attrs:{'data-field':'name','type':'text','value':sheet.name,'placeholder':'Your character’s name'}})}${UI.field({label:'Clan',attrs:{'data-field':'clan'},kind:'select',optionsHtml:`${option('', 'Choose a clan', !sheet.clan)}${clanOptions}`})}${UI.field({label:'Family',attrs:{'data-field':'family','disabled':!(clan?.families.length)},kind:'select',optionsHtml:`${option('', clan?.families.length ? 'Choose a family' : 'No family benefit', !sheet.family)}${familyOptions}`})}${familyTraitChoice}${UI.field({label:'School',attrs:{'data-field':'school','disabled':!(clan)},kind:'select',optionsHtml:`${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}`})}</div>${sheet.clan==='Imperial'?UI.field({label:'GM approval for Imperial family',labelAttrs:{'class':'creator-approval'},attrs:{'data-imperial-approval':true,'type':'text','value':sheet.exceptions.find(e=>e.code==='imperial')?.explanation || '','placeholder':'Record who approved this family'}}):''}${renderTraining(data)}${renderSchoolDecisions(data,'identity')}${renderCreationOptions(data)}${renderSection(renderSummary(data),'summary',data)}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-identity','id':'creator-identity'},bodyHtml:`${UI.sectionHeading({step:'01',title:'Identity & training',description:'Choose a clan, family, and starting school.'})}${UI.portrait({label:'Character picture',src:sheet.portrait,name:sheet.name,attrs:{class:'creator-portrait'},inputAttrs:{'data-portrait':true},removeAttrs:{'data-action':'remove-portrait','aria-label':'Remove character picture'}})}<div class="creator-fields">${UI.field({label:'Name',attrs:{'data-field':'name','type':'text','value':sheet.name,'placeholder':'Your character’s name'}})}${UI.field({label:'Clan',attrs:{'data-field':'clan'},kind:'select',optionsHtml:`${option('', 'Choose a clan', !sheet.clan)}${clanOptions}`})}${UI.field({label:'Family',attrs:{'data-field':'family','disabled':!(clan?.families.length)},kind:'select',optionsHtml:`${option('', clan?.families.length ? 'Choose a family' : 'No family benefit', !sheet.family)}${familyOptions}`})}${familyTraitChoice}${UI.field({label:'School',attrs:{'data-field':'school','disabled':!(clan)},kind:'select',optionsHtml:`${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}`})}</div>${sheet.clan==='Imperial'?UI.field({label:'GM approval for Imperial family',labelAttrs:{'class':'creator-approval'},attrs:{'data-imperial-approval':true,'type':'text','value':sheet.exceptions.find(e=>e.code==='imperial')?.explanation || '','placeholder':'Record who approved this family'}}):''}${renderTraining(data)}${renderSchoolDecisions(data,'identity')}${renderCreationOptions(data)}${renderSection(renderSummary(data),'summary',data)}`});
   }
 
   function renderTraits(data,rolling = false) {
@@ -707,6 +707,11 @@
       commitEdit();
       focusSkillStepper(name,button.dataset.delta,nextRow);
       return;
+    } else if (action === 'remove-portrait') {
+      sheet.portrait = '';
+      commitEdit();
+      root.querySelector('[data-portrait]')?.focus();
+      return;
     } else if (action === 'add-skill') {
       const name = skillIdentity(root.querySelector('#new-skill').value).name;
       if (!name) return;
@@ -764,6 +769,20 @@
     target?.focus();
   }
 
+  async function setPortrait(file) {
+    if (!file || external?.readOnly) return;
+    const editing = sheet;
+    try {
+      const url = await UI.readPortrait(file);
+      // Ignore a picture that finishes loading after another character was opened.
+      if (sheet !== editing) return;
+      sheet.portrait = url;
+      save();
+    } catch (error) { uiError = error.message || 'This picture could not be read.'; }
+    render();
+    root.querySelector('[data-portrait]')?.focus();
+  }
+
   function onChange(event) {
     if (event.target.id === 'new-skill') return;
     const {dataset} = event.target;
@@ -777,6 +796,7 @@
       return;
     }
     uiError = '';
+    if (event.target.dataset.portrait !== undefined) { setPortrait(event.target.files?.[0]); return; }
     if (handleExtendedChange(event)) return;
     const field = event.target.dataset.field;
     if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }

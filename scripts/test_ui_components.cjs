@@ -52,3 +52,19 @@ test('ring images and icon placeholders use one elemental renderer',()=>{
     assert.ok(image.includes(`data-ring="${ring}"`));
   }
 });
+
+test('portraits render only small inline images and offer Remove only when a picture exists',()=>{
+  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+  assert.ok(UI.isPortrait(picture));
+  const html=UI.portrait({label:'NPC picture',name:'Ren <Doji>',src:picture,inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove'}});
+  assert.match(html,/<img class="ui-portrait-image" src="data:image\/png;base64,/);
+  assert.match(html,/alt="Picture of Ren &lt;Doji&gt;"/);
+  assert.match(html,/type="file" accept="image\/\*"/);
+  assert.match(html,/Change picture/);assert.match(html,/Remove picture/);
+  const empty=UI.portrait({label:'NPC picture'});
+  assert.ok(!empty.includes('<img'));assert.match(empty,/Add picture/);assert.ok(!empty.includes('Remove picture'));
+  for(const src of ['javascript:alert(1)','https://example.test/a.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,AA" onerror="alert(1)','data:text/html;base64,PGI+','data:image/png;base64,'+'A'.repeat(UI.PORTRAIT_MAX_LENGTH)]) {
+    assert.ok(!UI.isPortrait(src),src.slice(0,40));
+    assert.ok(!UI.portrait({src}).includes('<img'),src.slice(0,40));
+  }
+});

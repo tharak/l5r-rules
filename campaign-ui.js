@@ -104,7 +104,8 @@
     ],actionsHtml:isGM?button('session-save','Save session')+button('session-delete','Delete session',session.id):button('session-close','Close')});
   }
   function npcEditor(npc) {
-    return UI.recordEditor({fields:[
+    const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'}});
+    return picture+UI.recordEditor({fields:[
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
       {label:'Notes',kind:'textarea',value:npc.notes,attrs:{'data-campaign-field':'npc-notes'}},
     ],actionsHtml:button('npc-save','Save NPC','',!npc.name.trim())+(npcId?button('npc-delete','Delete NPC',npcId):'')});
@@ -231,10 +232,11 @@
       else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
       else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};}
       else if (action==='npc-open') {npcId=id;npcDraft=null;}
+      else if (action==='npc-portrait-remove') setNPCPortrait('');
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
         if (!gm() || !draft || !draft.name.trim()) return;
-        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:draft.notes,updatedAt:new Date().toISOString()});
+        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:draft.notes,...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
         npcId='';npcDraft=null;
         store().flush();
       }
@@ -284,6 +286,28 @@
     finally {busy=false;changed();}
   }
   document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');if(b)act(b.dataset.campaign,b.dataset.id);});
+  // A new NPC keeps its picture in the draft until saved; an existing NPC saves it at once.
+  function setNPCPortrait(url) {
+    if (!gm()) return;
+    if (npcDraft) { if (url) npcDraft.portrait=url; else delete npcDraft.portrait; return; }
+    const data=store().get(path('npcs',npcId));
+    if (!data) return;
+    const next={...data,updatedAt:new Date().toISOString()};
+    if (url) next.portrait=url; else delete next.portrait;
+    store().queue(path('npcs',npcId),next);
+  }
+  document.addEventListener('change',async event=>{
+    if (event.target.dataset?.npcPortrait === undefined) return;
+    const file=event.target.files?.[0], editing=npcDraft || npcId;
+    if (!file) return;
+    try {
+      const url=await UI.readPortrait(file);
+      // Ignore a picture that finishes loading after another NPC was opened.
+      if ((npcDraft || npcId) !== editing) return;
+      setNPCPortrait(url);
+    } catch (err) { error=err.message || 'This picture could not be read.'; }
+    changed();
+  });
   document.addEventListener('input',event=>{
     const entryField=event.target.dataset.entryField;
     if(entryField) {

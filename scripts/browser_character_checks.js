@@ -22,6 +22,17 @@ async page => {
     check(await p.locator('.creator-roll-dice li').count()===2,'Default Trait roll did not run');
     await p.keyboard.press('Escape');
     check(await p.locator('[data-public]').count()===0,'Paused section privacy controls are still shown');
+    // A large PNG is shrunk to a small inline JPEG, kept across reloads, and removable.
+    const png=await p.evaluate(async()=>{const c=document.createElement('canvas');c.width=1200;c.height=800;const x=c.getContext('2d');x.fillStyle='#7a3';x.fillRect(0,0,1200,800);return c.toDataURL('image/png').split(',')[1];});
+    await p.locator('#creator-identity [data-portrait]').setInputFiles({name:'portrait.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+    await p.locator('#creator-identity img.ui-portrait-image').waitFor();
+    const stored=await p.evaluate(()=>CharacterBuilder.read(CharacterBuilder.list()[0].id).portrait);
+    check(stored.startsWith('data:image/jpeg;base64,')&&stored.length<=120000,'Picture was not shrunk to a small JPEG');
+    check(await p.locator('#creator-identity img.ui-portrait-image').evaluate(img=>img.naturalWidth===256&&img.naturalHeight===171),'Picture was not resized to 256px');
+    await p.reload();await p.locator('#creator-identity img.ui-portrait-image').waitFor();
+    await p.getByRole('button',{name:'Remove character picture',exact:true}).click();
+    check(await p.locator('#creator-identity img.ui-portrait-image').count()===0,'Picture was not removed');
+    check(await p.locator('#creator-identity [data-portrait]').evaluate(node=>node===document.activeElement),'Removing the picture lost keyboard focus');
     check(await p.getByRole('button',{name:'Begin play',exact:true}).count()===0,'Removed phase switch remains');
     check(await p.getByRole('heading',{name:'Creation review',exact:true}).count()===0,'Creation review card remains');
     check(await p.locator('#creator-identity #creator-summary').count()===1,'Character record must be inside section 01');

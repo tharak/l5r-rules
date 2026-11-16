@@ -580,6 +580,24 @@ test('skill rank steppers keep keyboard focus, even when the filters remove the 
   assert.equal(focused,'filter');
 });
 
+test('a character picture is added, kept across reloads, removed, and cleared by an Identity reset',async()=>{
+  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+  const c=await character({name:'Ren'});
+  assert.match(sectionHtml(c,'identity'),/Add picture/);
+  c.window.UI.readPortrait=async()=>picture;
+  await c.root.onchange({target:{dataset:{portrait:''},files:[{type:'image/png'}]}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await c.data()).character.portrait,picture);
+  const reloaded=await c.reload();
+  assert.match(sectionHtml(reloaded,'identity'),/<img class="ui-portrait-image" src="data:image\/png;base64,/);
+  reloaded.click({action:'remove-portrait'});
+  assert.equal((await reloaded.data()).character.portrait,'');
+  c.window.UI.readPortrait=async()=>{throw new Error('Choose an image file.');};
+  await c.root.onchange({target:{dataset:{portrait:''},files:[{type:'text/plain'}]}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(c.root.innerHTML,/Choose an image file\./);
+});
+
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
   const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
   let d=(await c.data()).derived;

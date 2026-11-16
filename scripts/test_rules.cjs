@@ -78,6 +78,12 @@ test('legacy six-section documents are upgraded to Abilities only by their owner
 test('campaign, session, NPC and membership permissions',async()=>{
  for(const u of ['alice','bob']){await assertSucceeds(getDoc(r(db(u),'campaigns/c/sessions/s')));await assertFails(getDoc(r(db(u),'campaigns/c/npcs/n')));await assertFails(setDoc(r(db(u),'campaigns/c/sessions/s'),{title:'Forged',text:'',updatedAt:'now'}));}
  await assertSucceeds(getDoc(r(db('gm'),'campaigns/c/npcs/n')));
+ const npc={name:'NPC',notes:'',updatedAt:'now'},picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+ await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
+ for(const portrait of ['https://example.test/a.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,AA" onerror="x','data:image/png;base64,'+'A'.repeat(120000),42])
+  await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait}));
+ await assertFails(setDoc(r(db('alice'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
+ await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/npcs/pictured')));
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'a\nb',updatedAt:'now'}));
  await assertFails(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'alice'}));
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'gm'}));

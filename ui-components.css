@@ -47,3 +47,15 @@
   .creator-ring .ui-ring-mark { background: transparent; border-radius: 0; text-shadow: none; color: var(--ink)!important; }
   .ui-ring-mark.book-mark { width: 44px; height: 44px; }
 }
+
+/* Picture picker for PCs and NPCs. The file input is visually hidden inside its
+   label, which is styled as a button and stays keyboard-focusable. */
+.ui-portrait { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 14px; }
+.ui-portrait-image { display: block; width: 96px; height: 96px; object-fit: cover; border: 1px solid #b9aa8d; border-radius: 3px; background: var(--wash); }
+.ui-portrait-empty { background: repeating-linear-gradient(135deg, var(--wash) 0 8px, transparent 8px 16px); }
+.ui-portrait-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ui-portrait-pick { position: relative; cursor: pointer; }
+.ui-portrait-pick:focus-within { outline: 2px solid var(--red); outline-offset: 2px; }
+.ui-portrait-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.ui-portrait-pick:has(.ui-portrait-input:disabled) { opacity: .5; cursor: not-allowed; }
+@media print { .ui-portrait-actions { display: none; } .ui-portrait-image { width: 72px; height: 72px; } }

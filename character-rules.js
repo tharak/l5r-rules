@@ -3,6 +3,9 @@
   const number = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
   const positive = value => Math.max(0,number(value));
   const integer = value => Math.floor(positive(value));
+  // Matches UI.isPortrait: a small inline JPEG/PNG/WebP, never a remote URL.
+  const PORTRAIT = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+  const portrait = value => typeof value === 'string' && value.length <= 120000 && PORTRAIT.test(value) ? value : '';
   function normalize(input = {}) {
     const s = {...input,version:2};
     delete s.phase;
@@ -16,6 +19,7 @@
     // Begin Play used to bake Fame into saved Glory. Convert that value once.
     if (input.phase === 'advancement' && input.glory != null && s.advantages.some(a=>a.name==='Fame')) s.glory = number(input.glory)-1;
     s.money = input.money == null ? null : {...input.money};
+    s.portrait = portrait(input.portrait);
     s.progression = {...input.progression,history:(input.progression?.history || []).map(e => ({...e}))};
     return s;
   }
@@ -448,7 +452,7 @@
     const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','skill-subtype:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
     if(!exceptionPrefixes[section])return s;
     if(section==='identity') {
-      Object.assign(s,{name:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
+      Object.assign(s,{name:'',portrait:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
       s.disadvantages=s.disadvantages.filter(a=>!a.grantSchool);
     } else if(section==='traits')s.traitBuys={};
     else if(section==='skills')Object.assign(s,{skills:{},skillTraits:{},emphases:{},legacyEmphases:{},schoolChoices:[]});

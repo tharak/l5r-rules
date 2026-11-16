@@ -476,3 +476,12 @@ test('Trait Rank 5 and 15 total advantage points are inclusive advisory limits',
  assert.ok(d.blockers.some(v=>v.code==='advantages'&&v.message.includes('limit of 15')));
  assert.equal(R.normalize(s).traitBuys.Strength,4);assert.equal(R.normalize(s).advantages[1].cost,8);
 });
+
+test('sheet pictures keep only small inline images and an Identity reset clears them',()=>{
+ const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+ assert.equal(R.normalize({portrait:picture}).portrait,picture);
+ for(const portrait of [undefined,'javascript:alert(1)','https://example.test/a.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,'+'A'.repeat(120000),42])assert.equal(R.normalize({portrait}).portrait,'');
+ const reset=R.resetSection({name:'Ren',portrait:picture,notes:'kept'},'identity',catalog);
+ assert.equal(reset.portrait,'');assert.equal(reset.notes,'kept');
+ assert.equal(R.resetSection({portrait:picture},'story',catalog).portrait,picture);
+});

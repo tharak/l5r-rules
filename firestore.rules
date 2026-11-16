@@ -119,10 +119,14 @@ service cloud.firestore {
       }
       match /npcs/{id} {
         allow read: if gm(c);
-        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['name','notes','updatedAt'])
+        // An optional picture is a small inline image, the same shape the client renders.
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['name','notes','updatedAt','portrait'])
           && request.resource.data.name is string && request.resource.data.name.size() <= 200
           && request.resource.data.notes is string && request.resource.data.notes.size() <= 900000
-          && request.resource.data.updatedAt is string;
+          && request.resource.data.updatedAt is string
+          && (!('portrait' in request.resource.data) || (request.resource.data.portrait is string
+            && request.resource.data.portrait.size() <= 120000
+            && request.resource.data.portrait.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$')));
         allow delete: if gm(c);
       }
       match /pcs/{id} {

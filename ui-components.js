@@ -97,5 +97,37 @@
   function recordEditor({fields=[],extraHtml='',actionsHtml='',attrs={}} = {}) {
     return element('div',{...attrs,class:classes('ui-record-editor',attrs.class)},fields.map(field).join('')+extraHtml+actionRow({bodyHtml:actionsHtml}));
   }
-  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor};
+  // Pictures are stored inline as small base64 images. Only this exact shape is
+  // rendered, so a stored value can never become a script or remote URL.
+  const PORTRAIT_PATTERN = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+  const PORTRAIT_MAX_LENGTH = 120000;
+  const isPortrait = value => typeof value === 'string' && value.length <= PORTRAIT_MAX_LENGTH && PORTRAIT_PATTERN.test(value);
+  // The picker renders the current picture (or a placeholder), a file input and,
+  // when there is a picture, a Remove button. Controllers handle both events.
+  function portrait({label='Picture',src='',name='',attrs={},inputAttrs={},removeAttrs={}} = {}) {
+    const image = isPortrait(src)
+      ? `<img class="ui-portrait-image" src="${src}" alt="${escape(name ? `Picture of ${name}` : label)}">`
+      : element('span',{class:'ui-portrait-image ui-portrait-empty','aria-hidden':true},'');
+    const pick = element('label',{class:'ui-portrait-pick ui-button ui-button--secondary ui-button--compact'},`${escape(src ? 'Change picture' : 'Add picture')}${element('input',{type:'file',accept:'image/*',...inputAttrs,class:classes('ui-portrait-input',inputAttrs.class),'aria-label':`${src ? 'Change' : 'Add'} ${label.toLowerCase()}`})}`);
+    const remove = src ? button({text:'Remove picture',variant:'quiet',size:'compact',attrs:removeAttrs}) : '';
+    return element('div',{...attrs,class:classes('ui-portrait',attrs.class)},image+element('div',{class:'ui-portrait-actions'},pick+remove));
+  }
+  // Shrink a chosen image to at most 256px on its longest side and re-encode it
+  // as JPEG, lowering quality until it fits the stored size limit.
+  async function readPortrait(file,{size=256} = {}) {
+    if (!file || !/^image\//.test(file.type)) throw new Error('Choose an image file.');
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1,size/Math.max(bitmap.width,bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1,Math.round(bitmap.width*scale)); canvas.height = Math.max(1,Math.round(bitmap.height*scale));
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff'; context.fillRect(0,0,canvas.width,canvas.height);
+    context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close?.();
+    for (const quality of [0.85,0.7,0.55,0.4]) {
+      const url = canvas.toDataURL('image/jpeg',quality);
+      if (isPortrait(url)) return url;
+    }
+    throw new Error('This picture is too detailed to store. Try a simpler or smaller image.');
+  }
+  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,isPortrait,PORTRAIT_MAX_LENGTH};
 })();
