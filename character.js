@@ -178,13 +178,9 @@
     return C.MACRO_SKILLS.includes(category) || C.WEAPON_SKILLS.includes(category);
   }
 
-  // A macro category such as Lore counts as trained once any of its subskills has a rank.
-  // Weapon skills (Kenjutsu, Heavy Weapons, …) are named on their own, so they count toward Weapons.
-  function isSkillTrained(name,skills) {
-    if (skills[name]?.rank > 0) return true;
-    if (!C.requiresSkillSubtype(name)) return false;
-    return Object.entries(skills).some(([subskill,skill])=>skill.rank > 0 && (subskill.startsWith(name+': ') || (name === 'Weapons' && C.WEAPON_SKILLS.includes(subskill))));
-  }
+  // A macro category row such as Lore never has a rank of its own: each bought
+  // subskill gets its own row, so the category picker follows the rank-zero filters.
+  const isSkillTrained = (name,skills) => skills[name]?.rank > 0;
 
   // Shared by the Rolls view and section 03 so both filters follow one rule.
   function isSkillVisible(name,skills,{zero,macro}) {
@@ -220,11 +216,13 @@
     return UI.dialog({title:`${macroSkill} · Choose subskill`,titleId:'subskill-dialog-title',attrs:{class:'creator-subskill-dialog'},bodyClass:'creator-subskill-body',bodyHtml:`<p>Choose a subskill to buy Rank 1 for 1 XP.</p><div class="creator-subskill-choices">${names.map(name=>UI.button({text:`${name.slice(macroSkill.length+2)}${skills[name]?.rank?` · Rank ${skills[name].rank}`:''}`,variant:'secondary',attrs:{'data-action':'choose-subskill','data-skill':name,disabled:!!skills[name]?.rank}})).join('')}</div>${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:`${UI.field({label:'Custom subskill',attrs:{id:'custom-subskill',placeholder:`Another ${macroSkill.toLowerCase()} subskill`}})}${UI.button({text:'Add subskill · 1 XP',attrs:{'data-action':'choose-subskill'}})}`})}`,footerHtml:UI.button({text:'Close',variant:'secondary',attrs:{'data-action':'close-subskills','aria-label':'Close subskill choices'}})});
   }
 
-  function closeSubskills() {
+  function closeSubskills(bought = '') {
     const name = macroSkill;
     macroSkill = '';
     render();
-    root.querySelector(`[data-action="open-subskills"][data-skill=${JSON.stringify(name)}]`)?.focus();
+    // The filters may hide the category picker; then focus the subskill that was just bought.
+    (root.querySelector(`[data-action="open-subskills"][data-skill=${JSON.stringify(name)}]`)
+      || (bought ? root.querySelector(`#creator-skills [data-action="skill"][data-skill=${JSON.stringify(bought)}][data-delta="1"]`) : null))?.focus();
   }
 
   function renderOptionChoice(kind,entry,index) {
@@ -642,7 +640,7 @@
       const name = skillIdentity(button.dataset.skill || `${macroSkill}: ${read('#custom-subskill')}`).name;
       if (!name.startsWith(macroSkill+': ') || C.requiresSkillSubtype(name)) return;
       if (!build().skills[name]?.rank) sheet.skills[name] = 1;
-      save(); closeSubskills(); return;
+      save(); closeSubskills(name); return;
     }
     if (action === 'xp-award-step') {
       const delta=Number(button.dataset.delta), next=xpAward+delta;

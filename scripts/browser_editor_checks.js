@@ -64,7 +64,8 @@ async page => {
     await macroFilter.check();
     check(await p.locator('#creator-skills [data-skill-name="Craft"]').count()===0,'Macro filter leaves untrained macro skills visible');
     check(await p.locator('#creator-skills [data-skill-name="Defense"]').count()===1,'Macro filter hides ordinary skills');
-    check(await p.getByRole('button',{name:'Choose Lore subskill',exact:true}).count()===1,'Macro filter hides a trained category picker');
+    check(await p.getByRole('button',{name:'Choose Lore subskill',exact:true}).count()===0,'Macro filter leaves the Lore picker visible after buying a Lore subskill');
+    check(await p.locator('#creator-skills [data-skill-name="Lore: History"]').count()===1,'Macro filter hides a bought Lore subskill');
     await zeroFilter.check();
     check(await zeroFilter.evaluate(node=>node===document.activeElement),'Toggling the filter lost keyboard focus');
     check(await p.locator('#creator-skills [data-skill-name="Defense"]').count()===0,'Rank zero filter leaves untrained skills visible');
