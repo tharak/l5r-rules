@@ -60,7 +60,8 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const contentStops = new Map();
           const isGM = snapshot.docs.find(d=>d.id===id).data().gmUid === uid;
           stops.push(()=>{for(const item of contentStops.values())item.stop();contentStops.clear();});
-          const canRead = data => data.public || data.creatorUid === uid || isGM;
+          // Privacy is paused: every campaign member reads every plot and note.
+          const canRead = () => true;
           const targetVisible = data => {
             const target=catalogs[data.targetKind]?.get(data.targetId);
             return !!target && (data.targetKind!=='npcs'||isGM) && (data.targetKind!=='plots'||(target.creatorUid===data.targetCreatorUid&&canRead(target)));

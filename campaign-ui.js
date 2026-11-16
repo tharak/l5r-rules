@@ -88,7 +88,6 @@
     return store().get(path('members',pc.ownerUid))?.displayName || 'Player';
   }
   const entryOwner = entry => entry.creatorUid === store().uid;
-  const visibilityLabel = entry => entry.public ? 'Public · Campaign members' : 'Private · Creator and GM';
   const entryAuthor = entry => store().get(path('members',entry.creatorUid))?.displayName || 'Player';
   function entryEditor(kind,draft) {
     const plot=kind==='plot';
@@ -96,7 +95,6 @@
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
       ...(plot?[{label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}}]:[]),
       {label:plot?'Plot point':'Note',kind:'textarea',value:draft.text,attrs:{...attrs('text'),maxlength:400000}},
-      {label:'Visibility',kind:'select',value:draft.public?'public':'private',attrs:attrs('public'),options:[{value:'private',label:'Private — creator and GM'},{value:'public',label:'Public — campaign members'}]},
     ],actionsHtml:button(kind+'-save',plot?'Save plot':'Save note','',!draft.text.trim()||(plot&&!draft.title.trim()))+button(kind+'-cancel','Cancel')});
   }
   function sessionEditor(session,isGM) {
@@ -114,11 +112,11 @@
   function notesFor(kind,id) {
     const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
-    return `<section class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.sectionHeading({title:'Notes',level:3,actionsHtml:`${button('note-new','+ Note',kind+':'+id)}`})}${notes.map(n=>`<article class="campaign-note"><div class="workspace-head"><small>${e(entryAuthor(n))} · ${visibilityLabel(n)}</small>${entryOwner(n)?UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('note-edit','Edit note',n.id)}${button('note-delete','Delete note',n.id)}`}):''}</div><p class="entry-text">${e(n.text)}</p></article>`).join('')||'<p>No notes yet.</p>'}${drafting?entryEditor('note',noteDraft):''}</section>`;
+    return `<section class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.sectionHeading({title:'Notes',level:3,actionsHtml:`${button('note-new','+ Note',kind+':'+id)}`})}${notes.map(n=>`<article class="campaign-note"><div class="workspace-head"><small>${e(entryAuthor(n))}</small>${entryOwner(n)?UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('note-edit','Edit note',n.id)}${button('note-delete','Delete note',n.id)}`}):''}</div><p class="entry-text">${e(n.text)}</p></article>`).join('')||'<p>No notes yet.</p>'}${drafting?entryEditor('note',noteDraft):''}</section>`;
   }
   function renderPlots(plots) {
     const selected=plots.find(p=>p.id===plotId);
-    return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues, plans, or secrets. You choose whether your plot points and notes are public or private.</p><div class="plot-list">${plots.map(p=>button('plot-open',p.title+' · '+(p.public?'Public':'Private'),p.id)).join('')||'<p>No plot points yet.</p>'}</div>${plotDraft?entryEditor('plot',plotDraft):selected?`<article class="campaign-plot"><h3>${e(selected.title)}</h3><small>${e(entryAuthor(selected))} · ${visibilityLabel(selected)}</small><p class="entry-text">${e(selected.text)}</p>${entryOwner(selected)?button('plot-edit','Edit plot',selected.id)+button('plot-delete','Delete plot',selected.id):''}${notesFor('plots',selected.id)}</article>`:''}`;
+    return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p><div class="plot-list">${plots.map(p=>button('plot-open',p.title,p.id)).join('')||'<p>No plot points yet.</p>'}</div>${plotDraft?entryEditor('plot',plotDraft):selected?`<article class="campaign-plot"><h3>${e(selected.title)}</h3><small>${e(entryAuthor(selected))}</small><p class="entry-text">${e(selected.text)}</p>${entryOwner(selected)?button('plot-edit','Edit plot',selected.id)+button('plot-delete','Delete plot',selected.id):''}${notesFor('plots',selected.id)}</article>`:''}`;
   }
   function render(slug) {
     renderAgain ||= () => {};
@@ -192,18 +190,19 @@
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
       else if (action==='section') {if(['sessions','pcs','npcs','plots'].includes(id) && (id!=='npcs'||gm()))section=id;}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
-      else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:false};}
+      else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};}
       else if (action==='plot-open') {plotId=id;plotDraft=null;}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};}}
       else if (action==='plot-cancel') plotDraft=null;
-      else if (action==='note-new') {const [kind,targetId]=id.split(':');noteId='';noteTarget={kind,id:targetId};noteDraft={text:'',public:false};}
+      else if (action==='note-new') {const [kind,targetId]=id.split(':');noteId='';noteTarget={kind,id:targetId};noteDraft={text:'',public:true};}
       else if (action==='note-edit') {const data=store().get(path('notes',id));if(data&&entryOwner(data)){noteId=id;noteTarget={kind:data.targetKind,id:data.targetId};noteDraft={...data};}}
       else if (action==='note-cancel') {noteDraft=noteTarget=null;noteId='';}
       else if (action==='plot-save'||action==='note-save') {
         const plot=action==='plot-save',draft=plot?plotDraft:noteDraft;
         if(!draft?.text.trim()||(plot&&!draft.title.trim()))return;
         const now=new Date().toISOString(),entryId=(plot?plotId:noteId)||crypto.randomUUID();
-        const data={...draft,creatorUid:store().uid,createdAt:draft.createdAt||now,updatedAt:now,revision:crypto.randomUUID()};
+        // Privacy is paused: every plot and note is shared, including ones saved as private before.
+        const data={...draft,public:true,creatorUid:store().uid,createdAt:draft.createdAt||now,updatedAt:now,revision:crypto.randomUUID()};
         if(plot)data.title=data.title.trim();else {
           Object.assign(data,{targetKind:noteTarget.kind,targetId:noteTarget.id});
           if(noteTarget.kind==='plots')data.targetCreatorUid=store().get(path('plots',noteTarget.id))?.creatorUid;
@@ -290,7 +289,7 @@
     if(entryField) {
       const kind=event.target.dataset.entryKind,draft=kind==='plot'?plotDraft:noteDraft;
       if(!draft)return;
-      draft[entryField]=entryField==='public'?event.target.value==='public':event.target.value;
+      draft[entryField]=event.target.value;
       const save=document.querySelector(`[data-campaign="${kind}-save"]`);
       if(save)save.disabled=busy||!draft.text.trim()||(kind==='plot'&&!draft.title.trim());
       return;

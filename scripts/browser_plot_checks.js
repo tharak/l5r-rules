@@ -14,22 +14,20 @@ async page => {
     await p.waitForFunction(()=>window.CampaignStorage?.backend);return p;
   };
   const saved=p=>p.waitForFunction(()=>CampaignStorage.status==='Saved to campaign');
-  const plot=async(p,title,text,isPublic=false)=>{
+  const plot=async(p,title,text)=>{
     await p.getByRole('button',{name:'Plots',exact:true}).click();
     await p.getByRole('button',{name:'+ Plot',exact:true}).click();
-    check(await p.locator('[data-entry-field="public"]').inputValue()==='private','New plot did not default to private');
+    check(await p.locator('[data-entry-field="public"]').count()===0,'Paused plot privacy control is still shown');
     await p.locator('[data-entry-field="title"]').fill(title);
     await p.locator('[data-entry-field="text"]').fill(text);
-    if(isPublic)await p.locator('[data-entry-field="public"]').selectOption('public');
     await p.getByRole('button',{name:'Save plot',exact:true}).click();await saved(p);
     await p.getByRole('heading',{name:title,exact:true}).waitFor();
     return p.evaluate(title=>CampaignStorage.list('campaigns/'+location.hash.split('/')[2]+'/plots/').find(p=>p.title===title).id,title);
   };
-  const note=async(p,text,isPublic=false)=>{
+  const note=async(p,text)=>{
     await p.getByRole('button',{name:'+ Note',exact:true}).click();
-    check(await p.locator('[data-entry-kind="note"][data-entry-field="public"]').inputValue()==='private','New note did not default to private');
+    check(await p.locator('[data-entry-kind="note"][data-entry-field="public"]').count()===0,'Paused note privacy control is still shown');
     await p.locator('[data-entry-kind="note"][data-entry-field="text"]').fill(text);
-    if(isPublic)await p.locator('[data-entry-kind="note"][data-entry-field="public"]').selectOption('public');
     await p.getByRole('button',{name:'Save note',exact:true}).click();await saved(p);
     await p.getByText(text,{exact:true}).waitFor();
   };
@@ -47,84 +45,60 @@ async page => {
       await p.goto('http://127.0.0.1:5000/?emulators#/campaigns/'+setup.c);
       await p.getByRole('button',{name:'Plots',exact:true}).waitFor();
     }
-    await plot(gm,'GM SECRET TITLE','GM SECRET CONTENT');
-    const privateId=await plot(alice,'ALICE PRIVATE TITLE','ALICE PRIVATE CONTENT');
-    await gm.getByRole('button',{name:'ALICE PRIVATE TITLE · Private',exact:true}).waitFor();
-    await gm.getByRole('button',{name:'ALICE PRIVATE TITLE · Private',exact:true}).click();
-    await gm.getByText('ALICE PRIVATE CONTENT',{exact:true}).waitFor();
-    check(await gm.getByRole('button',{name:'Edit plot',exact:true}).count()===0,'GM can change another creator plot');
-    const publicId=await plot(alice,'Shared clue','The ferry tracks lead downstream.',true);
-    await note(alice,'PRIVATE PLOT NOTE');await note(alice,'PUBLIC PLOT NOTE',true);
+    // Privacy is paused: every plot and note is visible to every campaign member.
+    await plot(gm,'GM PLOT TITLE','GM PLOT CONTENT');
+    const sharedId=await plot(alice,'Shared clue','The ferry tracks lead downstream.');
+    await note(alice,'ALICE PLOT NOTE');
     await bob.getByRole('button',{name:'Plots',exact:true}).click();
-    await bob.getByRole('button',{name:'Shared clue · Public',exact:true}).click();
-    await bob.getByText('PUBLIC PLOT NOTE',{exact:true}).waitFor();
-    check(!(await bob.locator('#app').innerText()).includes('PRIVATE'),'A private plot or note leaked into the player view');
-    const playerCache=await bob.evaluate(()=>JSON.stringify(localStorage));
-    check(!playerCache.includes('GM SECRET')&&!playerCache.includes('ALICE PRIVATE')&&!playerCache.includes('PRIVATE PLOT NOTE'),'Secret text reached the player cache');
-    await note(bob,'BOB PRIVATE PLOT NOTE');
-    await gm.getByRole('button',{name:'Shared clue · Public',exact:true}).click();
-    await gm.getByText('BOB PRIVATE PLOT NOTE',{exact:true}).waitFor();
+    await bob.getByRole('button',{name:'GM PLOT TITLE',exact:true}).click();
+    await bob.getByText('GM PLOT CONTENT',{exact:true}).waitFor();
+    await bob.getByRole('button',{name:'Shared clue',exact:true}).click();
+    await bob.getByText('ALICE PLOT NOTE',{exact:true}).waitFor();
+    check(await bob.getByRole('button',{name:'Edit plot',exact:true}).count()===0,'A player can change another creator plot');
+    check(await bob.getByRole('button',{name:'Edit note',exact:true}).count()===0,'A player can change another creator note');
+    await note(bob,'BOB PLOT NOTE');
+    await gm.getByRole('button',{name:'Shared clue',exact:true}).click();
+    await gm.getByText('BOB PLOT NOTE',{exact:true}).waitFor();
+    check(await gm.getByRole('button',{name:'Edit plot',exact:true}).count()===0,'GM can change another creator plot');
     for(const p of [alice,bob]) {
       await p.getByRole('button',{name:'Sessions',exact:true}).click();
       await p.getByRole('button',{name:'Prologue',exact:true}).click();
     }
-    await note(alice,'PRIVATE SESSION NOTE');await note(alice,'PUBLIC SESSION NOTE',true);
-    await bob.getByText('PUBLIC SESSION NOTE',{exact:true}).waitFor();
-    check(!(await bob.locator('#app').innerText()).includes('PRIVATE SESSION NOTE'),'Private session note leaked');
-    await note(bob,'BOB SESSION NOTE',true);
-    await alice.getByText('BOB SESSION NOTE',{exact:true}).waitFor();
+    await note(alice,'ALICE SESSION NOTE');
+    await bob.getByText('ALICE SESSION NOTE',{exact:true}).waitFor();
     await alice.getByRole('button',{name:'PC',exact:true}).click();
     await alice.getByRole('button',{name:'Notes',exact:true}).click();
-    await note(alice,'PRIVATE PC NOTE');await note(alice,'PUBLIC PC NOTE',true);
+    await note(alice,'ALICE PC NOTE');
     await bob.getByRole('button',{name:'PC',exact:true}).click();
     await bob.getByRole('button',{name:'Notes',exact:true}).click();
-    await bob.getByText('PUBLIC PC NOTE',{exact:true}).waitFor();
-    check(!(await bob.locator('#app').innerText()).includes('PRIVATE PC NOTE'),'Private PC note leaked');
+    await bob.getByText('ALICE PC NOTE',{exact:true}).waitFor();
+    // NPCs stay a GM-only section, so their notes do too.
     await gm.getByRole('button',{name:'NPC',exact:true}).click();
     await gm.getByRole('button',{name:'Shrine keeper',exact:true}).click();
-    await note(gm,'PRIVATE NPC NOTE');await note(gm,'NPC NOTE WITH PUBLIC SETTING',true);
+    await note(gm,'GM NPC NOTE');
     check(await bob.getByRole('button',{name:'NPC',exact:true}).count()===0,'Player can access GM-only NPCs');
-    // Public note privacy can be tightened by its creator without affecting the shared session.
-    await alice.getByRole('button',{name:'Sessions',exact:true}).click();
-    const publicNote=alice.locator('.campaign-note').filter({hasText:'PUBLIC SESSION NOTE'});
-    await publicNote.getByRole('button',{name:'Edit note',exact:true}).click();
-    await alice.locator('[data-entry-kind="note"][data-entry-field="public"]').selectOption('private');
-    await alice.getByRole('button',{name:'Save note',exact:true}).click();await saved(alice);
-    await bob.getByRole('button',{name:'Sessions',exact:true}).click();
-    await bob.waitForFunction(()=>!document.querySelector('#app').textContent.includes('PUBLIC SESSION NOTE'));
-    // Making the parent plot private removes other players' access to its notes, too.
-    await alice.getByRole('button',{name:'Plots',exact:true}).click();
-    await alice.getByRole('button',{name:'Shared clue · Public',exact:true}).click();
-    await alice.getByRole('button',{name:'Edit plot',exact:true}).click();
-    await alice.locator('[data-entry-kind="plot"][data-entry-field="public"]').selectOption('private');
-    await alice.getByRole('button',{name:'Save plot',exact:true}).click();await saved(alice);
-    await bob.getByRole('button',{name:'Plots',exact:true}).click();
-    await bob.waitForFunction(()=>!document.querySelector('#app').textContent.includes('Shared clue'));
-    await bob.waitForFunction(c=>!CampaignStorage.list('campaigns/'+c+'/notes/').some(n=>n.targetKind==='plots'),setup.c);
     await bob.reload();await bob.getByRole('button',{name:'Plots',exact:true}).click();
-    check(!(await bob.locator('#app').innerText()).includes('SECRET')&&!(await bob.locator('#app').innerText()).includes('Shared clue'),'Reload restored revoked plot text');
+    await bob.getByRole('button',{name:'GM PLOT TITLE',exact:true}).waitFor();
+    await alice.getByRole('button',{name:'Plots',exact:true}).click();
+    await alice.getByRole('button',{name:'Shared clue',exact:true}).click();
     await alice.setViewportSize({width:390,height:844});
-    await alice.screenshot({path:'output/playwright/plots-privacy-mobile.png',fullPage:true});
+    await alice.screenshot({path:'output/playwright/plots-mobile.png',fullPage:true});
     check(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile plot view overflows');
-    const forbidden=await bob.evaluate(async({c,privateId,publicId})=>{
+    const readable=await bob.evaluate(async({c,id})=>{
       const sdk=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js');
-      for(const id of [privateId,publicId]) {
-        try{await sdk.getDocFromServer(sdk.doc(sdk.getFirestore(),`campaigns/${c}/plots/${id}/content/body`));return false;}
-        catch(e){if(e.code!=='permission-denied')throw e;}
-      }
-      return true;
-    },{c:setup.c,privateId,publicId});
-    check(forbidden,'Direct player reads bypassed plot privacy');
+      return (await sdk.getDocFromServer(sdk.doc(sdk.getFirestore(),`campaigns/${c}/plots/${id}/content/body`))).exists();
+    },{c:setup.c,id:sharedId});
+    check(readable,'A campaign member cannot read a plot body from the server');
     alice.once('dialog',dialog=>dialog.accept());
     await alice.getByRole('button',{name:'Delete plot',exact:true}).click();await saved(alice);
-    await gm.waitForFunction(({c,id})=>!CampaignStorage.list('campaigns/'+c+'/notes/').some(n=>n.targetKind==='plots'&&n.targetId===id),{c:setup.c,id:publicId});
+    await gm.waitForFunction(({c,id})=>!CampaignStorage.list('campaigns/'+c+'/notes/').some(n=>n.targetKind==='plots'&&n.targetId===id),{c:setup.c,id:sharedId});
     const deletedNotes=await gm.evaluate(async({c,id})=>{
       const sdk=await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js');
       const docs=await sdk.getDocsFromServer(sdk.collection(sdk.getFirestore(),`campaigns/${c}/notes`));
       return !docs.docs.some(doc=>doc.data().targetKind==='plots'&&doc.data().targetId===id);
-    },{c:setup.c,id:publicId});
+    },{c:setup.c,id:sharedId});
     check(deletedNotes,'Plot deletion left attached note documents');
     check(errors.length===0,'Browser errors: '+errors.join('; '));
-    await page.evaluate(()=>window.plotBrowserCheckResult='Passed: GM/creator privacy, public plots and notes, all four note targets, creator-only editing, revocation, reload, direct server denials, deletion cleanup, and mobile layout.');
+    await page.evaluate(()=>window.plotBrowserCheckResult='Passed: shared plots and notes, all four note targets, GM-only NPCs, creator-only editing, reload, direct server reads, deletion cleanup, and mobile layout.');
   } finally {for(const context of contexts)await context.close();}
 }
