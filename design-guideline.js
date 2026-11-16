@@ -59,7 +59,6 @@
   add('shell','SITE-BRAND','Site brand','Five Rings mark with the archive name.','.site-brand','Desktop and compact mobile','<a class="site-brand" href="#/campaigns"><img src="public/assets/l5r-mark.webp" width="40" height="40" alt=""><span>l5r-rules<small>THE ROKUGAN ARCHIVE</small></span></a>');
   add('shell','SITE-NAVIGATION','Site header','Brand and primary navigation in one header composition.','.app-shell, .main-column, .site-brand, .topbar, .topbar-actions, #navigation','Brand and navigation on every page','<header class="topbar"><a class="site-brand" href="#/campaigns"><img src="public/assets/l5r-mark.webp" width="40" height="40" alt=""><span>l5r-rules<small>THE ROKUGAN ARCHIVE</small></span></a><nav aria-label="Site"><a href="#/campaigns">Campaigns</a><a href="#/characters" aria-current="page">Characters</a><a href="#/books">Books</a></nav></header>');
   add('shell','BREADCRUMB','Page label','Current destination above the main content.','.breadcrumb','Workspace and article titles','<div class="breadcrumb">Characters</div>');
-  add('shell','SITE-FOOTER','Site footer','Archive identity, guide link, and elemental motto.','.site-footer','Wide and stacked mobile','<footer class="site-footer"><span>l5r-rules · The Rokugan archive</span><a href="#/design-guideline">Design Guideline</a><span>Air · Earth · Fire · Water · Void</span></footer>');
   add('shell','WORKSPACE-HEADING','Workspace heading & actions','Page or section heading paired with actions.','.workspace, .workspace-head','Page heading, section heading; wrapping actions',`<div class="workspace"><div class="workspace-head"><h1>Campaigns</h1>${button('Create campaign')}</div></div>`,{source:'app.js, campaign-ui.js'});
   add('shell','PANEL','Panel & layout containers','Paper panels used in responsive campaign and book grids.','.panel, .campaign-workspace, .campaign-grid, .campaign-content, .campaign-list, .books-grid','Campaign grid; book grid; bordered panel','<div class="workspace"><section class="panel"><h2>Panel title</h2><p>Related information and controls.</p></section></div>',{source:'campaign.css, rokugan-theme.css'});
 
@@ -184,7 +183,6 @@
     ['foundations','RING-SYMBOLS','Ring imagery','RING-SYMBOLS BOOK-ICONS'],
     ['shell','SITE-NAVIGATION','Site header','SITE-NAVIGATION SITE-BRAND'],
     ['shell','PAGE-HEADER','Page header','BREADCRUMB ARTICLE-TITLE'],
-    ['shell','SITE-FOOTER','Site footer','SITE-FOOTER'],
     ['shell','WORKSPACE-LAYOUT','Workspace layout','CHARACTER-LAYOUT'],
     ['shared','BUTTON','Button','BUTTON-PRIMARY BUTTON-SECONDARY BUTTON-RESET'],
     ['shared','LINK','Link','LINK ARTICLE-LINKS'],

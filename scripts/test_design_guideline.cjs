@@ -8,9 +8,9 @@ const context = {window:{}};
 for(const file of ['ui-components.js','design-guideline.js']) vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),context);
 const {entries,examples} = context.window.DesignGuideline;
 
-test('33 families retain all 112 permanent example IDs exactly once',()=>{
-  assert.equal(entries.length,33);
-  assert.equal(examples.length,112);
+test('32 families retain all 111 permanent example IDs exactly once',()=>{
+  assert.equal(entries.length,32);
+  assert.equal(examples.length,111);
   assert.equal(new Set(entries.map(item=>item.id)).size,entries.length);
   const mapped=entries.flatMap(item=>item.exampleIds);
   assert.equal(mapped.length,examples.length);
@@ -49,5 +49,4 @@ test('shared components load before consumers and are included in production bui
   }
   for(const file of ['character.js','campaign-ui.js','design-guideline.js','app.js']) assert.ok(index.indexOf('src="ui-components.js"')<index.indexOf(`src="${file}"`),file);
   assert.ok(index.indexOf('href="ui-components.css"')>index.indexOf('href="rokugan-theme.css"'));
-  assert.ok(index.includes('href="#/design-guideline"'));
 });

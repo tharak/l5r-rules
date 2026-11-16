@@ -213,7 +213,6 @@
   .result-icon, .search-empty span, .end-mark { color: var(--gold); }
   .eyebrow, .eyebrow.muted { color: var(--red); }
   .eyebrow-line { background: var(--red); }
-  .site-footer { background: var(--nav); border-top: 2px solid var(--gold); color: #c7b991; gap: 16px; font-size: 10px; letter-spacing: .06em; }
 
   @media (max-width: 700px) {
     .topbar { padding: 14px 16px 8px; }
@@ -228,7 +227,6 @@
     .character-tile { padding: 0 10px 0 0; gap: 10px; }
     .character-tile .character-avatar { width: 56px; height: 56px; font-size: 22px; }
     .character-info h2 { font-size: 17px; }
-    .site-footer { align-items: flex-start; gap: 10px; }
   }
 }
 
