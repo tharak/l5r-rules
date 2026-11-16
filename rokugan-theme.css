@@ -247,3 +247,7 @@
 .mon-debug-covers img { width: 100%; height: 150px; object-fit: cover; border-radius: 2px; }
 .mon-debug-covers figcaption { grid-column: 1 / -1; font: 16px var(--serif); }
 .mon-debug-clan { margin: 16px 0 8px; font: 17px var(--serif); }
+
+/* Hidden visually, still announced by screen readers. */
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.campaign-toolbar { display: flex; justify-content: flex-start; margin-bottom: 16px; }

@@ -123,7 +123,7 @@
     renderAgain ||= () => {};
     if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
     if (slug !== 'campaigns') clearCardSheets();
-    if (!store().uid) { reset(''); return `<div class="workspace"><h1>Campaigns</h1><p>Use Account in the top right to sign in and create or join shared campaigns.</p><p><a href="#/characters">Open device characters</a></p></div>`; }
+    if (!store().uid) { reset(''); return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1><p>Use Account in the top right to sign in and create or join shared campaigns.</p><p><a href="#/characters">Open device characters</a></p></div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
       if (inviteLoaded !== token) {
@@ -137,7 +137,7 @@
       reset('');
       const campaigns = store().list('campaigns/');
       watchCardSheets(campaigns);
-      return `<div class="workspace">${UI.sectionHeading({title:'Campaigns',level:1,actionsHtml:`${button('create','Create campaign')}`})}${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? UI.disclosure({attrs:{},titleHtml:`Retained drafts`,bodyHtml:`${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}`}) : ''}</div>`;
+      return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1><div class="campaign-toolbar">${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? UI.disclosure({attrs:{},titleHtml:`Retained drafts`,bodyHtml:`${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}`}) : ''}</div>`;
     }
     reset(slug.slice('campaigns/'.length));
     const c = store().get(`campaigns/${active}`);
