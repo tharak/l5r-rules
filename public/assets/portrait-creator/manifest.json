@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "canvas": 512,
+  "placeholder": true,
+  "attributes": {
+    "gender": [{"id": "male", "label": "Male"}, {"id": "female", "label": "Female"}],
+    "age": [{"id": "young", "label": "Young"}, {"id": "adult", "label": "Adult"}, {"id": "elder", "label": "Elder"}],
+    "body": [{"id": "slim", "label": "Slim"}, {"id": "average", "label": "Average"}, {"id": "heavy", "label": "Heavy"}]
+  },
+  "slots": [
+    {"id": "background", "label": "Background", "required": true, "options": [
+      {"id": "parchment", "label": "Parchment", "files": {"*/*/*": "layers/background/parchment.svg"}},
+      {"id": "bamboo", "label": "Bamboo", "files": {"*/*/*": "layers/background/bamboo.svg"}}
+    ]},
+    {"id": "body", "label": null, "required": true, "options": [
+      {"id": "base", "label": "Body", "files": {
+        "*/*/slim": "layers/body/slim.svg",
+        "*/*/average": "layers/body/average.svg",
+        "*/*/heavy": "layers/body/heavy.svg"
+      }}
+    ]},
+    {"id": "face", "label": null, "required": true, "options": [
+      {"id": "base", "label": "Face", "files": {
+        "*/young/*": "layers/face/young.svg",
+        "*/adult/*": "layers/face/adult.svg",
+        "*/elder/*": "layers/face/elder.svg"
+      }}
+    ]},
+    {"id": "outfit", "label": "Outfit", "required": true, "options": [
+      {"id": "kimono", "label": "Kimono", "files": {
+        "*/*/slim": "layers/outfit/kimono-slim.svg",
+        "*/*/average": "layers/outfit/kimono-average.svg",
+        "*/*/heavy": "layers/outfit/kimono-heavy.svg"
+      }},
+      {"id": "armor", "label": "Armour", "files": {
+        "*/*/slim": "layers/outfit/armor-slim.svg",
+        "*/*/average": "layers/outfit/armor-average.svg",
+        "*/*/heavy": "layers/outfit/armor-heavy.svg"
+      }}
+    ]},
+    {"id": "hair", "label": "Hair", "options": [
+      {"id": "topknot", "label": "Topknot", "files": {
+        "male/*/*": "layers/hair/topknot.svg",
+        "male/elder/*": "layers/hair/topknot-grey.svg"
+      }},
+      {"id": "bun", "label": "Bun with pins", "files": {
+        "female/*/*": "layers/hair/bun.svg",
+        "female/elder/*": "layers/hair/bun-grey.svg"
+      }},
+      {"id": "long", "label": "Long and loose", "files": {
+        "*/*/*": "layers/hair/long.svg",
+        "*/elder/*": "layers/hair/long-grey.svg"
+      }}
+    ]}
+  ],
+  "mon": {
+    "*/*/slim": {"x": 316, "y": 400, "size": 64, "opacity": 0.9},
+    "*/*/average": {"x": 330, "y": 400, "size": 68, "opacity": 0.9},
+    "*/*/heavy": {"x": 350, "y": 400, "size": 72, "opacity": 0.9}
+  }
+}

@@ -495,3 +495,13 @@ test('the seven Great Clans with official mons map to bundled images; other clan
  }
  for(const clan of ['Mantis','Spider','Fox','Ronin','Imperial','','crab',undefined])assert.equal(C.clanMon(clan),'',String(clan));
 });
+
+test('portrait creator recipes keep only short ids and are cleared with the picture by an Identity reset',()=>{
+ const recipe={gender:'female',age:'elder',body:'slim',layers:{hair:'bun',outfit:'kimono'},mon:false};
+ assert.deepEqual(plain(R.normalize({portraitRecipe:recipe}).portraitRecipe),recipe);
+ assert.equal(R.normalize({}).portraitRecipe,null);
+ assert.equal(R.normalize({portraitRecipe:'x'}).portraitRecipe,null);
+ const dirty=R.normalize({portraitRecipe:{gender:'<b>',age:'adult',layers:{hair:'a b','../x':'y',ok:'fine'},extra:'drop'}}).portraitRecipe;
+ assert.deepEqual(plain(dirty),{layers:{ok:'fine'},mon:true,age:'adult'});
+ assert.equal(R.resetSection({portraitRecipe:recipe},'identity',catalog).portraitRecipe,null);
+});

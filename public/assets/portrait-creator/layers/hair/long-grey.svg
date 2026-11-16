@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<!-- Placeholder layer for the portrait creator; replace with real art (see docs/portrait-creator-art.md). -->
+<defs><filter id="ink" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter></defs>
+<g filter="url(#ink)" stroke="#2b2118" stroke-linecap="round" stroke-linejoin="round"><path d="M192 196 Q176 316 160 406 L196 410 Q206 316 206 226 Z" fill="#9c968c" stroke-width="3"/><path d="M320 196 Q336 316 352 406 L316 410 Q306 316 306 226 Z" fill="#9c968c" stroke-width="3"/><path d="M196 200 Q194 114 256 112 Q318 114 316 200 Q304 152 256 146 Q208 152 196 200 Z" fill="#9c968c" stroke-width="3"/></g>
+</svg>

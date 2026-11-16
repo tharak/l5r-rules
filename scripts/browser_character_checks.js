@@ -46,6 +46,18 @@ async page => {
     const saved=await p.locator('#creator-identity img.ui-portrait-image').evaluate(img=>{const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;const x=c.getContext('2d');x.drawImage(img,0,0);const [r,,b]=x.getImageData(c.width-2,c.height/2,1,1).data;return {width:img.naturalWidth,height:img.naturalHeight,r,b};});
     check(saved.width===256&&saved.height===256,'Saved picture is not a 256px square: '+JSON.stringify(saved));
     check(saved.r>200&&saved.b<60,'Dragging did not change the saved crop: '+JSON.stringify(saved));
+    // The portrait creator composes layers and saves the picture back to Identity.
+    await p.getByRole('button',{name:'Create picture',exact:true}).click();
+    await p.locator('.portrait-creator-canvas').waitFor();
+    await p.getByRole('radiogroup',{name:'Body type'}).getByText('Heavy',{exact:true}).click();
+    await p.getByRole('radiogroup',{name:'Outfit'}).getByText('Armour',{exact:true}).click();
+    await p.getByRole('button',{name:'Use picture',exact:true}).click();
+    await p.waitForURL(/#\/create-character/);
+    await p.locator('#creator-identity img.ui-portrait-image').waitFor();
+    check(await p.evaluate(()=>CharacterBuilder.read(CharacterBuilder.list()[0].id).portraitRecipe?.body)==='heavy','Portrait creator choices were not saved');
+    await p.getByRole('button',{name:'Create picture',exact:true}).click();
+    check(await p.getByRole('radiogroup',{name:'Body type'}).locator('input:checked').getAttribute('value')==='heavy','Portrait creator did not restore its choices');
+    await p.getByRole('button',{name:'Cancel',exact:true}).click();await p.waitForURL(/#\/create-character/);
     await p.reload();await p.locator('#creator-identity img.ui-portrait-image').waitFor();
     await p.getByRole('button',{name:'Remove character picture',exact:true}).click();
     check(await p.locator('#creator-identity img.ui-portrait-image').count()===0,'Picture was not removed');

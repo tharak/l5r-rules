@@ -608,6 +608,24 @@ test('a character picture is added, kept across reloads, removed, and cleared by
   assert.match(c.root.innerHTML,/Choose an image file\./);
 });
 
+test('Create picture hands the sheet to the portrait creator and saves its picture and choices back',async()=>{
+  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+  const c=await character({name:'Hida Kenta',clan:'Crab',portraitRecipe:{gender:'male',layers:{hair:'topknot'}}});
+  assert.match(sectionHtml(c,'identity'),/data-action="create-portrait"/);
+  let request;
+  c.window.PortraitCreator={open:next=>{request=next;}};
+  c.click({action:'create-portrait'});
+  assert.equal(request.title,'Hida Kenta');assert.equal(request.clan,'Crab');assert.equal(request.returnHref,'#/create-character');
+  assert.equal(request.recipe.layers.hair,'topknot');
+  request.onUse(picture,{gender:'female',age:'young',body:'slim',layers:{hair:'bun'},mon:true});
+  const saved=(await c.data()).character;
+  assert.equal(saved.portrait,picture);assert.equal(saved.portraitRecipe.gender,'female');
+  assert.equal(c.window.CharacterBuilder.setPortrait('missing',picture),false);
+  assert.equal(c.window.CharacterBuilder.setPortrait(c.window.CharacterBuilder.list()[0].id,'javascript:alert(1)'),false);
+  c.click({action:'remove-portrait'});
+  assert.equal((await c.data()).character.portraitRecipe,null);
+});
+
 test('a school macro-skill grants a chosen subtype rather than a bare skill or emphasis',async()=>{
   const c=await character();c.school('Peacock','New Basic School: Kujaku Bushi School');
   let d=(await c.data()).derived;

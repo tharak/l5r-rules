@@ -178,4 +178,11 @@ test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',asy
  assert.equal(d.data.get(id).notes,'Carries a sealed letter.');
  await pick();
  assert.equal(d.data.get(id).portrait,picture);
+ // Create picture hands the NPC to the portrait creator and saves its result.
+ let request;d.window.PortraitCreator={open:next=>{request=next;}};
+ await d.click('npc-portrait-remove');
+ await d.click('npc-portrait-create');
+ assert.equal(request.title,'Court messenger');assert.equal(request.returnHref,'#/campaigns/c');
+ request.onUse(picture);
+ assert.equal(d.data.get(id).portrait,picture);
 });

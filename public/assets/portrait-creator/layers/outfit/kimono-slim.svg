@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<!-- Placeholder layer for the portrait creator; replace with real art (see docs/portrait-creator-art.md). -->
+<defs><filter id="ink" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter></defs>
+<g filter="url(#ink)" stroke="#2b2118" stroke-linecap="round" stroke-linejoin="round"><path d="M112 512 L122 392 Q140 330 210 300 L256 372 L302 300 Q372 330 390 392 L400 512 Z" fill="#7d6248" stroke-width="3.5"/>
+<path d="M216 302 L256 380 L296 302" fill="#f4ead6" stroke-width="3"/>
+<path d="M226 304 L256 360 L286 304" fill="none" stroke-width="2"/>
+<path d="M256 380 L256 512" stroke-width="2.5" stroke-opacity=".6"/><path d="M156 420 q10 40 -4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/><path d="M180 440 q10 40 -4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/><path d="M204 420 q10 40 -4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/><path d="M356 420 q-10 40 4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/><path d="M332 440 q-10 40 4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/><path d="M308 420 q-10 40 4 92" fill="none" stroke-width="1.6" stroke-opacity=".45"/></g>
+</svg>

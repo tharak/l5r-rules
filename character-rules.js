@@ -6,6 +6,15 @@
   // Matches UI.isPortrait: a small inline JPEG/PNG/WebP, never a remote URL.
   const PORTRAIT = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
   const portrait = value => typeof value === 'string' && value.length <= 120000 && PORTRAIT.test(value) ? value : '';
+  // The portrait creator's choices: a few short ids, so the creator reopens where the player left it.
+  const RECIPE_ID = /^[a-z0-9_-]{1,40}$/;
+  function portraitRecipe(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const recipe = {layers:{},mon:value.mon !== false};
+    for (const key of ['gender','age','body']) if (RECIPE_ID.test(value[key] || '')) recipe[key] = value[key];
+    for (const [slot,option] of Object.entries(value.layers || {}).slice(0,20)) if (RECIPE_ID.test(slot) && RECIPE_ID.test(option || '')) recipe.layers[slot] = option;
+    return recipe;
+  }
   function normalize(input = {}) {
     const s = {...input,version:2};
     delete s.phase;
@@ -20,6 +29,7 @@
     if (input.phase === 'advancement' && input.glory != null && s.advantages.some(a=>a.name==='Fame')) s.glory = number(input.glory)-1;
     s.money = input.money == null ? null : {...input.money};
     s.portrait = portrait(input.portrait);
+    s.portraitRecipe = portraitRecipe(input.portraitRecipe);
     s.progression = {...input.progression,history:(input.progression?.history || []).map(e => ({...e}))};
     return s;
   }
@@ -452,7 +462,7 @@
     const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','skill-subtype:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
     if(!exceptionPrefixes[section])return s;
     if(section==='identity') {
-      Object.assign(s,{name:'',portrait:'',clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
+      Object.assign(s,{name:'',portrait:'',portraitRecipe:null,clan:'',family:'',familyTrait:'',school:'',schoolChoices:[],schoolDecisions:{},training:[]});
       s.disadvantages=s.disadvantages.filter(a=>!a.grantSchool);
     } else if(section==='traits')s.traitBuys={};
     else if(section==='skills')Object.assign(s,{skills:{},skillTraits:{},emphases:{},legacyEmphases:{},schoolChoices:[]});

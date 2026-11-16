@@ -104,13 +104,13 @@
   const isPortrait = value => typeof value === 'string' && value.length <= PORTRAIT_MAX_LENGTH && PORTRAIT_PATTERN.test(value);
   // The picker renders the current picture (or a placeholder), a file input and,
   // when there is a picture, a Remove button. Controllers handle both events.
-  function portrait({label='Picture',src='',name='',attrs={},inputAttrs={},removeAttrs={}} = {}) {
+  function portrait({label='Picture',src='',name='',attrs={},inputAttrs={},removeAttrs={},actionsHtml=''} = {}) {
     const image = isPortrait(src)
       ? `<img class="ui-portrait-image" src="${src}" alt="${escape(name ? `Picture of ${name}` : label)}">`
       : element('span',{class:'ui-portrait-image ui-portrait-empty','aria-hidden':true},'');
     const pick = element('label',{class:'ui-portrait-pick ui-button ui-button--secondary ui-button--compact'},`${escape(src ? 'Change picture' : 'Add picture')}${element('input',{type:'file',accept:'image/*',...inputAttrs,class:classes('ui-portrait-input',inputAttrs.class),'aria-label':`${src ? 'Change' : 'Add'} ${label.toLowerCase()}`})}`);
     const remove = src ? button({text:'Remove picture',variant:'quiet',size:'compact',attrs:removeAttrs}) : '';
-    return element('div',{...attrs,class:classes('ui-portrait',attrs.class)},image+element('div',{class:'ui-portrait-actions'},pick+remove));
+    return element('div',{...attrs,class:classes('ui-portrait',attrs.class)},image+element('div',{class:'ui-portrait-actions'},pick+actionsHtml+remove));
   }
   // Square cropper geometry, kept pure so it can be tested. `view` is the frame's
   // side in CSS pixels; zoom 1 is the smallest scale that still fills the frame.
@@ -129,6 +129,25 @@
     const next = cropGeometry({width,height,view,zoom,x:0,y:0});
     const ratio = next.scale/current.scale;
     return cropGeometry({width,height,view,zoom:next.zoom,x:px-(px-current.x)*ratio,y:py-(py-current.y)*ratio});
+  }
+  // Encode a square canvas as a stored picture: scale it down to at most
+  // `size` pixels on a white ground, then lower JPEG quality until it fits.
+  function encodePortrait(source,size = 256) {
+    const side = Math.max(1,Math.min(size,source.width));
+    let canvas = source;
+    if (source.width !== side || source.height !== side) {
+      canvas = document.createElement('canvas');
+      canvas.width = canvas.height = side;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff'; context.fillRect(0,0,side,side);
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(source,0,0,side,side);
+    }
+    for (const quality of [0.85,0.7,0.55,0.4]) {
+      const picture = canvas.toDataURL('image/jpeg',quality);
+      if (isPortrait(picture)) return picture;
+    }
+    throw new Error('This picture is too detailed to store. Try a simpler or smaller image.');
   }
   // Open a modal where the viewer drags and zooms the chosen image inside a
   // square, then save that square as a JPEG of at most `size` pixels.
@@ -198,17 +217,13 @@
           const context = canvas.getContext('2d');
           context.fillStyle = '#fff'; context.fillRect(0,0,side,side);
           context.drawImage(image,source.x,source.y,source.size,source.size,0,0,side,side);
-          for (const quality of [0.85,0.7,0.55,0.4]) {
-            const picture = canvas.toDataURL('image/jpeg',quality);
-            if (isPortrait(picture)) { finish(picture); return; }
-          }
-          box.close(); holder.remove(); URL.revokeObjectURL(url);
-          reject(new Error('This picture is too detailed to store. Try a simpler or smaller image.'));
+          try { finish(encodePortrait(canvas,size)); }
+          catch (error) { box.close(); holder.remove(); URL.revokeObjectURL(url); reject(error); }
         });
         frame.focus();
       };
       image.src = url;
     });
   }
-  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

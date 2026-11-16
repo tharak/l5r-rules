@@ -69,6 +69,16 @@
     activeId = id;
     return true;
   }
+  // Save a picture (and the portrait creator's choices) to one character.
+  function setPortrait(id,picture,recipe = null) {
+    if (!UI.isPortrait(picture)) return false;
+    const records = roster(), record = records.find(item => item.id === id);
+    if (!record) return false;
+    record.sheet = R.normalize({...record.sheet,portrait:picture,portraitRecipe:recipe});
+    record.updatedAt = new Date().toISOString();
+    if (id === activeId && !external && sheet) Object.assign(sheet,{portrait:record.sheet.portrait,portraitRecipe:record.sheet.portraitRecipe});
+    return storeRoster(records);
+  }
   function remove(id) {
     const records = roster().filter(record => record.id !== id);
     if (records.length === roster().length) return;
@@ -121,7 +131,7 @@
     const availableSchools=[...(sheet.advantages.some(a=>a.name==='Different School') ? C.schools(catalog) : clan?.schools || [])];
     const currentSchool=selectedSchool();if(currentSchool && !availableSchools.includes(currentSchool))availableSchools.push(currentSchool);
     const schoolOptions = availableSchools.filter(school=>!school.nonhuman || `${school.slug}#${school.anchor}`===sheet.school).map(school => option(`${school.slug}#${school.anchor}`, `${school.name}${school.benefit ? ` · +1 ${school.benefit}` : ''}`, `${school.slug}#${school.anchor}` === sheet.school)).join('');
-    return UI.panel({attrs:{'class':'creator-panel creator-identity','id':'creator-identity'},bodyHtml:`${UI.sectionHeading({step:'01',title:'Identity & training',description:'Choose a clan, family, and starting school.'})}<div class="creator-identity-head">${UI.portrait({label:'Character picture',src:sheet.portrait,name:sheet.name,attrs:{class:'creator-portrait'},inputAttrs:{'data-portrait':true},removeAttrs:{'data-action':'remove-portrait','aria-label':'Remove character picture'}})}${C.clanMon(sheet.clan)?`<img class="creator-clan-mon" src="${C.clanMon(sheet.clan)}" alt="${escapeHtml(sheet.clan)} Clan mon">`:''}</div><div class="creator-fields">${UI.field({label:'Name',attrs:{'data-field':'name','type':'text','value':sheet.name,'placeholder':'Your character’s name'}})}${UI.field({label:'Clan',attrs:{'data-field':'clan'},kind:'select',optionsHtml:`${option('', 'Choose a clan', !sheet.clan)}${clanOptions}`})}${UI.field({label:'Family',attrs:{'data-field':'family','disabled':!(clan?.families.length)},kind:'select',optionsHtml:`${option('', clan?.families.length ? 'Choose a family' : 'No family benefit', !sheet.family)}${familyOptions}`})}${familyTraitChoice}${UI.field({label:'School',attrs:{'data-field':'school','disabled':!(clan)},kind:'select',optionsHtml:`${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}`})}</div>${sheet.clan==='Imperial'?UI.field({label:'GM approval for Imperial family',labelAttrs:{'class':'creator-approval'},attrs:{'data-imperial-approval':true,'type':'text','value':sheet.exceptions.find(e=>e.code==='imperial')?.explanation || '','placeholder':'Record who approved this family'}}):''}${renderTraining(data)}${renderSchoolDecisions(data,'identity')}${renderCreationOptions(data)}${renderSection(renderSummary(data),'summary',data)}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-identity','id':'creator-identity'},bodyHtml:`${UI.sectionHeading({step:'01',title:'Identity & training',description:'Choose a clan, family, and starting school.'})}<div class="creator-identity-head">${UI.portrait({label:'Character picture',src:sheet.portrait,name:sheet.name,attrs:{class:'creator-portrait'},inputAttrs:{'data-portrait':true},removeAttrs:{'data-action':'remove-portrait','aria-label':'Remove character picture'},actionsHtml:external?'':UI.button({text:'Create picture',variant:'secondary',size:'compact',attrs:{'data-action':'create-portrait'}})})}${C.clanMon(sheet.clan)?`<img class="creator-clan-mon" src="${C.clanMon(sheet.clan)}" alt="${escapeHtml(sheet.clan)} Clan mon">`:''}</div><div class="creator-fields">${UI.field({label:'Name',attrs:{'data-field':'name','type':'text','value':sheet.name,'placeholder':'Your character’s name'}})}${UI.field({label:'Clan',attrs:{'data-field':'clan'},kind:'select',optionsHtml:`${option('', 'Choose a clan', !sheet.clan)}${clanOptions}`})}${UI.field({label:'Family',attrs:{'data-field':'family','disabled':!(clan?.families.length)},kind:'select',optionsHtml:`${option('', clan?.families.length ? 'Choose a family' : 'No family benefit', !sheet.family)}${familyOptions}`})}${familyTraitChoice}${UI.field({label:'School',attrs:{'data-field':'school','disabled':!(clan)},kind:'select',optionsHtml:`${option('', clan?.schools.length ? 'Choose a school' : 'No starting school listed', !sheet.school)}${schoolOptions}`})}</div>${sheet.clan==='Imperial'?UI.field({label:'GM approval for Imperial family',labelAttrs:{'class':'creator-approval'},attrs:{'data-imperial-approval':true,'type':'text','value':sheet.exceptions.find(e=>e.code==='imperial')?.explanation || '','placeholder':'Record who approved this family'}}):''}${renderTraining(data)}${renderSchoolDecisions(data,'identity')}${renderCreationOptions(data)}${renderSection(renderSummary(data),'summary',data)}`});
   }
 
   function renderTraits(data,rolling = false) {
@@ -707,8 +717,14 @@
       commitEdit();
       focusSkillStepper(name,button.dataset.delta,nextRow);
       return;
+    } else if (action === 'create-portrait') {
+      if (external || !window.PortraitCreator?.open) return;
+      const id = activeId;
+      window.PortraitCreator.open({title:sheet.name || 'your character',clan:sheet.clan,recipe:sheet.portraitRecipe,returnHref:'#/create-character',
+        onUse:(picture,recipe) => { setPortrait(id,picture,recipe); }});
+      return;
     } else if (action === 'remove-portrait') {
-      sheet.portrait = '';
+      sheet.portrait = ''; sheet.portraitRecipe = null;
       commitEdit();
       root.querySelector('[data-portrait]')?.focus();
       return;
@@ -769,7 +785,7 @@
     target?.focus();
   }
 
-  async function setPortrait(file) {
+  async function uploadPortrait(file) {
     if (!file || external?.readOnly) return;
     const editing = sheet;
     try {
@@ -802,7 +818,7 @@
       const file = event.target.files?.[0];
       // Clear the input so choosing the same file again still opens the cropper.
       event.target.value = '';
-      setPortrait(file); return;
+      uploadPortrait(file); return;
     }
     if (handleExtendedChange(event)) return;
     const field = event.target.dataset.field;
@@ -896,7 +912,7 @@
     finally { sheet = previous; }
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
-  window.CharacterBuilder = { mount, list, create, open, remove, read:readRecord, sections, normalize:R.normalize };
+  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, read:readRecord, sections, normalize:R.normalize };
   const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
   function refreshRemoteSheet() {

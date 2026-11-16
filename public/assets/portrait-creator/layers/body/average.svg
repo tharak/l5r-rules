@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<!-- Placeholder layer for the portrait creator; replace with real art (see docs/portrait-creator-art.md). -->
+<defs><filter id="ink" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="4"/></filter></defs>
+<g filter="url(#ink)" stroke="#2b2118" stroke-linecap="round" stroke-linejoin="round"><path d="M227 250 L223 312 L289 312 L285 250 Z" fill="#ead3b0" stroke-width="3"/>
+<path d="M96 512 L102 392 Q116 330 219 304 L293 304 Q396 330 410 392 L416 512 Z" fill="#ead3b0" stroke-width="3"/>
+<ellipse cx="200" cy="204" rx="10" ry="17" fill="#ead3b0" stroke-width="3"/>
+<ellipse cx="312" cy="204" rx="10" ry="17" fill="#ead3b0" stroke-width="3"/>
+<ellipse cx="256" cy="196" rx="58" ry="72" fill="#ead3b0" stroke-width="3.5"/></g>
+</svg>

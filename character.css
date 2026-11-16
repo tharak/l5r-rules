@@ -360,3 +360,18 @@
 .creator-subskill-choices { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(160px,100%),1fr)); gap: 8px; margin: 16px 0; }
 .creator-subskill-body .creator-add-row { flex-wrap: wrap; }
 @media print { .creator-subskill-dialog { display: none !important; } }
+
+/* Portrait creator: a square live preview beside the option groups; stacked on narrow screens. */
+.portrait-creator-grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 16px; }
+.portrait-creator-preview { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.portrait-creator-canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 3px; background: var(--wash); }
+.portrait-creator-options { display: grid; gap: 14px; min-width: 0; }
+.portrait-creator-field { margin: 0; padding: 0; border: 0; min-width: 0; }
+.portrait-creator-field legend { margin-bottom: 6px; padding: 0; font-weight: 600; font-size: 12px; }
+.portrait-creator-note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.portrait-creator-status { margin: 0; color: var(--red); }
+.portrait-creator-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 700px) {
+  .portrait-creator-grid { grid-template-columns: minmax(0, 1fr); }
+  .portrait-creator-preview { position: static; max-width: 360px; width: 100%; margin: 0 auto; }
+}

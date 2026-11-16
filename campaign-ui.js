@@ -104,7 +104,7 @@
     ],actionsHtml:isGM?button('session-save','Save session')+button('session-delete','Delete session',session.id):button('session-close','Close')});
   }
   function npcEditor(npc) {
-    const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'}});
+    const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')});
     return picture+UI.recordEditor({fields:[
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
       {label:'Notes',kind:'textarea',value:npc.notes,attrs:{'data-campaign-field':'npc-notes'}},
@@ -233,6 +233,10 @@
       else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};}
       else if (action==='npc-open') {npcId=id;npcDraft=null;}
       else if (action==='npc-portrait-remove') setNPCPortrait('');
+      else if (action==='npc-portrait-create' && gm() && window.PortraitCreator?.open) {
+        const npc=npcDraft || store().get(path('npcs',npcId));
+        window.PortraitCreator.open({title:npc?.name || 'this NPC',returnHref:`#/campaigns/${active}`,onUse:picture=>setNPCPortrait(picture)});
+      }
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
         if (!gm() || !draft || !draft.name.trim()) return;
