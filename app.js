@@ -250,6 +250,8 @@ function render() {
   const portraitCreator = slug === 'portrait-creator';
   const clanMons = slug === 'clan-mons';
   document.body.dataset.overview = ['campaigns', 'characters', 'books'].includes(slug);
+  // Campaign pages show the map of Rokugan behind their content.
+  document.body.classList.toggle('route-campaigns', campaignRoute);
   const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   document.title = `${title} · l5r-rules`;

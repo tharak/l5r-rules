@@ -137,3 +137,4 @@ Source pages:
 
 When several sources have a mon for the same clan, the app uses them in this order: the official site, l5r.wiki, the mandala, then l5r.fandom.com (`MON_PRIORITY` in `character-catalog.js`).
 The five-rings mark `public/assets/l5r-mark.webp` (site logo, favicon, and the mon for clans no source has one for) is the official Legend of the Five Rings favicon from [legendofthefiverings.com](https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2025/05/L5R-Favicon_05-16-25.webp), resized to 256px.
+The map of Rokugan behind the campaign pages (`public/assets/rokugan-map.webp`) is the official map background from [legendofthefiverings.com](https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/03_Map_Background-Rokugan-1900x2755.webp), resized to 1600px wide.

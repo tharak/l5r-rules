@@ -26,6 +26,8 @@
     background-attachment: fixed;
     color: var(--ink);
   }
+  /* Campaign pages: the map of Rokugan behind the content, under a parchment wash for legibility. */
+  body.route-campaigns { background-image: linear-gradient(#f2e9d6a6, #f2e9d6a6), url('public/assets/rokugan-map.webp'); }
   .main-column { min-height: 100vh; }
   ::selection { background: #943d322b; color: #302f28; }
   a:focus-visible, button:focus-visible, input:focus-visible,
