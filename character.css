@@ -202,6 +202,11 @@
   #creator-rolls .creator-trait-display { flex-direction: row; flex-wrap: nowrap; align-items: baseline; align-self: start; justify-content: flex-start; gap: 6px; }
   #creator-rolls .creator-trait-display output { color: var(--ink); font: 600 13px var(--sans); }
   #creator-rolls .creator-ring-trait-column + .creator-ring-trait-column { border-top: 1px solid var(--line); }
+  /* A one-trait ring (Void) shares its grid cell with a hidden two-row spacer, so its card is
+     never shorter than a two-trait card; its real column stretches to fill that height. */
+  #creator-rolls .creator-ring-traits:has(> .creator-ring-trait-spacer) > * { grid-area: 1 / 1; }
+  #creator-rolls .creator-ring-traits:has(> .creator-ring-trait-spacer) > .creator-ring-trait-column { align-self: stretch; }
+  #creator-rolls .creator-ring-trait-spacer { visibility: hidden; pointer-events: none; }
   #creator-rolls .creator-ring-skill-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(180px,100%),1fr)); gap: 8px; list-style: none; margin: 0; padding: 10px; border: 0; border-radius: 0; background: transparent; color: var(--ink); }
   #creator-rolls .creator-ring-skill-list:empty { display: none; }
   #creator-rolls .creator-ring-skill-list li { min-width: 0; padding: 0; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }

@@ -114,7 +114,7 @@
   .creator-identity-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
   /* Section 01 shows the character's clan mon as a large, faint watermark behind its content. */
   .creator-identity-mon { position: relative; isolation: isolate; }
-  .creator-identity-mon::before { content: ''; position: absolute; top: 24px; right: 24px; width: min(420px, 70%); aspect-ratio: 1; background: var(--clan-mon) center / contain no-repeat; opacity: .09; pointer-events: none; z-index: -1; }
+  .creator-identity-mon::before { content: ''; position: absolute; top: 24px; left: 50%; transform: translateX(-50%); width: min(420px, 70%); aspect-ratio: 1; background: var(--clan-mon) center / contain no-repeat; opacity: .09; pointer-events: none; z-index: -1; }
   .books-grid { gap: 24px; align-items: start; }
   .books-grid > .panel { position: relative; border-top: 3px solid var(--gold); padding: 27px; }
   .books-grid > .panel h2 { padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 24px; }
