@@ -6,6 +6,8 @@ Structured weapon and armor statistics and skill mastery descriptions reuse the 
 
 The seven Great Clan mons in `public/assets/clans/` (Crab, Crane, Dragon, Lion, Phoenix, Scorpion, Unicorn) are official artwork from the clan pages of [legendofthefiverings.com](https://www.legendofthefiverings.com/lore/clans/the-crane-clan/) (© Legend of the Five Rings, published by Fantasy Flight Games / Asmodee; all rights reserved). They are used for non-commercial fan purposes, resized to 192px from the site's `05a_Clan_Icon` images on `cdn.svc.asmodee.net`, and are not covered by the CC BY-SA license above.
 
+The Mantis, Spider, and Imperial Family mons in `public/assets/clans/` come from [l5r.wiki](https://l5r.wiki/clans) (`/mons/mon_mantis.gif`, `/mons/mon_spider.gif`, `/mons/mon_w_imperial_family.png`), whose content is licensed [CC BY-SA](https://creativecommons.org/licenses/by-sa/4.0/). They were recoloured (Mantis green, Spider black, Imperial gold), trimmed, and resized to 192px; the modified files are shared under the same license.
+
 Source pages:
 
 - Start: https://lasthaiku.wikidot.com/start
