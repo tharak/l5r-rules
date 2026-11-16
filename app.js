@@ -170,12 +170,15 @@ async function mountOfficialImages(element) {
       tile({src:C.clanMon(clan),title:'Mon',lines:[path(C.clanMon(clan)),original(C.officialSourceUrl('mon',clan))]}),
       tile({src:C.clanCover(clan),title:'Cover',wide:true,lines:[path(C.clanCover(clan)),original(C.officialSourceUrl('cover',clan))]}),
       tile({src:C.clanCover(clan,{tall:true}),title:'Tall cover',lines:[path(C.clanCover(clan,{tall:true})),original(C.officialSourceUrl('tall',clan))]}),
+      tile({src:C.clanBanner(clan),title:'Banner',lines:[path(C.clanBanner(clan)),original(C.officialSourceUrl('banner',clan))]}),
       ...C.familyArtList(clan).map(item => tile({src:item.src,title:item.family ? `${item.family} family` : 'Unidentified family',flag:item.guess,
         lines:[item.guess ? '<b>Best guess</b>' : '',item.family && !known.has(item.family) ? 'Not a family in the character catalog' : '',path(item.src),original(C.officialSourceUrl('family',clan,item.letter))]}))
     ].join('');
     return `<section class="official-clan"><h2>${esc(clan)}</h2><div class="official-art">${art}</div></section>`;
   };
   const site = [
+    tile({src:'public/assets/clans/covers/clans.webp',title:'Clans cover',wide:true,lines:['Cover of the clans overview page',path('public/assets/clans/covers/clans.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/00_Clans_Cover-1-1900x1781.webp')]}),
+    tile({src:'public/assets/clans/covers/clans-tall.webp',title:'Clans tall cover',lines:[path('public/assets/clans/covers/clans-tall.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/UI_L5R_Lore_Cover_Clans-1.webp')]}),
     tile({src:'public/assets/l5r-mark.webp',title:'Five-rings mark',lines:['Site logo, favicon, and the mon for clans without one',path('public/assets/l5r-mark.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2025/05/L5R-Favicon_05-16-25.webp')]}),
     tile({src:'public/assets/rokugan-map.webp',title:'Map of Rokugan',wide:true,lines:['Campaign page background',path('public/assets/rokugan-map.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/03_Map_Background-Rokugan-1900x2755.webp')]})
   ].join('');

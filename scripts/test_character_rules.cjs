@@ -537,5 +537,9 @@ test('official images link back to their original files on legendofthefiverings.
  assert.equal(C.officialSourceUrl('mon','Crab'),cdn+'05a_Clan_Icon-1-900x900.webp');
  assert.equal(C.officialSourceUrl('tall','Unicorn'),cdn+'UI_L5R_Clan_Cover_Unicorn_Mobile.webp');
  assert.equal(C.officialSourceUrl('mon','Mantis'),'');
+ assert.equal(C.officialSourceUrl('banner','Crab'),cdn+'01_Clans_Page_Crab-1.webp');
+ for(const clan of C.CLAN_COVERS)assert.ok(fs.existsSync(C.clanBanner(clan)),clan);
+ assert.equal(C.clanBanner('Mantis'),'');
+ for(const f of ['clans','clans-tall'])assert.ok(fs.existsSync(`public/assets/clans/covers/${f}.webp`),f);
  assert.deepEqual(Object.keys(C.OFFICIAL_CLAN_NUMBERS).sort(),[...C.CLAN_COVERS].sort());
 });
