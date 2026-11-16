@@ -454,7 +454,7 @@
     if(!actions.includes(action))return false;
     if(action==='reset-section') {
       const key=button.dataset.section;
-      if(!resetDescriptions[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID and privacy settings are kept.`))return true;
+      if(!resetDescriptions[key] || !window.confirm(`Reset ${sectionTitle(key)}? This resets ${resetDescriptions[key]}. Fixed school grants are recalculated. The character ID is kept.`))return true;
       sheet=R.resetSection(sheet,key,catalog);
     } else if(action==='award-xp') {
       try {sheet=R.award(sheet,xpAward,'XP added from character editor.');xpAward=0;}catch(e){uiError=e.message;}
@@ -530,8 +530,7 @@
       emphasisDialog.showModal();
     }
     if (root.querySelectorAll) for (const details of root.querySelectorAll('details')) if(openDetails.includes(details.id || details.querySelector('summary')?.textContent?.split(' ·')[0])) details.open=true;
-    const visibility = window.SheetSharing?.visibility(sheet) || sheet.visibility;
-    if (visibility && root.querySelectorAll) {
+    if (root.querySelectorAll) {
       const ids = {identity:'creator-identity',traits:'creator-traits',skills:'creator-skills',options:'creator-options',story:'creator-story',summary:'creator-summary',abilities:'creator-abilities'};
       for (const [key,id] of Object.entries(ids)) {
         const panel = root.querySelector('#'+id);
@@ -545,9 +544,6 @@
           row.append(title);
           row.insertAdjacentHTML('beforeend',UI.button({text:'Reset',variant:'quiet',size:'compact',attrs:{'class':'creator-reset-section','data-action':'reset-section','data-section':key,'aria-label':`Reset ${sectionTitle(key)}`}}));
         }
-        const privacy = UI.actionRow({attrs:{'class':'creator-section-tools'},bodyHtml:UI.checkbox({label:key==='summary'?' Public summary & combat':key==='story'?' Public story & equipment':' Public',attrs:{'type':'checkbox','data-public':key,'checked':visibility[key],'disabled':external},labelAttrs:{'class':'section-public'}})});
-        if (heading) heading.insertAdjacentHTML('beforeend',privacy);
-        else panel.querySelector('.creator-summary-inner')?.insertAdjacentHTML('afterbegin',privacy);
       }
     }
   }
@@ -778,10 +774,6 @@
     }
     uiError = '';
     if (handleExtendedChange(event)) return;
-    if (event.target.dataset.public) {
-      if (external) return;
-      sheet.visibility = {...window.SheetSharing.visibility(sheet),[event.target.dataset.public]:event.target.checked}; save(); render(); return;
-    }
     const field = event.target.dataset.field;
     if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }
     else if (field === 'family') { sheet.family = event.target.value; sheet.familyTrait = ''; }

@@ -1,7 +1,9 @@
 (() => {
   const keys = ['identity','traits','skills','options','story','summary','abilities'];
   const labels = ['Identity and training','Rings and traits','Skills','Advantages and disadvantages','Story and equipment','Summary and combat','Abilities'];
-  const visibility = sheet => Object.fromEntries(keys.map(key => [key,typeof sheet.visibility?.[key] === 'boolean' ? sheet.visibility[key] : key === 'identity']));
+  // Privacy is paused: every section is shared. Keep the visibility map so saved data and
+  // Firestore rules keep their shape when per-section privacy returns.
+  const visibility = () => Object.fromEntries(keys.map(key => [key,true]));
   const sections = (s,d) => ({
     identity:{name:s.name,clan:s.clan,family:s.family,school:d.school?.name || '',training:d.techniques,affinity:d.school?.affinity || ''},
     traits:{rings:d.rings,traits:d.traits},

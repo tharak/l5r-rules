@@ -21,8 +21,7 @@ async page => {
     await p.getByRole('button',{name:'Roll Agility trait',exact:true}).click();
     check(await p.locator('.creator-roll-dice li').count()===2,'Default Trait roll did not run');
     await p.keyboard.press('Escape');
-    check(await p.locator('[data-public]').count()===7,'Seven section privacy controls missing');
-    check(!await p.locator('[data-public="abilities"]').isChecked(),'Abilities default public');
+    check(await p.locator('[data-public]').count()===0,'Paused section privacy controls are still shown');
     check(await p.getByRole('button',{name:'Begin play',exact:true}).count()===0,'Removed phase switch remains');
     check(await p.getByRole('heading',{name:'Creation review',exact:true}).count()===0,'Creation review card remains');
     check(await p.locator('#creator-identity #creator-summary').count()===1,'Character record must be inside section 01');
@@ -63,7 +62,6 @@ async page => {
     await p.locator('[data-action="reset-section"][data-section="identity"]').click();
     check(await p.locator('[data-field="name"]').inputValue()==='','Identity reset did not clear inputs');
     check(await p.evaluate(()=>CharacterBuilder.list()[0].id)===characterId,'Reset replaced the character ID');
-    check(!await p.locator('[data-public="abilities"]').isChecked(),'Reset changed privacy');
     await p.locator('[data-field="name"]').fill('Character browser test');
     await p.locator('[data-field="notes"]').fill('Story to reset');
     await p.locator('[data-action="reset-section"][data-section="story"]').click();

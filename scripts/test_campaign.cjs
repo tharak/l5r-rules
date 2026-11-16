@@ -20,7 +20,8 @@ test('all 128 visibility masks project only selected sections with matching revi
   assert.deepEqual(Object.keys(p.sections),Array.from(api.keys.filter(k=>visibility[k])));
   for(const k of api.keys)assert.equal(JSON.stringify(p).includes('"secret":"'+k+'"'),visibility[k]);
  }
- assert.deepEqual(JSON.parse(JSON.stringify(api.visibility({}))),{identity:true,traits:false,skills:false,options:false,story:false,summary:false,abilities:false});
+ // Privacy is paused: every section is shared, whatever an older sheet saved.
+  assert.deepEqual(JSON.parse(JSON.stringify(api.visibility({visibility:{skills:false}}))),{identity:true,traits:true,skills:true,options:true,story:true,summary:true,abilities:true});
 });
 test('migration preserves device and account IDs, active selection and durable pending edits',()=>{
  const storage=new Map([

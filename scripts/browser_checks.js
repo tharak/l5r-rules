@@ -71,7 +71,7 @@ async page => {
   await page.getByRole('button',{name:'Create PC',exact:true}).click();
   await page.locator('[data-field="name"]').waitFor();
   await page.locator('[data-field="name"]').fill('GM Personal PC');
-  check(await page.locator('[data-public]').count()===7,'Seven privacy controls missing');
+  check(await page.locator('[data-public]').count()===0,'Paused section privacy controls are still shown');
   await page.locator('[data-field="notes"]').fill('HIDDEN OWNER NOTES');
   await page.getByText('Custom ability',{exact:true}).click();
   await page.locator('#custom-ability-name').fill('HIDDEN OWNER ABILITY');
@@ -133,17 +133,8 @@ async page => {
   check(await player.getByRole('button',{name:'Edit',exact:true}).count()===0,'Player can edit another owner’s PC');
   check(!(await player.locator('#app').innerText()).includes('HIDDEN OWNER NOTES')&&!(await player.locator('#app').innerText()).includes('HIDDEN OWNER ABILITY'),'Hidden notes or abilities leaked');
   const ownerPC = await page.evaluate(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').find(pc=>pc.ownerUid===CampaignStorage.uid));
-  await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
-  await page.locator('[data-public="identity"]').uncheck();
-  await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
-  await page.getByRole('button',{name:'Save PC',exact:true}).click();
-  await page.getByRole('heading',{name:'PCs',exact:true}).waitFor();
-  await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('Private PC')&&!document.querySelector('#app').textContent.includes('GM Personal PC'));
-  await page.locator('[data-campaign="pc-open"][data-id="'+ownerPC.id+'"]').click();
-  await page.locator('[data-public="identity"]').check();
-  await page.waitForFunction(()=>CharacterStorage.status==='Saved to your account');
-  await page.getByRole('button',{name:'Save PC',exact:true}).click();
-  await page.getByRole('heading',{name:'PCs',exact:true}).waitFor();
+  check(ownerPC,'GM PC was not linked');
+  await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('GM Personal PC'));
   await player.getByRole('button',{name:'+PC',exact:true}).click();
   await player.getByRole('button',{name:'Create PC',exact:true}).click();
   await player.locator('[data-field="name"]').waitFor();
