@@ -116,8 +116,49 @@
     return `<section class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.sectionHeading({title:'Notes',level:3,actionsHtml:`${button('note-new','+ Note',kind+':'+id)}`})}${notes.map(n=>`<article class="campaign-note"><div class="workspace-head"><small>${e(entryAuthor(n))}</small>${entryOwner(n)?UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('note-edit','Edit note',n.id)}${button('note-delete','Delete note',n.id)}`}):''}</div><p class="entry-text">${e(n.text)}</p></article>`).join('')||'<p>No notes yet.</p>'}${drafting?entryEditor('note',noteDraft):''}</section>`;
   }
   function renderPlots(plots) {
-    const selected=plots.find(p=>p.id===plotId);
-    return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p><div class="plot-list">${plots.map(p=>button('plot-open',p.title,p.id)).join('')||'<p>No plot points yet.</p>'}</div>${plotDraft?entryEditor('plot',plotDraft):selected?`<article class="campaign-plot"><h3>${e(selected.title)}</h3><small>${e(entryAuthor(selected))}</small><p class="entry-text">${e(selected.text)}</p>${entryOwner(selected)?button('plot-edit','Edit plot',selected.id)+button('plot-delete','Delete plot',selected.id):''}${notesFor('plots',selected.id)}</article>`:''}`;
+    // A new plot is drafted above the list; an existing one is edited inside its entry.
+    const fresh = plotDraft && !plotId ? `<div class="campaign-entry-new">${entryEditor('plot',plotDraft)}</div>` : '';
+    const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`),
+      plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
+        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
+    return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p>${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
+  }
+  // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
+  // across re-renders (toggle events do not bubble, so listen in the capture phase).
+  const openEntries = new Set();
+  document.addEventListener('toggle',event => {
+    const details = event.target;
+    if (!details?.dataset?.entry) return;
+    if (details.open) openEntries.add(details.dataset.entry); else openEntries.delete(details.dataset.entry);
+  },true);
+  const day = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : ''; };
+  const entry = (key,summaryHtml,bodyHtml) => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}><summary>${summaryHtml}</summary><div class="campaign-entry-body">${bodyHtml}</div></details>`;
+  const entryTitle = (title,meta) => `<span class="campaign-entry-title">${e(title)}</span>${meta?`<small class="campaign-entry-meta">${meta}</small>`:''}`;
+  const avatar = (src,clan) => { const mon = window.CharacterCatalog?.clanMon(clan || ''); const img = UI.isPortrait(src) ? src : mon; return img ? `<img class="campaign-entry-avatar" src="${img}" alt="">` : '<span class="campaign-entry-avatar" aria-hidden="true"></span>'; };
+  const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
+  function renderSessions(sessions,isGM) {
+    const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,entryTitle(session.title || 'Untitled session',day(session.updatedAt)),
+      isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
+        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
+    return `${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:isGM?button('session-new','+ Session'):''})}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
+  }
+  function renderNPCs(npcs,isGM) {
+    const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
+    const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
+      isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}<p class="entry-text">${npc.notes ? e(npc.notes) : '<em>No description yet.</em>'}</p></div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit NPC',npc.id)+button('npc-delete','Delete NPC',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
+    return `${UI.sectionHeading({title:'NPCs',level:2,actionsHtml:isGM?button('npc-new','+NPC'):''})}${fresh}<div class="campaign-entries">${list || '<p>No NPCs yet.</p>'}</div>`;
+  }
+  function renderPCs(pcs,isGM,invitation) {
+    const list = pcs.map(pc => {
+      const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`;
+      return entry(`pcs:${pc.id}`,`${avatar(profile?.portrait,profile?.clan)}${entryTitle(label(pc),e(playerName(pc)))}`,
+        `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
+    }).join('');
+    const picker = picking ? `<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>` : '';
+    const invite = invitation ? UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}) : '';
+    return `${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}<div class="campaign-entries">${list || '<p>No PCs linked yet.</p>'}</div>${picker}${invite}`;
   }
   function render(slug) {
     renderAgain ||= () => {};
@@ -142,23 +183,22 @@
     reset(slug.slice('campaigns/'.length));
     const c = store().get(`campaigns/${active}`);
     if (!c) { reset(''); return '<div class="workspace"><h1>Campaign unavailable</h1><p>Loading, or membership is no longer active.</p><a href="#/campaigns">Campaigns</a></div>'; }
-    const isGM = gm(), sessions = store().list(path('sessions','')), npcs = isGM ? store().list(path('npcs','')) : [], pcs = store().list(path('pcs',''));
+    const isGM = gm(), sessions = store().list(path('sessions','')), npcs = store().list(path('npcs','')), pcs = store().list(path('pcs',''));
     const plots=store().list(path('plots',''));
     if(plotId&&!plots.some(p=>p.id===plotId)){plotId='';plotDraft=null;if(noteTarget?.kind==='plots'){noteTarget=noteDraft=null;noteId='';}}
-    if (!isGM && section === 'npcs') section = 'sessions';
     if (sessionId && !sessions.some(s=>s.id===sessionId)) sessionId = '';
     const s = sessions.find(s=>s.id===sessionId), n = npcDraft || npcs.find(n=>n.id===npcId);
-    for (const pc of pcs) if (!own(pc)) watch(pc);
+    for (const pc of pcs) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({label:'Campaign title',labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
-      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[]),['plots','Plots']].map(([value,label])=>({value,label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
-      ${section==='sessions'?`${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:`${isGM?button('session-new','+ Session'):''}`})}<div class="session-list">${sessions.map(s=>button('session-open',s.title || 'Untitled session',s.id)).join('')}</div>${s?`${sessionEditor(s,isGM)}${notesFor('sessions',s.id)}`:sessions.length?'':'<p>No sessions yet.</p>'}`:''}
-      ${section==='pcs'?`${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}${pcs.map(pc=>`${UI.recordRow({attrs:{'class':'roster-row'},bodyHtml:`<span>${e(label(pc))} (${e(playerName(pc))})</span>${button('pc-open',own(pc)?'Edit':'View',pc.id)}${button('pc-notes','Notes',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`})}${pcNotesId===pc.id?`<h3>${e(label(pc))}</h3>${notesFor('pcs',pc.id)}`:''}`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}${invitation?UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}):''}`:''}
-      ${section==='npcs'&&isGM?`${UI.sectionHeading({title:'NPCs',level:2,actionsHtml:`${button('npc-new','+NPC')}`})}<div class="npc-list">${npcs.map(n=>button('npc-open',n.name||'Unnamed NPC',n.id)).join('')}</div>${n?`${npcEditor(n)}${npcId?notesFor('npcs',npcId):''}`:''}`:''}
-      ${section==='plots'?renderPlots(plots):''}`})}
+      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
+      ${section==='sessions'?renderSessions(sessions,isGM):''}
+      ${section==='plots'?renderPlots(plots):''}
+      ${section==='npcs'?renderNPCs(npcs,isGM):''}
+      ${section==='pcs'?renderPCs(pcs,isGM,invitation):''}`})}
       </div>${section==='pcs'&&selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   function mountEditor() {
@@ -189,11 +229,11 @@
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
-      else if (action==='section') {if(['sessions','pcs','npcs','plots'].includes(id) && (id!=='npcs'||gm()))section=id;}
+      else if (action==='section') {if(['sessions','plots','npcs','pcs'].includes(id))section=id;}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
       else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};}
-      else if (action==='plot-open') {plotId=id;plotDraft=null;}
-      else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};}}
+      else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
+      else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
       else if (action==='note-new') {const [kind,targetId]=id.split(':');noteId='';noteTarget={kind,id:targetId};noteDraft={text:'',public:true};}
       else if (action==='note-edit') {const data=store().get(path('notes',id));if(data&&entryOwner(data)){noteId=id;noteTarget={kind:data.targetKind,id:data.targetId};noteDraft={...data};}}
@@ -210,7 +250,7 @@
         }
         delete data.id;
         store().queue(path(plot?'plots':'notes',entryId),data);
-        if(plot){plotId=entryId;plotDraft=null;}else{noteId='';noteDraft=noteTarget=null;}
+        if(plot){plotId=entryId;plotDraft=null;openEntries.add(`plots:${entryId}`);}else{noteId='';noteDraft=noteTarget=null;}
         store().flush();
       }
       else if(action==='plot-delete'||action==='note-delete') {
@@ -220,8 +260,8 @@
           if(kind==='plots'){plotId='';plotDraft=null;}else if(noteId===id){noteId='';noteDraft=noteTarget=null;}
         }
       }
-      else if (action==='session-new') { sessionId=crypto.randomUUID();store().queue(path('sessions',sessionId),{title:'New session',text:'',updatedAt:new Date().toISOString()}); }
-      else if (action==='session-open') sessionId=id;
+      else if (action==='session-new') { const now=new Date().toISOString();sessionId=crypto.randomUUID();openEntries.add(`sessions:${sessionId}`);store().queue(path('sessions',sessionId),{title:'New session',text:'',createdAt:now,updatedAt:now}); }
+      else if (action==='session-open') {sessionId=id;openEntries.add(`sessions:${id}`);}
       else if (action==='session-save') {
         const session=store().get(path('sessions',sessionId));
         if(!gm() || !session)return;
@@ -231,7 +271,7 @@
       else if (action==='session-close') sessionId='';
       else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
       else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};}
-      else if (action==='npc-open') {npcId=id;npcDraft=null;}
+      else if (action==='npc-open') {npcId=id;npcDraft=null;openEntries.add(`npcs:${id}`);}
       else if (action==='npc-portrait-remove') setNPCPortrait('');
       else if (action==='npc-portrait-create' && gm() && window.PortraitCreator?.open) {
         const npc=npcDraft || store().get(path('npcs',npcId));

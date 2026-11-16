@@ -49,7 +49,7 @@ test('anyone reads the public profile; only the owner and the GM read the full s
  await assertSucceeds(batch(db('alice'),[['users/alice/characters/pc',changed],['users/alice/publicCharacters/pc',{...projection,revision:'r3'}]]));
 });
 test('campaign, session, NPC and membership permissions',async()=>{
- for(const u of ['alice','bob']){await assertSucceeds(getDoc(r(db(u),'campaigns/c/sessions/s')));await assertFails(getDoc(r(db(u),'campaigns/c/npcs/n')));await assertFails(setDoc(r(db(u),'campaigns/c/sessions/s'),{title:'Forged',text:'',updatedAt:'now'}));}
+ for(const u of ['alice','bob']){await assertSucceeds(getDoc(r(db(u),'campaigns/c/sessions/s')));await assertSucceeds(getDoc(r(db(u),'campaigns/c/npcs/n')));await assertFails(setDoc(r(db(u),'campaigns/c/npcs/n'),{name:'Forged',notes:'',updatedAt:'now'}));await assertFails(setDoc(r(db(u),'campaigns/c/sessions/s'),{title:'Forged',text:'',updatedAt:'now'}));}
  await assertSucceeds(getDoc(r(db('gm'),'campaigns/c/npcs/n')));
  const npc={name:'NPC',notes:'',updatedAt:'now'},picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
@@ -57,7 +57,7 @@ test('campaign, session, NPC and membership permissions',async()=>{
   await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait}));
  await assertFails(setDoc(r(db('alice'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/npcs/pictured')));
- await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'a\nb',updatedAt:'now'}));
+ await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'a\nb',createdAt:'then',updatedAt:'now'}));
  await assertFails(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'alice'}));
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'gm'}));
  await assertFails(setDoc(r(db('outsider'),'campaigns/c/members/outsider'),{gmUid:'gm',membershipId:'new',inviteToken:''}));
@@ -110,8 +110,10 @@ test('plots and attached notes are readable by every member and writable only by
  }
  // NPCs stay a GM-only section, so their notes do too.
  await assertSucceeds(writeEntry('gm','notes','npc_note',metadata('gm',true,'n1',{targetKind:'npcs',targetId:'n'})));
- await assertFails(getDoc(r(db('alice'),'campaigns/c/notes/npc_note/content/body')));
- await assertFails(writeEntry('alice','notes','npc_attack',metadata('alice',true,'n1',{targetKind:'npcs',targetId:'n'})));
+ // NPCs and their notes are public to every member; members may add notes to them.
+ await assertSucceeds(getDoc(r(db('alice'),'campaigns/c/notes/npc_note/content/body')));
+ await assertSucceeds(writeEntry('alice','notes','npc_member_note',metadata('alice',true,'n1',{targetKind:'npcs',targetId:'n'})));
+ for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c/notes/npc_note/content/body')));
  await assertFails(writeEntry('alice','notes','missing_target',metadata('alice',true,'n1',{targetKind:'sessions',targetId:'missing'})));
  await assertFails(writeEntry('outsider','plots','outside',metadata('outsider',true,'p1')));
  await assertFails(deleteDoc(r(db('alice'),plotPath)));

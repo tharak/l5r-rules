@@ -64,7 +64,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const canRead = () => true;
           const targetVisible = data => {
             const target=catalogs[data.targetKind]?.get(data.targetId);
-            return !!target && (data.targetKind!=='npcs'||isGM) && (data.targetKind!=='plots'||(target.creatorUid===data.targetCreatorUid&&canRead(target)));
+            return !!target && (data.targetKind!=='plots'||(target.creatorUid===data.targetCreatorUid&&canRead(target)));
           };
           const refreshContent = () => {
             for (const kind of ['plots','notes']) {
@@ -93,9 +93,10 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const fail = error => { if (error.code === 'permission-denied') cancel(id); else events.error(error); };
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
           watch(`campaigns/${id}`);
-          const collections = ['members','sessions','pcs'];
+          // NPCs are public to every member; only the invitation stays with the GM.
+          const collections = ['members','sessions','pcs','npcs'];
           // The immutable GM identifier is available on the private membership index.
-          if (isGM) { collections.push('npcs'); watch(`campaigns/${id}/private/invitation`); }
+          if (isGM) watch(`campaigns/${id}/private/invitation`);
           collections.push('plots','notes');
           for (const collection of collections) {
             const path = `campaigns/${id}/${collection}`;

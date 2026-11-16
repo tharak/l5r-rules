@@ -102,12 +102,12 @@ test('only a PC\'s creator edits it; the GM views the full sheet and players ope
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  const buttons=()=>[...render().matchAll(/data-campaign="pc-open" data-id="([^"]+)"[^>]*>([^<]+)</g)].map(m=>m[1]+':'+m[2]);
  render();d.click('section','pcs');
- assert.deepEqual(buttons(),['alice:View','bob:View']);
+ assert.deepEqual(buttons(),['alice:Full sheet','bob:Full sheet']);
  d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
  assert.ok(d.watches.some(w=>w.pcId==='bob'&&w.full),'the GM watches the full sheet');
  d.click('close-sheet');
  d.store.uid='alice';render();d.click('section','pcs');
- assert.deepEqual(buttons(),['alice:Edit','bob:View']);
+ assert.deepEqual(buttons(),['alice:Edit','bob:Open']);
  d.click('pc-open','bob');
  assert.doesNotMatch(render(),/id="campaign-editor"/);
  assert.equal(d.location.hash,'#/pc/bob/bob-pc');

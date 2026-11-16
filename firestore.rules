@@ -120,14 +120,16 @@ service cloud.firestore {
       }
       match /sessions/{id} {
         allow read: if joined(c);
-        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['title','text','updatedAt'])
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['title','text','createdAt','updatedAt'])
           && request.resource.data.title is string && request.resource.data.title.size() <= 200
           && request.resource.data.text is string && request.resource.data.text.size() <= 900000
+          && (!('createdAt' in request.resource.data) || (request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40))
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
+      // NPCs are public to every member; only the GM writes them.
       match /npcs/{id} {
-        allow read: if gm(c);
+        allow read: if joined(c);
         // An optional picture is a small inline image, the same shape the client renders.
         allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['name','notes','updatedAt','portrait'])
           && request.resource.data.name is string && request.resource.data.name.size() <= 200
@@ -152,7 +154,6 @@ service cloud.firestore {
         function targetReadable(m) {
           return kind == 'plots' || (m.targetKind in ['sessions','pcs','npcs','plots']
             && exists(/databases/$(database)/documents/campaigns/$(c)/$(m.targetKind)/$(m.targetId))
-            && (m.targetKind != 'npcs' || gm(c))
             && (m.targetKind != 'plots' || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == m.targetCreatorUid));
         }
         function validMetadata() {
