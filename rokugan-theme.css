@@ -96,6 +96,9 @@
   .character-info p, .character-info small { color: var(--muted); }
   .character-actions .character-delete { color: var(--red); }
   .character-avatar { background: var(--wash); color: var(--red); border-color: var(--gold); }
+  /* Pictures are cropped square by the user, so keep them square rather than circular. */
+  .character-avatar { border-radius: 3px; }
+  img.character-avatar { object-fit: cover; }
   .books-grid { gap: 24px; align-items: start; }
   .books-grid > .panel { position: relative; border-top: 3px solid var(--gold); padding: 27px; }
   .books-grid > .panel h2 { padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 24px; }

@@ -597,8 +597,11 @@ test('a character picture is added, kept across reloads, removed, and cleared by
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal((await reloaded.data()).character.portrait,picture);
   assert.equal(input.value,'','the file input is cleared so the same file can be chosen again');
+  // The characters list carries the picture so it can be shown before the name.
+  assert.equal(reloaded.window.CharacterBuilder.list()[0].portrait,picture);
   reloaded.click({action:'remove-portrait'});
   assert.equal((await reloaded.data()).character.portrait,'');
+  assert.equal(reloaded.window.CharacterBuilder.list()[0].portrait,'');
   c.window.UI.readPortrait=async()=>{throw new Error('Choose an image file.');};
   await c.root.onchange({target:{dataset:{portrait:''},files:[{type:'text/plain'}]}});
   await new Promise(resolve=>setImmediate(resolve));

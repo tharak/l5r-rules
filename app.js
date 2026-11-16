@@ -119,9 +119,16 @@ function iconFor(title) {
   return icons[title] || '◈';
 }
 
+// The saved picture, or the name's first letter when there is none. The name
+// follows in the tile, so the picture itself is decorative.
+function characterAvatar(character) {
+  if (UI.isPortrait(character.portrait)) return `<img class="character-avatar" src="${character.portrait}" alt="">`;
+  return `<span class="character-avatar" aria-hidden="true">${esc((character.name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
+}
+
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
-  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Create PC',attrs:{'data-dashboard':'new'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`<div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Edit',variant:'secondary',attrs:{'data-dashboard':'open','data-id':c.id}})}${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
+  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Create PC',attrs:{'data-dashboard':'new'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2>${esc(c.name || 'Unnamed PC')}</h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Edit',variant:'secondary',attrs:{'data-dashboard':'open','data-id':c.id}})}${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
 }
 
 function renderArticle(page) {

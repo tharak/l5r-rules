@@ -54,7 +54,7 @@
     return true;
   }
   function list() {
-    return roster().map(record => ({id:record.id,name:record.sheet?.name || '',clan:record.sheet?.clan || '',family:record.sheet?.family || '',concept:record.sheet?.concept || '',updatedAt:record.updatedAt || ''})).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+    return roster().map(record => ({id:record.id,name:record.sheet?.name || '',portrait:UI.isPortrait(record.sheet?.portrait) ? record.sheet.portrait : '',clan:record.sheet?.clan || '',family:record.sheet?.family || '',concept:record.sheet?.concept || '',updatedAt:record.updatedAt || ''})).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
   }
   function create() {
     const id = makeId(), records = roster();
