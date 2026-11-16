@@ -151,6 +151,11 @@ async function mountClanMons(element) {
     <p class="mon-debug-priority">Priority: ${C.MON_PRIORITY.map(kind => esc(C.MON_SOURCES[kind].label)).join(' → ')}</p>
     ${sections}
     <h2>Clan cover art (legendofthefiverings.com)</h2><div class="mon-debug-covers">${C.CLAN_COVERS.map(name => `<figure><img src="${C.clanCover(name)}" alt="${esc(name)} Clan cover art" loading="lazy"><img src="${C.clanCover(name,{tall:true})}" alt="${esc(name)} Clan tall cover art" loading="lazy"><figcaption>${esc(name)}</figcaption></figure>`).join('')}</div>
+    <h2>Family art (legendofthefiverings.com)</h2><p class="mon-debug-priority">The site does not label these images; each is matched to a family by its content. Red outlines are guesses; "?" is unidentified. File letters follow the site's order (04a, 04b…).</p>
+    ${Object.keys(C.FAMILY_ART).map(clan => {
+      const known = new Set((clans.find(c => c.name === clan)?.families || []).map(f => f.name));
+      return `<h3 class="mon-debug-clan">${esc(clan)}</h3><div class="mon-debug-grid">${C.familyArtList(clan).map(item => card({src:item.src,title:item.family || '?',flag:item.guess,lines:[`File ${esc(clan.toLowerCase())}-${item.letter}`,item.family && !known.has(item.family) ? 'Not a family in the character catalog' : '',item.guess ? '<strong>Best guess</strong>' : '']})).join('')}</div>`;
+    }).join('')}
     <h2>Clans without a mon (default five-rings mon)</h2><div class="mon-debug-grid">${missing}</div></div>`;
 }
 

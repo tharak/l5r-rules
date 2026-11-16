@@ -128,11 +128,32 @@
   // tall one (780×2000) per Great Clan; other clans have none.
   const CLAN_COVERS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'];
   const clanCover = (name,{tall = false} = {}) => CLAN_COVERS.includes(name) ? `public/assets/clans/covers/${name.toLowerCase()}${tall ? '-tall' : ''}.webp` : '';
+  // Official family art from the Great Clan pages of legendofthefiverings.com, saved as
+  // public/assets/clans/families/<clan>-<letter>.webp in the site's file order (04a, 04b…).
+  // The site does not label them, so each letter is matched to a family by its content;
+  // FAMILY_ART_GUESSES lists the uncertain matches and '' marks an unidentified image.
+  const FAMILY_ART = {
+    Crab:{a:'Hida',b:'Hiruma',c:'Kaiu',d:'Yasuki',e:'Kuni'},
+    Crane:{a:'Doji',b:'Daidoji',c:'Kakita',d:'Asahina'},
+    Dragon:{a:'Mirumoto',b:'Togashi',c:'Kitsuki',d:'Agasha'},
+    Lion:{a:'Matsu',b:'Kitsu',c:'Akodo',d:'Ikoma'},
+    Phoenix:{a:'Shiba',b:'Isawa',c:'Kaito',d:'Asako'},
+    Scorpion:{a:'Shosuro',b:'Bayushi',c:'',d:'Soshi',e:'Yogo'},
+    Unicorn:{a:'Shinjo',b:'Utaku',c:'Moto',d:'Iuchi'}
+  };
+  const FAMILY_ART_GUESSES = {Crane:['Doji','Kakita','Asahina'],Lion:['Matsu','Akodo','Ikoma'],Phoenix:['Shiba','Kaito'],Scorpion:['Shosuro','Bayushi','Soshi'],Unicorn:['Utaku','Moto']};
+  const familyArtFile = (clan,letter) => `public/assets/clans/families/${clan.toLowerCase()}-${letter}.webp`;
+  const familyArt = (clan,family) => {
+    const letter = Object.entries(FAMILY_ART[clan] || {}).find(([,name]) => name && name === family)?.[0];
+    return letter ? familyArtFile(clan,letter) : '';
+  };
+  // Every family image of a clan, for the debug page.
+  const familyArtList = clan => Object.entries(FAMILY_ART[clan] || {}).map(([letter,family]) => ({letter,family,src:familyArtFile(clan,letter),guess:!family || !!FAMILY_ART_GUESSES[clan]?.includes(family)}));
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
     const [chosen,...alternatives] = clanMonCandidates(name);
     return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, FAMILY_ART, familyArt, familyArtList, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

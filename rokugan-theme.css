@@ -268,3 +268,4 @@
 .mon-debug-covers figure { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
 .mon-debug-covers img { width: 100%; height: 150px; object-fit: cover; border-radius: 2px; }
 .mon-debug-covers figcaption { grid-column: 1 / -1; font: 16px var(--serif); }
+.mon-debug-clan { margin: 16px 0 8px; font: 17px var(--serif); }

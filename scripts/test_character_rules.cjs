@@ -513,3 +513,15 @@ test('the seven Great Clans have wide and tall cover art; other clans have none'
  }
  for(const clan of ['Mantis','Ronin','',undefined])assert.equal(C.clanCover(clan),'',String(clan));
 });
+
+test('family art maps catalog families to bundled images and marks uncertain matches',()=>{
+ for(const clan of Object.keys(C.FAMILY_ART))for(const item of C.familyArtList(clan))assert.ok(fs.existsSync(item.src),item.src);
+ assert.equal(C.familyArt('Crab','Yasuki'),'public/assets/clans/families/crab-d.webp');
+ assert.equal(C.familyArt('Dragon','Togashi'),'public/assets/clans/families/dragon-b.webp');
+ assert.equal(C.familyArt('Crab','Toritaka'),'');assert.equal(C.familyArt('Mantis','Yoritomo'),'');assert.equal(C.familyArt('Scorpion',''),'');
+ assert.equal(C.familyArtList('Crab').some(item=>item.guess),false);
+ assert.equal(C.familyArtList('Scorpion').find(item=>item.letter==='c').guess,true);
+ // Every named family exists in the catalog, except Kaito (Phoenix on the official site only).
+ for(const [clan,map] of Object.entries(C.FAMILY_ART))for(const family of Object.values(map).filter(Boolean))
+  if(family!=='Kaito')assert.ok(catalog.clans.find(c=>c.name===clan).families.some(f=>f.name===family),clan+' '+family);
+});
