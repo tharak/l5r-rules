@@ -149,11 +149,23 @@
   };
   // Every family image of a clan, for the debug page.
   const familyArtList = clan => Object.entries(FAMILY_ART[clan] || {}).map(([letter,family]) => ({letter,family,src:familyArtFile(clan,letter),guess:!family || !!FAMILY_ART_GUESSES[clan]?.includes(family)}));
+  // The site's per-clan file number, used to link each bundled image to its original file.
+  const OFFICIAL_CLAN_NUMBERS = {Crab:1,Phoenix:2,Lion:3,Dragon:4,Unicorn:5,Crane:6,Scorpion:''};
+  const OFFICIAL_CDN = 'https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/';
+  function officialSourceUrl(kind,clan,letter = 'a') {
+    if (!(clan in OFFICIAL_CLAN_NUMBERS)) return '';
+    const n = OFFICIAL_CLAN_NUMBERS[clan] === '' ? '' : `-${OFFICIAL_CLAN_NUMBERS[clan]}`;
+    if (kind === 'mon') return `${OFFICIAL_CDN}05a_Clan_Icon${n}-${clan === 'Crab' ? '900x900' : '900x845'}.webp`;
+    if (kind === 'cover') return `${OFFICIAL_CDN}01_Clan_Cover${n}-1900x1781.webp`;
+    if (kind === 'tall') return `${OFFICIAL_CDN}UI_L5R_Clan_Cover_${clan}_Mobile.webp`;
+    if (kind === 'family') return `${OFFICIAL_CDN}04${letter}_Clan_Families${n}-900x900.webp`;
+    return '';
+  }
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
   function clanMonInfo(name) {
     const [chosen,...alternatives] = clanMonCandidates(name);
     return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, FAMILY_ART, familyArt, familyArtList, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, FAMILY_ART, familyArt, familyArtList, OFFICIAL_CLAN_NUMBERS, officialSourceUrl, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

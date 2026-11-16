@@ -525,3 +525,14 @@ test('family art maps catalog families to bundled images and marks uncertain mat
  for(const [clan,map] of Object.entries(C.FAMILY_ART))for(const family of Object.values(map).filter(Boolean))
   if(family!=='Kaito')assert.ok(catalog.clans.find(c=>c.name===clan).families.some(f=>f.name===family),clan+' '+family);
 });
+
+test('official images link back to their original files on legendofthefiverings.com',()=>{
+ const cdn='https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/';
+ assert.equal(C.officialSourceUrl('family','Lion','c'),cdn+'04c_Clan_Families-3-900x900.webp');
+ assert.equal(C.officialSourceUrl('cover','Scorpion'),cdn+'01_Clan_Cover-1900x1781.webp');
+ assert.equal(C.officialSourceUrl('mon','Crane'),cdn+'05a_Clan_Icon-6-900x845.webp');
+ assert.equal(C.officialSourceUrl('mon','Crab'),cdn+'05a_Clan_Icon-1-900x900.webp');
+ assert.equal(C.officialSourceUrl('tall','Unicorn'),cdn+'UI_L5R_Clan_Cover_Unicorn_Mobile.webp');
+ assert.equal(C.officialSourceUrl('mon','Mantis'),'');
+ assert.deepEqual(Object.keys(C.OFFICIAL_CLAN_NUMBERS).sort(),[...C.CLAN_COVERS].sort());
+});

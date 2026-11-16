@@ -149,14 +149,40 @@ async function mountClanMons(element) {
   const missing = clans.filter(clan => !C.clanMonInfo(clan.name)).map(clan => card({src:C.DEFAULT_MON,title:clan.name,lines:[esc(clan.group),'Default five-rings mon']})).join('');
   element.innerHTML = `<div class="workspace mon-debug">${UI.sectionHeading({title:'Clan mons',level:1,description:'Debug view: which image each clan uses. Sources are used in priority order: the official site, l5r.wiki, the mandala, then l5r.fandom.com. Mandala positions are clock positions in Shin-Ian\'s artwork, with 12:00 at the top.'})}
     <p class="mon-debug-priority">Priority: ${C.MON_PRIORITY.map(kind => esc(C.MON_SOURCES[kind].label)).join(' → ')}</p>
+    <p class="mon-debug-priority">Cover art, family art, and the other images from the official site are on <a href="#/official-images">Official images</a>.</p>
     ${sections}
-    <h2>Clan cover art (legendofthefiverings.com)</h2><div class="mon-debug-covers">${C.CLAN_COVERS.map(name => `<figure><img src="${C.clanCover(name)}" alt="${esc(name)} Clan cover art" loading="lazy"><img src="${C.clanCover(name,{tall:true})}" alt="${esc(name)} Clan tall cover art" loading="lazy"><figcaption>${esc(name)}</figcaption></figure>`).join('')}</div>
-    <h2>Family art (legendofthefiverings.com)</h2><p class="mon-debug-priority">The site does not label these images; each is matched to a family by its content. Red outlines are guesses; "?" is unidentified. File letters follow the site's order (04a, 04b…).</p>
-    ${Object.keys(C.FAMILY_ART).map(clan => {
-      const known = new Set((clans.find(c => c.name === clan)?.families || []).map(f => f.name));
-      return `<h3 class="mon-debug-clan">${esc(clan)}</h3><div class="mon-debug-grid">${C.familyArtList(clan).map(item => card({src:item.src,title:item.family || '?',flag:item.guess,lines:[`File ${esc(clan.toLowerCase())}-${item.letter}`,item.family && !known.has(item.family) ? 'Not a family in the character catalog' : '',item.guess ? '<strong>Best guess</strong>' : '']})).join('')}</div>`;
-    }).join('')}
     <h2>Clans without a mon (default five-rings mon)</h2><div class="mon-debug-grid">${missing}</div></div>`;
+}
+
+// Every image downloaded from legendofthefiverings.com, grouped by Great Clan, each linked
+// to its original file. Family art shows which family each image was matched to.
+async function mountOfficialImages(element) {
+  const C = window.CharacterCatalog;
+  let clans = [];
+  try { clans = (await (await fetch('public/character-data.json')).json()).clans; } catch { element.innerHTML = '<p>The clan list could not be loaded.</p>'; return; }
+  if (currentSlug() !== 'official-images') return;
+  const original = href => href ? `<a href="${href}" target="_blank" rel="noopener">Original file ↗</a>` : '';
+  const tile = ({src,title,lines,flag,wide}) => `<figure class="official-tile${wide?' official-tile-wide':''}${flag?' mon-debug-flag':''}"><img src="${src}" alt="${esc(title)}" loading="lazy"><figcaption><strong>${esc(title)}</strong>${lines.filter(Boolean).map(line => `<small>${line}</small>`).join('')}</figcaption></figure>`;
+  const path = src => `<code>${esc(src)}</code>`;
+  const clanBlock = clan => {
+    const known = new Set((clans.find(c => c.name === clan)?.families || []).map(f => f.name));
+    const art = [
+      tile({src:C.clanMon(clan),title:'Mon',lines:[path(C.clanMon(clan)),original(C.officialSourceUrl('mon',clan))]}),
+      tile({src:C.clanCover(clan),title:'Cover',wide:true,lines:[path(C.clanCover(clan)),original(C.officialSourceUrl('cover',clan))]}),
+      tile({src:C.clanCover(clan,{tall:true}),title:'Tall cover',lines:[path(C.clanCover(clan,{tall:true})),original(C.officialSourceUrl('tall',clan))]}),
+      ...C.familyArtList(clan).map(item => tile({src:item.src,title:item.family ? `${item.family} family` : 'Unidentified family',flag:item.guess,
+        lines:[item.guess ? '<b>Best guess</b>' : '',item.family && !known.has(item.family) ? 'Not a family in the character catalog' : '',path(item.src),original(C.officialSourceUrl('family',clan,item.letter))]}))
+    ].join('');
+    return `<section class="official-clan"><h2>${esc(clan)}</h2><div class="official-art">${art}</div></section>`;
+  };
+  const site = [
+    tile({src:'public/assets/l5r-mark.webp',title:'Five-rings mark',lines:['Site logo, favicon, and the mon for clans without one',path('public/assets/l5r-mark.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2025/05/L5R-Favicon_05-16-25.webp')]}),
+    tile({src:'public/assets/rokugan-map.webp',title:'Map of Rokugan',wide:true,lines:['Campaign page background',path('public/assets/rokugan-map.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/03_Map_Background-Rokugan-1900x2755.webp')]})
+  ].join('');
+  element.innerHTML = `<div class="workspace mon-debug official-images">${UI.sectionHeading({title:'Official images',level:1})}
+    <p class="mon-debug-priority">Images downloaded from <a href="https://www.legendofthefiverings.com/" target="_blank" rel="noopener">legendofthefiverings.com</a> (© Legend of the Five Rings / Asmodee). The site does not label the family art; each image is matched to a family by its content, and red outlines mark guesses. Clan mons for every clan are on <a href="#/clan-mons">Clan mons</a>.</p>
+    ${C.CLAN_COVERS.map(clanBlock).join('')}
+    <section class="official-clan"><h2>Site images</h2><div class="official-art">${site}</div></section></div>`;
 }
 
 function renderCharacters() {
@@ -255,9 +281,10 @@ function render() {
   const designGuide = slug === 'design-guideline';
   const portraitCreator = slug === 'portrait-creator';
   const clanMons = slug === 'clan-mons';
+  const officialImages = slug === 'official-images';
   // Campaign pages show the map of Rokugan behind their content.
   document.body.classList.toggle('route-campaigns', campaignRoute);
-  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // Campaign pages show no page label; the map and their own content identify them.
   $('#breadcrumb').hidden = campaignRoute;
@@ -265,11 +292,12 @@ function render() {
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
-  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
   if (characterEditor) window.CharacterBuilder.mount($('#app'));
   if (portraitCreator) window.PortraitCreator.mount($('#app'));
   if (clanMons) mountClanMons($('#app'));
+  if (officialImages) mountOfficialImages($('#app'));
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
   const fragment = location.hash.split('#').slice(2).join('#');

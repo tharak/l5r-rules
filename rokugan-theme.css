@@ -240,12 +240,18 @@
 .mon-debug-flag { border-color: var(--red); border-left-width: 3px; }
 .mon-debug-alt { display: inline-block !important; width: 20px !important; height: 20px !important; vertical-align: middle; margin-right: 3px; background: none !important; }
 .mon-debug-priority { margin: 0 0 8px; color: var(--muted); }
-.mon-debug-covers { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.mon-debug-covers figure { display: grid; grid-template-columns: 2fr 1fr; gap: 6px; margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
-.mon-debug-covers img { width: 100%; height: 150px; object-fit: cover; border-radius: 2px; }
-.mon-debug-covers figcaption { grid-column: 1 / -1; font: 16px var(--serif); }
 .mon-debug-clan { margin: 16px 0 8px; font: 17px var(--serif); }
 
 /* Hidden visually, still announced by screen readers. */
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .campaign-toolbar { display: flex; justify-content: flex-start; margin-bottom: 16px; }
+/* Official images page (#/official-images). */
+.official-clan { margin-top: 24px; }
+.official-art { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-items: start; }
+.official-tile { margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); min-width: 0; }
+.official-tile-wide { grid-column: span 2; }
+.official-tile img { display: block; width: 100%; height: 180px; object-fit: contain; background: var(--wash); border-radius: 2px; }
+.official-tile figcaption { display: grid; gap: 2px; margin-top: 6px; }
+.official-tile figcaption strong { font: 15px var(--serif); }
+.official-tile figcaption small, .official-tile code { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 420px) { .official-tile-wide { grid-column: auto; } }
