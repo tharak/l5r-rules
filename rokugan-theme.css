@@ -58,21 +58,6 @@
     top: 40px; background: var(--surface); border-color: var(--line);
     box-shadow: 0 12px 30px #30271b26;
   }
-  .setting-banner {
-    display: none; position: relative; min-height: 245px; overflow: hidden;
-    border-bottom: 1px solid #b9a780;
-    background: #e8dcc3 url('public/assets/rokugan-landscape.svg') right center / auto 100% no-repeat;
-  }
-  body[data-overview="true"] .setting-banner { display: block; }
-  .setting-banner::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(90deg, #eee4d0 0%, #eee4d0eb 30%, #eee4d000 68%);
-  }
-  .setting-banner-copy { position: relative; padding: 46px clamp(20px,4vw,60px) 40px; }
-  .setting-kicker { margin: 0 0 19px; color: #7b4937; font-size: 9px; font-weight: 700; letter-spacing: .2em; }
-  .setting-banner h2 { margin: 0; font: 400 clamp(32px,3.7vw,52px)/1.25 var(--serif); letter-spacing: -.045em; }
-  .setting-banner h2 em { color: var(--red); font-weight: 400; }
-  .setting-motto { margin: 19px 0 0; color: #675a44; font: italic 14px var(--serif); letter-spacing: .03em; }
   .breadcrumb { color: #796b52; font-size: 10px; letter-spacing: .13em; text-transform: uppercase; border-bottom: 1px solid #cfc1a766; }
   .workspace { padding-top: 28px; }
   .workspace h1, .creator-header h1 { color: var(--ink); font-weight: 400; letter-spacing: -.04em; }
@@ -237,12 +222,6 @@
     .site-brand small { font-size: 7px; letter-spacing: .12em; }
     .topbar-actions { gap: 7px; } .account-menu summary { padding: 8px 9px; font-size: 11px; }
     .topbar nav a { padding: 12px 0; font-size: 13px; }
-    .setting-banner { min-height: 210px; background-position: 64% center; }
-    .setting-banner::before { background: linear-gradient(90deg, #eee4d0f5, #eee4d0bc 55%, #eee4d040); }
-    .setting-banner-copy { padding: 34px 20px; }
-    .setting-kicker { font-size: 8px; line-height: 1.6; max-width: 220px; margin-bottom: 14px; }
-    .setting-banner h2 { max-width: 300px; font-size: 32px; }
-    .setting-motto { margin-top: 16px; font-size: 12px; }
     .workspace { padding-top: 18px; }
     .books-grid > .panel { padding: 22px 18px; }
     .books-grid > .panel h2 { font-size: 21px; }
@@ -252,7 +231,6 @@
     .site-footer { align-items: flex-start; gap: 10px; }
   }
 }
-@media print { .setting-banner { display: none !important; } }
 
 /* Clan mon debug page (#/clan-mons). */
 .mon-debug h2 { margin: 28px 0 10px; font: 20px var(--serif); }

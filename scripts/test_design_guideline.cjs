@@ -8,9 +8,9 @@ const context = {window:{}};
 for(const file of ['ui-components.js','design-guideline.js']) vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),context);
 const {entries,examples} = context.window.DesignGuideline;
 
-test('33 families retain all 113 permanent example IDs exactly once',()=>{
+test('33 families retain all 112 permanent example IDs exactly once',()=>{
   assert.equal(entries.length,33);
-  assert.equal(examples.length,113);
+  assert.equal(examples.length,112);
   assert.equal(new Set(entries.map(item=>item.id)).size,entries.length);
   const mapped=entries.flatMap(item=>item.exampleIds);
   assert.equal(mapped.length,examples.length);
@@ -18,7 +18,7 @@ test('33 families retain all 113 permanent example IDs exactly once',()=>{
   assert.deepEqual([...mapped].sort(),[...examples].map(item=>item.id).sort());
   for (const id of ['UI-CAMPAIGN-CARD','UI-RANK-STEPPER','UI-SKILL-ROW','UI-PRINT-IDENTITY']) assert.ok(mapped.includes(id),id);
   assert.equal(entries.find(item=>item.id==='UI-RING-SYMBOLS').exampleIds.join(' '),'UI-RING-SYMBOLS UI-BOOK-ICONS');
-  assert.equal(entries.find(item=>item.id==='UI-SITE-NAVIGATION').exampleIds.join(' '),'UI-SITE-NAVIGATION UI-SITE-BRAND UI-SETTING-BANNER');
+  assert.equal(entries.find(item=>item.id==='UI-SITE-NAVIGATION').exampleIds.join(' '),'UI-SITE-NAVIGATION UI-SITE-BRAND');
   for (const id of ['UI-BUTTON','UI-FIELD','UI-CARD','UI-RECORD-EDITOR']) assert.ok(entries.some(item=>item.id===id),id);
 });
 

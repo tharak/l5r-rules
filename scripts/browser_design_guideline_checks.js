@@ -81,7 +81,7 @@ async page => {
       const doc=id=>document.querySelector(`[data-dg-preview="${id}"]`).contentDocument;
       return {
         colors:[...doc('UI-COLOR-PALETTE').querySelectorAll('[data-dg-color]')].map(n=>n.textContent),
-        header:['.site-brand','.topbar','.setting-banner'].every(selector=>doc('UI-SITE-NAVIGATION').querySelector(selector)),
+        header:['.site-brand','.topbar'].every(selector=>doc('UI-SITE-NAVIGATION').querySelector(selector)),
         images:doc('UI-RING-SYMBOLS').querySelectorAll('.creator-ring-symbol').length,
         placeholders:doc('UI-BOOK-ICONS').querySelectorAll('.ui-ring-placeholder').length,
         placeholderImages:doc('UI-BOOK-ICONS').querySelectorAll('.creator-ring-symbol').length,
