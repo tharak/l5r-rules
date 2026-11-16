@@ -35,7 +35,7 @@ async function character(saved,preferences = {}) {
   const change = (dataset,value) => root.onchange({target:{dataset,value}});
   const click = dataset => root.onclick({target:{closest:() => ({dataset})}});
   return {
-    root, inputs, change, click, window, document,
+    root, inputs, change, click, window, document, context,
     renders:()=>renders,
     records:()=>JSON.parse(storage.get('l5r-rules-characters-v1')),
     remote(records) {
@@ -650,6 +650,20 @@ test('Public checkboxes and the journal save to the sheet; entries start private
   c.window.confirm=()=>true;c.click({action:'journal-delete',id});
   assert.equal((await c.data()).character.journal.length,0);
   assert.match(html(),/No journal entries yet/);
+});
+
+test('View public previews exactly the shared profile from the sheet as it is now',async()=>{
+  const c=await character({name:'Doji Ren',clan:'Crane',advantages:[{name:'Fame',cost:3,public:true},{name:'Allies',cost:2}],publicStats:{glory:true},journal:[{id:'a',text:'Public news',createdAt:'2026-11-02T10:00:00Z',public:true},{id:'b',text:'SECRET PLAN',createdAt:'2026-11-03T10:00:00Z',public:false}]});
+  c.context.PublicCharacter=undefined;
+  for(const file of ['sheet-sharing.js','character-public.js'])require('node:vm').runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),c.context);
+  assert.match(c.root.innerHTML,/data-action="preview-public"/);
+  c.click({action:'preview-public'});
+  const html=c.root.innerHTML;
+  assert.match(html,/creator-public-preview/);assert.match(html,/Doji Ren/);assert.match(html,/Fame/);assert.match(html,/Public news/);assert.match(html,/Glory/);
+  for(const secret of ['SECRET PLAN','Allies'])assert.ok(!html.slice(html.indexOf('creator-public-preview')).includes(secret),secret);
+  assert.match(html,/Sign in to share it with a link/);
+  c.click({action:'close-public-preview'});
+  assert.doesNotMatch(c.root.innerHTML,/creator-public-preview"/);
 });
 
 test('the GM sees the player\'s journal read-only and adds, edits and deletes only their own entries',async()=>{

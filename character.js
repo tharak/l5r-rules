@@ -16,6 +16,7 @@
   let emphasisView = 'skills';
   let rollState = null;
   let journalDraft = null;
+  let publicPreview = false;
   let xpAward = 0;
   let catalog, catalogPromise, sheet, root, activeId, external = null;
   let remoteRefreshPending = false;
@@ -445,7 +446,7 @@
   const publicHref = () => `#/pc/${encodeURIComponent(window.CharacterStorage?.accountId || '')}/${encodeURIComponent(activeId || '')}`;
   function renderNavigation() {
     const sections=[['rolls','Rolls'],['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Story'],['equipment','Equipment']];
-    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save PC',attrs:{'data-action':'save-close'}})}${!external && window.CharacterStorage?.accountId && activeId ? `<a class="creator-public-link" href="${publicHref()}">Public view</a>${UI.button({text:'Copy public link',variant:'secondary',attrs:{'data-action':'copy-public-link'}})}` : ''}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save PC',attrs:{'data-action':'save-close'}})}${!external ? UI.button({text:'View public',variant:'secondary',attrs:{'data-action':'preview-public','aria-haspopup':'dialog'}}) : ''}${!external && window.CharacterStorage?.accountId && activeId ? UI.button({text:'Copy public link',variant:'secondary',attrs:{'data-action':'copy-public-link'}}) : ''}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
@@ -603,7 +604,7 @@
     if (!root?.isConnected || !catalog || (!external && !editorRoute())) return;
     const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.id || d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
-    root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${macroSkill?renderSubskills():''}${rollState?renderRollDialog():''}</div>`;
+    root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${macroSkill?renderSubskills():''}${rollState?renderRollDialog():''}${publicPreview?renderPublicPreview(data):''}</div>`;
     const subskillDialog = root.querySelector('.creator-subskill-dialog');
     if (subskillDialog) {
       subskillDialog.oncancel = event => { event.preventDefault(); closeSubskills(); };
@@ -613,6 +614,11 @@
     if (rollDialog) {
       rollDialog.oncancel = event => { event.preventDefault(); closeRoll(); };
       rollDialog.showModal();
+    }
+    const previewDialog = root.querySelector('.creator-public-preview');
+    if (previewDialog) {
+      previewDialog.oncancel = event => { event.preventDefault(); closePublicPreview(); };
+      previewDialog.showModal();
     }
     const emphasisDialog = root.querySelector('.creator-emphasis-dialog');
     if (emphasisDialog) {
@@ -708,6 +714,21 @@
     return true;
   }
 
+  // What other players and anyone with the link see, built from the sheet as it is now
+  // (the same profile that is shared on save), plus the GM's public journal entries.
+  function renderPublicPreview(data) {
+    const profile = window.SheetSharing.profile(sheet,data);
+    const gm = gmEntries.filter(entry => entry.public).map(entry => ({id:entry.id,text:entry.text,createdAt:entry.createdAt,authorName:entry.authorName || 'GM'}));
+    const page = window.PublicCharacter?.page({revision:'',profile},gm) || '';
+    return UI.dialog({title:'Public view',titleId:'public-preview-title',attrs:{class:'creator-public-preview'},bodyClass:'creator-public-preview-body',
+      bodyHtml:`<p class="creator-rule">This is what other players and anyone with the link see. Everything else on the sheet is private to you and the GM.${window.CharacterStorage?.accountId ? '' : ' Sign in to share it with a link.'}</p>${page}`,
+      footerHtml:UI.button({text:'Close',variant:'secondary',attrs:{'data-action':'close-public-preview','aria-label':'Close public view'}})});
+  }
+  function closePublicPreview() {
+    publicPreview = false;
+    render();
+    root.querySelector('[data-action="preview-public"]')?.focus();
+  }
   function closeEmphases() {
     const name = emphasisSkill;
     emphasisSkill = '';
@@ -798,6 +819,10 @@
       commitEdit();
       focusSkillStepper(name,button.dataset.delta,nextRow);
       return;
+    } else if (action === 'preview-public') {
+      publicPreview = true; render(); return;
+    } else if (action === 'close-public-preview') {
+      closePublicPreview(); return;
     } else if (action === 'copy-public-link') {
       const url = new URL(publicHref(),location.href).href;
       Promise.resolve(navigator.clipboard?.writeText(url)).then(() => { button.textContent = 'Link copied'; },() => { window.prompt?.('Copy this link',url); });
@@ -965,6 +990,7 @@
     macroSkill = '';
     rollState = null;
     journalDraft = null;
+    publicPreview = false;
     xpAward = 0;
     root = element;
     root.onclick = onClick;
