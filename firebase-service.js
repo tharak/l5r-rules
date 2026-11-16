@@ -43,6 +43,11 @@ try {
     authSDK.connectAuthEmulator(auth,'http://127.0.0.1:9099', {disableWarnings:true});
     dbSDK.connectFirestoreEmulator(db,'127.0.0.1',8080);
   }
+  // Public character documents are readable signed out, for the #/pc/... public view.
+  window.PublicSheets = {
+    watch(owner,id,receive,fail) { return dbSDK.onSnapshot(dbSDK.doc(db,'users',owner,'publicCharacters',id),snapshot => receive(snapshot.exists() ? snapshot.data() : null),fail); }
+  };
+  window.dispatchEvent(new Event('public-sheets-ready'));
   window.addEventListener('character-sync-changed', update);
   authSDK.onAuthStateChanged(auth, account => {
     user = account;
@@ -56,7 +61,6 @@ try {
           const records = snapshot.docs.map(doc => {
             const data = doc.data(), sheet = JSON.parse(data.sheetJson);
             if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) throw new Error('Invalid character data');
-            sheet.visibility = data.visibility || window.SheetSharing.visibility(sheet);
             return {id:doc.id, sheet, updatedAt:data.updatedAt};
           });
           receive(records, snapshot.metadata.fromCache);

@@ -10,18 +10,12 @@ function sandbox(files,storage=new Map()) {
  for(const file of files)vm.runInNewContext(fs.readFileSync(file,'utf8'),context);
  return {window,storage};
 }
-test('all 128 visibility masks project only selected sections with matching revisions',()=>{
+test('public names come from the profile, falling back to older section-based documents',()=>{
  const {window:w}=sandbox(['sheet-sharing.js']),api=w.SheetSharing;
- for(let bits=0;bits<128;bits++){
-  const visibility=Object.fromEntries(api.keys.map((k,i)=>[k,!!(bits&(1<<i))]));
-  const sections=Object.fromEntries(api.keys.map(k=>[k,{secret:k}]));
-  const p=api.project({revision:'same',visibility,sections});
-  assert.equal(p.revision,'same');
-  assert.deepEqual(Object.keys(p.sections),Array.from(api.keys.filter(k=>visibility[k])));
-  for(const k of api.keys)assert.equal(JSON.stringify(p).includes('"secret":"'+k+'"'),visibility[k]);
- }
- // Privacy is paused: every section is shared, whatever an older sheet saved.
-  assert.deepEqual(JSON.parse(JSON.stringify(api.visibility({visibility:{skills:false}}))),{identity:true,traits:true,skills:true,options:true,story:true,summary:true,abilities:true});
+ assert.equal(api.publicName({profile:{name:'Doji Ren'}}),'Doji Ren');
+ assert.equal(api.publicName({sections:{identity:{name:'Old Format'}}}),'Old Format');
+ assert.equal(api.publicName(null),'');
+ assert.deepEqual([...api.STATS],['honor','glory','status','taint']);
 });
 test('migration preserves device and account IDs, active selection and durable pending edits',()=>{
  const storage=new Map([
@@ -94,13 +88,13 @@ function campaignCards() {
  }};
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
- vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});
+ vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('sheet-sharing.js','utf8'),{window,structuredClone,crypto:require('node:crypto')});
  vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null},location,Event,console,setTimeout,crypto:require('node:crypto')});
  const render=()=>window.CampaignUI.render('campaigns');
  return {data,store,watches,window,location,listeners,documentListeners,render,setCharacters:value=>characters=value,
   click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
 }
-test('only a PC\'s creator edits it; everyone else in the campaign gets a read-only View',()=>{
+test('only a PC\'s creator edits it; the GM views the full sheet and players open the public view',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/pcs/alice',{ownerUid:'alice',characterId:'alice-pc'});
@@ -110,10 +104,14 @@ test('only a PC\'s creator edits it; everyone else in the campaign gets a read-o
  render();d.click('section','pcs');
  assert.deepEqual(buttons(),['alice:View','bob:View']);
  d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
+ assert.ok(d.watches.some(w=>w.pcId==='bob'&&w.full),'the GM watches the full sheet');
  d.click('close-sheet');
  d.store.uid='alice';render();d.click('section','pcs');
  assert.deepEqual(buttons(),['alice:Edit','bob:View']);
- d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
+ d.click('pc-open','bob');
+ assert.doesNotMatch(render(),/id="campaign-editor"/);
+ assert.equal(d.location.hash,'#/pc/bob/bob-pc');
+ assert.ok(!d.watches.some(w=>w.full&&w.pcId==='bob'&&w!==d.watches.find(x=>x.full)),'players never watch a full sheet');
 });
 test('campaign cards display PC - player, escape names, and handle empty and private identities',async()=>{
  const d=campaignCards();
@@ -185,4 +183,17 @@ test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',asy
  assert.equal(request.title,'Court messenger');assert.equal(request.returnHref,'#/campaigns/c');
  request.onUse(picture);
  assert.equal(d.data.get(id).portrait,picture);
+});
+test('the public view shows the profile, escapes text, and handles missing or old documents',()=>{
+ const window={addEventListener(){}};
+ for(const file of ['ui-components.js','character-catalog.js','sheet-sharing.js','character-public.js'])vm.runInNewContext(fs.readFileSync(file,'utf8'),{window,structuredClone,crypto:require('node:crypto')});
+ const P=window.PublicCharacter;
+ const html=P.page({revision:'r',profile:{name:'Doji <Ren>',portrait:'javascript:alert(1)',clan:'Crane',family:'Doji',school:'Kakita Bushi',insightRank:2,gear:['Katana'],stats:{glory:2.5},advantages:[{name:'Fame',selection:''}],disadvantages:[],journal:[{id:'a',text:'Old <b>entry</b>',createdAt:'2026-11-01'},{id:'b',text:'New entry',createdAt:'2026-11-05'}]}});
+ assert.match(html,/Doji &lt;Ren&gt;/);assert.ok(!html.includes('javascript:'));
+ assert.match(html,/public\/assets\/clans\/official\/crane\.webp/,'falls back to the clan mon without a valid picture');
+ assert.match(html,/Glory<\/span><strong>2\.5/);assert.match(html,/Carries<\/h2><p>Katana/);assert.match(html,/Fame/);
+ assert.ok(!html.includes('Disadvantages'),'empty sections are left out');
+ assert.ok(html.indexOf('New entry')<html.indexOf('Old &lt;b&gt;entry'),'newest journal entry first');
+ assert.match(P.page(null),/Character unavailable/);
+ assert.match(P.page({sections:{identity:{name:'Old Format'}}}),/Old Format[\s\S]*saves it again/);
 });

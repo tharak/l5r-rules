@@ -94,7 +94,7 @@ function expandActivePath(entries, slug, fragment) {
 function renderNavigation() {
   const slug = currentSlug();
   document.querySelectorAll('#navigation a').forEach(a => {
-    const selected = slug === 'design-guideline' ? false : slug.startsWith('campaigns') || slug.startsWith('invite/') ? a.hash === '#/campaigns' : slug === 'characters' || slug.startsWith('characters/') || slug === 'create-character' || slug === 'portrait-creator' ? a.hash === '#/characters' : a.hash === '#/books';
+    const selected = slug === 'design-guideline' ? false : slug.startsWith('campaigns') || slug.startsWith('invite/') ? a.hash === '#/campaigns' : slug === 'characters' || slug.startsWith('characters/') || slug === 'create-character' || slug === 'portrait-creator' || slug.startsWith('pc/') ? a.hash === '#/characters' : a.hash === '#/books';
     if (selected) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   });
 }
@@ -304,9 +304,10 @@ function render() {
   const portraitCreator = slug === 'portrait-creator';
   const clanMons = slug === 'clan-mons';
   const officialImages = slug === 'official-images';
+  const publicPC = /^pc\/[^/]+\/[^/]+$/.test(slug);
   // Campaign pages show the map of Rokugan behind their content.
   document.body.classList.toggle('route-campaigns', campaignRoute);
-  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // Campaign pages show no page label; the map and their own content identify them.
   $('#breadcrumb').hidden = campaignRoute;
@@ -314,12 +315,13 @@ function render() {
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
-  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
   if (characterEditor) window.CharacterBuilder.mount($('#app'));
   if (portraitCreator) window.PortraitCreator.mount($('#app'));
   if (clanMons) mountClanMons($('#app'));
   if (officialImages) mountOfficialImages($('#app'));
+  if (publicPC) { const [,owner,id] = slug.split('/'); window.PublicCharacter.mount($('#app'),decodeURIComponent(owner),decodeURIComponent(id)); } else window.PublicCharacter?.unmount();
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
   const fragment = location.hash.split('#').slice(2).join('#');

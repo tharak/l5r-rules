@@ -7,11 +7,11 @@ const sdk=require('firebase/firestore');
 test('campaign service CRUD, invitation replacement, linking, editing, leaving and deletion',{timeout:20000},async()=>{
  const env=await initializeTestEnvironment({projectId:'demo-l5r-rules-service-tests',firestore:{host:'127.0.0.1',port:8080,rules:fs.readFileSync('firestore.rules','utf8')}});
  const gmDB=env.authenticatedContext('gm').firestore(),aliceDB=env.authenticatedContext('alice').firestore(),bobDB=env.authenticatedContext('bob').firestore();
- const sheet={name:'Alice PC',notes:'PRIVATE',visibility:{identity:true,traits:false,skills:false,options:false,story:false,summary:false}};
- const sections=s=>({identity:{name:s.name},traits:{},skills:{},options:{},story:{notes:s.notes},summary:{}});
+ const sheet={name:'Alice PC',journal:[{id:'p',text:'PRIVATE',public:false}]};
+ const profile=s=>({name:s.name,portrait:'',clan:'',family:'',school:'',insightRank:1,gear:[],stats:{},advantages:[],disadvantages:[],journal:[]});
  global.window={CharacterStorage:{records:()=>[{id:'pc',sheet,updatedAt:'now'}]},SheetSharing:{encode:async(s,updatedAt)=>{
-  const full={sheetJson:JSON.stringify(s),updatedAt,revision:randomUUID(),visibility:s.visibility,sections:sections(s)};
-  return {full,public:{revision:full.revision,sections:Object.fromEntries(Object.entries(full.sections).filter(([k])=>s.visibility[k]))}};
+  const full={sheetJson:JSON.stringify(s),updatedAt,revision:randomUUID(),profile:profile(s)};
+  return {full,public:{revision:full.revision,profile:full.profile}};
  }}};
  const {createCampaignBackend}=await import('../campaign-service.js');
  const gm=createCampaignBackend(gmDB,sdk,'gm','Game Master'),alice=createCampaignBackend(aliceDB,sdk,'alice','Alice'),bob=createCampaignBackend(bobDB,sdk,'bob','Bob');
@@ -53,9 +53,10 @@ test('campaign service CRUD, invitation replacement, linking, editing, leaving a
   assert.equal((await gm.get(`campaigns/${secondCampaign}/pcs/${secondRef}`)).characterId,'pc');
   await alice.deleteCampaign(secondCampaign);
   assert.ok(await alice.get('users/alice/characters/pc'));
-  // Privacy is paused: unlinking a PC does not hide its sheet.
+  // Unlinking the PC ends the GM's read of the full sheet; the public profile stays readable.
   await gm.write(`campaigns/${c}/pcs/${pcId}`,null);
-  assert.ok(await gm.get('users/alice/characters/pc'));
+  await assertFails(gm.get('users/alice/characters/pc'));
+  assert.ok(await bob.get('users/alice/publicCharacters/pc'));
   const newPCId=await alice.link(c,'pc');assert.notEqual(newPCId,pcId);
   await gm.removeMember(c,'alice');
   assert.equal(await gm.get(`campaigns/${c}/pcs/${newPCId}`),null);

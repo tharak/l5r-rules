@@ -125,7 +125,7 @@ test('section resets preserve identity, privacy and unrelated purchases while re
  const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.journal=[{id:'j1',text:'Keep my notes',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}];s.traitBuys.Strength=1;s.skills.Defense=3;
  s.advantages=[{id:'large',name:'Large',baseCost:4}];s.purchases=[{id:'custom',name:'Other purchase',cost:2}];s.abilities=[{id:'power',kind:'custom',name:'Custom power',cost:3}];
  s.exceptions=[{id:'trait-approval',code:'rank:trait:Strength',explanation:'Old trait approval'},{id:'power-approval',code:'ability:power',explanation:'Keep power approval'}];
- const original=JSON.stringify(s),visibility=plain(s.visibility);
+ const original=JSON.stringify(s);
  const traits=R.resetSection(s,'traits',catalog);assert.equal(calc(traits).traits.Strength.rank,3);assert.equal(calc(traits).xpSpent,calc(s).xpSpent-16);assert.deepEqual(plain(traits.journal),plain(s.journal));assert.equal(traits.skills.Defense,3);assert.deepEqual(plain(traits.exceptions),[plain(s.exceptions[1])]);
  const skills=R.resetSection(s,'skills',catalog);assert.equal(calc(skills).skills.Defense.rank,1);assert.equal(calc(skills).skills['Heavy Weapons'].rank,1);assert.equal(calc(skills).xpSpent,calc(s).xpSpent-5);assert.equal(skills.traitBuys.Strength,1);
  const options=R.resetSection(s,'options',catalog);assert.equal(calc(options).xpSpent,calc(s).xpSpent-3);assert.equal(options.purchases[0].name,'Other purchase');
@@ -133,7 +133,7 @@ test('section resets preserve identity, privacy and unrelated purchases while re
  const story=R.resetSection(s,'story',catalog);assert.equal(story.concept,'');assert.deepEqual(plain(story.journal),plain(s.journal));assert.equal(story.purchases.length,0);assert.equal(story.startingXP,80);assert.ok(calc(story).equipment.some(e=>e.source==='school'));
  const identity=R.resetSection(s,'identity',catalog);assert.equal(identity.school,'');assert.deepEqual(plain(identity.journal),plain(s.journal));assert.equal(identity.skills.Defense,3);
  const summary=R.resetSection(s,'summary',catalog);assert.equal(summary.startingXP,40);assert.deepEqual(plain(summary.journal),plain(s.journal));assert.equal(summary.school,s.school);
- for(const reset of [traits,skills,options,abilities,story,identity,summary]){assert.equal(reset.id,s.id);assert.deepEqual(plain(reset.visibility),visibility);}
+ for(const reset of [traits,skills,options,abilities,story,identity,summary]){assert.equal(reset.id,s.id);assert.equal(reset.visibility,undefined);}
  assert.equal(JSON.stringify(s),original,'Reset mutated the original sheet');
  const nextSchool=starting('Crane','Kakita Bushi');const changed=R.normalize({...s,clan:nextSchool.clan,family:nextSchool.family,school:nextSchool.school});
  const reset=R.resetSection(changed,'skills',catalog);assert.equal(calc(reset).skills.Iaijutsu.rank,1);assert.ok(!calc(reset).skills['Heavy Weapons']);
@@ -263,7 +263,7 @@ test('memorization and school changes recalculate current costs and grants',()=>
 });
 test('legacy migration preserves selections, custom charges, notes and six privacy choices without duplicate costs',()=>{
  const original={name:'Legacy',school:'sccrab#toc1',clan:'Crab',notes:'a\n\nb',skills:{'Lore:Shadowlands':3},schoolChoices:['Battle'],equipmentChoices:['Light Armor','Tetsubo'],purchases:[{name:'Kenjutsu emphasis',cost:2}],visibility:{identity:false,traits:true,skills:false,options:false,story:false,summary:true},customLegacyField:'keep'};
- const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility.abilities,false);assert.equal(s.notes,'');assert.deepEqual(plain(s.journal),[{id:'legacy-notes',text:original.notes,createdAt:'',updatedAt:'',public:false}]);
+ const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility,undefined);assert.equal(s.notes,'');assert.deepEqual(plain(s.journal),[{id:'legacy-notes',text:original.notes,createdAt:'',updatedAt:'',public:false}]);
  const p=trained(s);assert.equal(calc(p).xpSpent,calc(s).xpSpent);assert.deepEqual(plain(p.purchases),plain(s.purchases));assert.equal(calc(p).xpSpent,7);
 });
 test('equipment applies armor, weapon skills/masteries, bow strength and arrows without charging XP',()=>{
@@ -300,17 +300,23 @@ test('school ranks are independent; paths replace techniques and advanced school
  assert.ok(d.blockers.some(v=>v.code.startsWith('training:')&&v.message.includes('Earth 4')));
  p.advantages.push({name:'Multiple Schools',cost:10});assert.ok(!d.abilities.length);
 });
-test('all 128 masks exclude hidden selected abilities and private history/exceptions from projections, exports and shared print source',()=>{
- const s=starting();s.abilities=[{id:'secret',kind:'custom',name:'SECRET ABILITY',description:'SECRET POWER'}];s.exceptions=[{code:'*',explanation:'PRIVATE APPROVAL'}];s.progression.history=[{kind:'award',amount:10,explanation:'PRIVATE HISTORY'}];
- const d=calc(s),sections=S.sections(s,d);
- assert.ok(!JSON.stringify(sections.identity).includes('SECRET'));assert.ok(!JSON.stringify(sections).includes('PRIVATE'));
- for(let mask=0;mask<128;mask++) {
-  const visibility=Object.fromEntries(S.keys.map((k,i)=>[k,!!(mask&(1<<i))]));
-  const p=S.project({revision:'r',visibility,sections}),json=JSON.stringify(p);
-  assert.equal(json.includes('SECRET ABILITY'),visibility.abilities);
-  assert.ok(!json.includes('PRIVATE APPROVAL'));assert.ok(!json.includes('PRIVATE HISTORY'));assert.ok(!json.includes('sheetJson'));
-  assert.deepEqual(Object.keys(p.sections),Array.from(S.keys.filter(k=>visibility[k])));
- }
+test('the public profile holds always-public details and only the items ticked Public',()=>{
+ const s=starting();
+ s.name='Hida Kenta';s.abilities=[{id:'secret',kind:'custom',name:'SECRET ABILITY',description:'SECRET POWER'}];
+ s.exceptions=[{code:'*',explanation:'PRIVATE APPROVAL'}];s.progression.history=[{kind:'award',amount:10,explanation:'PRIVATE HISTORY'}];
+ s.advantages=[{name:'Fame',cost:3,public:true},{name:'Allies',cost:2,selection:'SECRET ALLY'}];
+ s.disadvantages=[{name:'Dark Secret',cost:4,selection:'SECRET SIN'},{name:'Missing Limb',cost:2,public:true}];
+ s.publicStats={glory:true,honor:false,status:true,taint:false};s.taint=2;s.concept='SECRET CONCEPT';s.heritage='SECRET HERITAGE';
+ s.journal=[{id:'p',text:'Public entry',createdAt:'2026-11-02',public:true},{id:'q',text:'SECRET ENTRY',createdAt:'2026-11-03',public:false}];
+ const d=calc(s),p=S.profile(s,d),json=JSON.stringify(p);
+ assert.deepEqual(Object.keys(p),['name','portrait','clan','family','school','insightRank','gear','stats','advantages','disadvantages','journal']);
+ assert.equal(p.name,'Hida Kenta');assert.equal(p.clan,'Crab');assert.ok(p.school);assert.equal(p.insightRank,d.insightRank);
+ assert.deepEqual(Object.keys(p.stats),['glory','status']);
+ assert.deepEqual(plain(p.advantages),[{name:'Fame',selection:''}]);assert.deepEqual(plain(p.disadvantages),[{name:'Missing Limb',selection:''}]);
+ assert.deepEqual(plain(p.journal),[{id:'p',text:'Public entry',createdAt:'2026-11-02'}]);
+ for(const secret of ['SECRET','PRIVATE','taint','sheetJson','history','exceptions'])assert.ok(!json.includes(secret),secret);
+ // Gear lists only equipped weapons and armour.
+ for(const name of p.gear)assert.ok(d.equipment.some(e=>e.name===name&&e.equipped&&['weapon','armor'].includes(e.item?.kind)),name);
 });
 test('ten-dice rule describes capped pools without executing dice rolls',()=>{
  for(const [rolled,kept,expected] of [[12,4,'10k5'],[13,9,'10k10+2'],[11,10,'10k10+2'],[10,11,'10k10+2'],[20,10,'10k10+20']])assert.equal(R.dicePool(rolled,kept).notation,expected);

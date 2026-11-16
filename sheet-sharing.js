@@ -1,23 +1,30 @@
 (() => {
-  const keys = ['identity','traits','skills','options','story','summary','abilities'];
-  const labels = ['Identity and training','Rings and traits','Skills','Advantages and disadvantages','Story and equipment','Summary and combat','Abilities'];
-  // Privacy is paused: every section is shared. Keep the visibility map so saved data and
-  // Firestore rules keep their shape when per-section privacy returns.
-  const visibility = () => Object.fromEntries(keys.map(key => [key,true]));
-  const sections = (s,d) => ({
-    identity:{name:s.name,clan:s.clan,family:s.family,school:d.school?.name || '',training:d.techniques,affinity:d.school?.affinity || ''},
-    traits:{rings:d.rings,traits:d.traits},
-    skills:{skills:Object.fromEntries(Object.entries(d.skills).map(([name,v]) => [name,{rank:v.rank,base:v.base,emphases:v.emphases,masteries:v.masteries,notes:v.notes}]))},
-    options:{advantages:d.advantages.map(a=>({name:a.name,cost:a.cost,selection:a.selection || ''})),disadvantages:d.disadvantages.map(a=>({name:a.name,cost:a.cost,selection:a.selection || ''})),ancestors:d.ancestors.map(a=>({name:a.name,cost:a.cost,description:a.description || ''}))},
-    story:{concept:s.concept,notes:s.notes,heritage:s.heritage,equipment:d.equipment.map(({item,...e})=>e),money:d.money,honor:d.honor,glory:d.glory,status:d.status,taint:d.taint,purchases:s.purchases.map(a=>({name:a.name,cost:a.cost}))},
-    summary:{insight:d.insight,insightRank:d.insightRank,schoolRank:d.schoolRank,xpSpent:d.xpSpent,xpRemaining:d.xpRemaining,xpEarned:d.xpEarned,combat:Object.fromEntries(['initiative','baseArmorTN','armorTN','reduction','healing','unarmedDamage','unarmedAttack','voidPoints','wounds','woundPenaltyReduction','movementWater'].map(k=>[k,d.combat[k]]))},
-    abilities:{abilities:d.abilities.map(a=>({name:a.name,kind:a.kind,ring:a.ring || '',mastery:a.mastery || 0,description:a.description || '',memorized:!!a.memorized,grant:!!a.grant,cost:a.cost,slug:a.slug || '',anchor:a.anchor || ''}))}
+  // What other players and anyone with a character's link can see. Always public: name,
+  // picture, clan, family, school, Insight Rank and equipped weapons/armour. Honor, Glory,
+  // Status, Taint, advantages, disadvantages and journal entries appear only when ticked
+  // Public. The GM reads the full sheet instead.
+  const STATS = ['honor','glory','status','taint'];
+  const option = entry => ({name:entry.name,selection:entry.selection || ''});
+  const profile = (s,d) => ({
+    name:s.name || '',
+    portrait:s.portrait || '',
+    clan:s.clan || '',
+    family:s.family || '',
+    school:d.school?.name || '',
+    insightRank:d.insightRank,
+    gear:d.equipment.filter(e => e.equipped && ['weapon','armor'].includes(e.item?.kind)).map(e => e.name),
+    stats:Object.fromEntries(STATS.filter(key => s.publicStats?.[key]).map(key => [key,Number(d[key] ?? s[key]) || 0])),
+    advantages:d.advantages.filter(a => a.public).map(option),
+    disadvantages:d.disadvantages.filter(a => a.public).map(option),
+    journal:(s.journal || []).filter(e => e.public).map(e => ({id:e.id,text:e.text,createdAt:e.createdAt}))
   });
-  const project = full => ({revision:full.revision,sections:Object.fromEntries(keys.filter(key => full.visibility[key] && full.sections[key]).map(key => [key,full.sections[key]]))});
   const encode = async (sheet,updatedAt = new Date().toISOString()) => {
     sheet = window.CharacterBuilder.normalize?.(structuredClone(sheet)) || structuredClone(sheet);
-    const full = {sheetJson:JSON.stringify(sheet),updatedAt,revision:crypto.randomUUID(),visibility:visibility(sheet),sections:await window.CharacterBuilder.sections(sheet)};
-    return {full,public:project(full)};
+    const shared = await window.CharacterBuilder.profile(sheet);
+    const full = {sheetJson:JSON.stringify(sheet),updatedAt,revision:crypto.randomUUID(),profile:shared};
+    return {full,public:{revision:full.revision,profile:shared}};
   };
-  window.SheetSharing = {keys,labels,visibility,sections,project,encode};
+  // Older public documents carried sections instead of a profile.
+  const publicName = data => data?.profile?.name ?? data?.sections?.identity?.name ?? '';
+  window.SheetSharing = {STATS,profile,encode,publicName};
 })();

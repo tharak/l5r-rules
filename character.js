@@ -398,9 +398,10 @@
     </div>`;
   }
 
+  const publicHref = () => `#/pc/${encodeURIComponent(window.CharacterStorage?.accountId || '')}/${encodeURIComponent(activeId || '')}`;
   function renderNavigation() {
     const sections=[['rolls','Rolls'],['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Story'],['equipment','Equipment']];
-    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save PC',attrs:{'data-action':'save-close'}})}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save PC',attrs:{'data-action':'save-close'}})}${!external && window.CharacterStorage?.accountId && activeId ? `<a class="creator-public-link" href="${publicHref()}">Public view</a>${UI.button({text:'Copy public link',variant:'secondary',attrs:{'data-action':'copy-public-link'}})}` : ''}${UI.button({text:'Export JSON ↗',variant:'secondary',attrs:{'data-action':'export'}})}${UI.button({text:'Print sheet ↗',variant:'secondary',attrs:{'data-action':'print'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
@@ -753,6 +754,10 @@
       commitEdit();
       focusSkillStepper(name,button.dataset.delta,nextRow);
       return;
+    } else if (action === 'copy-public-link') {
+      const url = new URL(publicHref(),location.href).href;
+      Promise.resolve(navigator.clipboard?.writeText(url)).then(() => { button.textContent = 'Link copied'; },() => { window.prompt?.('Copy this link',url); });
+      return;
     } else if (action === 'create-portrait') {
       if (external || !window.PortraitCreator?.open) return;
       const id = activeId;
@@ -803,9 +808,7 @@
     } else if (action === 'print') { window.print(); return;
     } else if (action === 'reset') {
       if (!window.confirm('Clear this character and start over?')) return;
-      const visibility = sheet.visibility;
       sheet = blank();
-      if (external) sheet.visibility = visibility;
     } else return;
     commitEdit();
   }
@@ -947,15 +950,15 @@
     }
   }
 
-  async function sections(input) {
+  async function profile(input) {
     catalogPromise ||= fetch('public/character-data.json').then(r => r.json());
     catalog = await catalogPromise;
     const previous = sheet;
-    try { sheet = R.normalize(input); return window.SheetSharing.sections(sheet,build()); }
+    try { sheet = R.normalize(input); return window.SheetSharing.profile(sheet,build()); }
     finally { sheet = previous; }
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
-  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, read:readRecord, sections, normalize:R.normalize };
+  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, read:readRecord, profile, normalize:R.normalize };
   const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
   function refreshRemoteSheet() {

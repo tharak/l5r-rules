@@ -15,47 +15,36 @@ service cloud.firestore {
       return data.ownerUid == u && data.characterId == id && member(c,u)
         && data.membershipId == get(/databases/$(database)/documents/campaigns/$(c)/members/$(u)).data.membershipId;
     }
-    function mask(v) {
-      return v is map && v.keys().hasAll(['identity','traits','skills','options','story','summary'])
-        && v.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
-        && v.identity is bool && v.traits is bool && v.skills is bool && v.options is bool && v.story is bool && v.summary is bool && (!('abilities' in v) || v.abilities is bool);
+    // The GM of a campaign this PC is linked to, holding a valid full grant.
+    function granted(u,id) {
+      let grant = get(/databases/$(database)/documents/users/$(u)/characters/$(id)/grants/$('full_' + request.auth.uid)).data;
+      return signed() && joined(grant.campaignId) && gm(grant.campaignId)
+        && grant.membershipId == get(/databases/$(database)/documents/campaigns/$(grant.campaignId)/members/$(request.auth.uid)).data.membershipId
+        && validPC(grant.campaignId,grant.pcId,u,id);
     }
-    function projectionSection(f,p,k) {
-      return f.visibility.get(k,false) ? (k in p.sections && p.sections[k] == f.sections[k]) : !(k in p.sections);
-    }
-    function projection(f,p) {
-      return p.keys().hasOnly(['revision','sections']) && p.revision == f.revision && p.sections is map
-        && p.sections.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
-        && projectionSection(f,p,'identity') && projectionSection(f,p,'traits') && projectionSection(f,p,'skills')
-        && projectionSection(f,p,'options') && projectionSection(f,p,'story') && projectionSection(f,p,'summary') && projectionSection(f,p,'abilities');
-    }
-    function sectionShape(s) {
-      return s.identity is map && s.identity.keys().hasOnly(['name','clan','family','school','training','affinity','spells'])
-        && s.traits is map && s.traits.keys().hasOnly(['rings','traits'])
-        && s.skills is map && s.skills.keys().hasOnly(['skills'])
-        && s.options is map && s.options.keys().hasOnly(['advantages','disadvantages','ancestors'])
-        && s.story is map && s.story.keys().hasOnly(['concept','notes','heritage','equipment','money','honor','glory','status','taint','purchases'])
-        && s.summary is map && s.summary.keys().hasOnly(['insight','insightRank','schoolRank','xpSpent','xpRemaining','xpEarned','combat'])
-        && (!('abilities' in s) || (s.abilities is map && s.abilities.keys().hasOnly(['abilities']))) ;
+    // The public profile: always-public details and the items ticked Public (built by
+    // sheet-sharing.js). Its keys and size are limited; its content is the owner's choice.
+    function profileShape(p) {
+      return p is map && p.keys().hasOnly(['name','portrait','clan','family','school','insightRank','gear','stats','advantages','disadvantages','journal'])
+        && (!('portrait' in p) || (p.portrait is string && p.portrait.size() <= 120000))
+        && (!('stats' in p) || (p.stats is map && p.stats.keys().hasOnly(['honor','glory','status','taint'])))
+        && (!('journal' in p) || p.journal is list);
     }
     function validFull(u,id) {
       let f = request.resource.data;
       let p = getAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id)).data;
-      return f.keys().hasAll(['sheetJson','updatedAt','revision','visibility','sections'])
-        && f.keys().hasOnly(['sheetJson','updatedAt','revision','visibility','sections'])
+      return f.keys().hasAll(['sheetJson','updatedAt','revision','profile'])
+        && f.keys().hasOnly(['sheetJson','updatedAt','revision','profile'])
         && f.sheetJson is string && f.sheetJson.size() <= 400000
         && f.updatedAt is string && f.updatedAt.size() <= 40 && f.revision is string && f.revision.size() <= 80
-        && mask(f.visibility) && f.sections is map
-        && f.sections.keys().hasAll(['identity','traits','skills','options','story','summary'])
-        && f.sections.keys().hasOnly(['identity','traits','skills','options','story','summary','abilities'])
-        && (('abilities' in f.visibility) == ('abilities' in f.sections))
-        && sectionShape(f.sections) && projection(f,p);
+        && profileShape(f.profile)
+        && p.keys().hasOnly(['revision','profile']) && p.revision == f.revision && p.profile == f.profile;
     }
-    // Privacy is paused: anyone can read a character sheet by its path, and only its
-    // creator writes it. Listing stays owner-only so sheets cannot be enumerated.
+    // The full sheet: its owner and the GM read it; only the owner writes it. Listing stays
+    // owner-only so sheets cannot be enumerated.
     match /users/{u}/characters/{id} {
       allow list: if owner(u);
-      allow get: if true;
+      allow get: if owner(u) || granted(u,id);
       allow create, update: if owner(u) && validFull(u,id);
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/publicCharacters/$(id));
       match /grants/{viewer} {
@@ -67,11 +56,13 @@ service cloud.firestore {
         allow delete: if owner(u) || (signed() && viewer in ['full_' + request.auth.uid,'public_' + request.auth.uid]);
       }
     }
+    // The public profile: anyone with the link reads it; it always mirrors the full sheet's.
     match /users/{u}/publicCharacters/{id} {
       allow list: if owner(u);
       allow get: if true;
-      allow create, update: if owner(u)
-        && projection(getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data,request.resource.data);
+      allow create, update: if owner(u) && request.resource.data.keys().hasOnly(['revision','profile'])
+        && getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data.revision == request.resource.data.revision
+        && getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data.profile == request.resource.data.profile;
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/characters/$(id));
     }
     match /users/{u}/campaigns/{c} {

@@ -39,7 +39,7 @@
       // Share one public subscription across cards and keep only the name in memory.
       const receive = (data,pc,metadata) => {
         if (!current()) return;
-        const name = metadata?.fromCache || metadata?.hasPendingWrites ? '' : data?.sections?.identity?.name || '';
+        const name = metadata?.fromCache || metadata?.hasPendingWrites ? '' : window.SheetSharing.publicName(data);
         if (item.name !== name) {item.name=name;changed();}
       };
       const fail = () => {if (current()) {item.name='';changed();}};
@@ -82,7 +82,7 @@
   }
   function label(pc) {
     if (own(pc)) return window.CharacterBuilder.list().find(c=>c.id===pc.characterId)?.name || 'Private PC';
-    return sheets.get(pc.id+':public')?.data?.sections?.identity?.name || 'Private PC';
+    return window.SheetSharing.publicName(sheets.get(pc.id+':public')?.data) || 'Private PC';
   }
   function playerName(pc) {
     return store().get(path('members',pc.ownerUid))?.displayName || 'Player';
@@ -151,7 +151,7 @@
     for (const pc of pcs) if (!own(pc)) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
-    if (selectedPC && !own(selectedPC)) watch(selectedPC,true);
+    if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({label:'Campaign title',labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['pcs','PC'],...(isGM?[['npcs','NPC']]:[]),['plots','Plots']].map(([value,label])=>({value,label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
@@ -159,14 +159,14 @@
       ${section==='pcs'?`${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}${pcs.map(pc=>`${UI.recordRow({attrs:{'class':'roster-row'},bodyHtml:`<span>${e(label(pc))} (${e(playerName(pc))})</span>${button('pc-open',own(pc)?'Edit':'View',pc.id)}${button('pc-notes','Notes',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`})}${pcNotesId===pc.id?`<h3>${e(label(pc))}</h3>${notesFor('pcs',pc.id)}`:''}`).join('') || '<p>No PCs linked yet.</p>'}${picking?`<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`:''}${invitation?UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}):''}`:''}
       ${section==='npcs'&&isGM?`${UI.sectionHeading({title:'NPCs',level:2,actionsHtml:`${button('npc-new','+NPC')}`})}<div class="npc-list">${npcs.map(n=>button('npc-open',n.name||'Unnamed NPC',n.id)).join('')}</div>${n?`${npcEditor(n)}${npcId?notesFor('npcs',npcId):''}`:''}`:''}
       ${section==='plots'?renderPlots(plots):''}`})}
-      </div>${section==='pcs'&&selectedPC&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${section==='pcs'&&selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   function mountEditor() {
     const target = document.getElementById('campaign-editor');
     if (!target || !sheetId) return;
     const item = sheets.get(sheetId+':full');
     if (!item?.data) { target.textContent = 'Loading full sheet…'; return; }
-    // Only a sheet's creator edits it; everyone else in the campaign gets a read-only view.
+    // Only a sheet's creator edits it; the GM gets a read-only copy of the full sheet.
     window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,returnHref:`#/campaigns/${active}`,save(){},close(){sheetId='';editor=null;changed();}});
     editor = item.data.revision;
   }
@@ -252,7 +252,9 @@
         const pc=store().get(path('pcs',id));
         if(!pc)return;
         if (own(pc)) {window.CharacterBuilder.open(pc.characterId);creatorCampaign=active;location.hash='#/create-character';}
-        else {sheetId=id;editor=null;}
+        // The GM reads the full sheet; other players see the public view.
+        else if (gm()) {sheetId=id;editor=null;}
+        else location.hash=`#/pc/${encodeURIComponent(pc.ownerUid)}/${encodeURIComponent(pc.characterId)}`;
       } else if (action==='pc-remove') {store().queue(path('pcs',id),null);sheetId='';}
       else if (action==='close-sheet') {sheetId='';editor=null;}
       else if (action==='share-invite'||action==='invite') {

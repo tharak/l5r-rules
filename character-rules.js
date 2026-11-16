@@ -32,7 +32,8 @@
     for (const key of ['name','clan','family','familyTrait','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
     for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions']) s[key] = {...input[key]};
     for (const key of ['schoolChoices','equipmentChoices','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
-    s.visibility = Object.fromEntries(['identity','traits','skills','options','story','summary','abilities'].map(k => [k,typeof input.visibility?.[k] === 'boolean' ? input.visibility[k] : k === 'identity']));
+    // The old per-section visibility map is replaced by per-item Public flags.
+    delete s.visibility;
     s.status = input.status ?? (['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1); s.glory = input.glory ?? 1; s.honor = input.honor ?? null; s.taint = input.taint ?? 0; s.woundsTaken=integer(input.woundsTaken);
     // Begin Play used to bake Fame into saved Glory. Convert that value once.
     if (input.phase === 'advancement' && input.glory != null && s.advantages.some(a=>a.name==='Fame')) s.glory = number(input.glory)-1;
