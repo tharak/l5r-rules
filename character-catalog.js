@@ -128,6 +128,8 @@
   // tall one (780×2000) per Great Clan; other clans have none.
   const CLAN_COVERS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'];
   const clanCover = (name,{tall = false} = {}) => CLAN_COVERS.includes(name) ? `public/assets/clans/covers/${name.toLowerCase()}${tall ? '-tall' : ''}.webp` : '';
+  // Five square illustrations per Great Clan (03a–03e on the site), 600px.
+  const clanIllustrations = name => CLAN_COVERS.includes(name) ? ['a','b','c','d','e'].map(letter => ({letter,src:`public/assets/clans/illustrations/${name.toLowerCase()}-${letter}.webp`})) : [];
   // Tall brush-edged hero banner from the clans pages (500×1000, transparent edges).
   const clanBanner = name => CLAN_COVERS.includes(name) ? `public/assets/clans/banners/${name.toLowerCase()}.webp` : '';
   // Official family art from the Great Clan pages of legendofthefiverings.com, saved as
@@ -162,6 +164,7 @@
     if (kind === 'tall') return `${OFFICIAL_CDN}UI_L5R_Clan_Cover_${clan}_Mobile.webp`;
     if (kind === 'family') return `${OFFICIAL_CDN}04${letter}_Clan_Families${n}-900x900.webp`;
     if (kind === 'banner') return `${OFFICIAL_CDN}01_Clans_Page_${clan}-1.webp`;
+    if (kind === 'illustration') return `${OFFICIAL_CDN}03${letter}_Clan_Squared_Illustrations${n}-1200x1200.webp`;
     return '';
   }
   // The chosen mon plus any lower-priority alternatives, for the #/clan-mons debug page.
@@ -169,6 +172,6 @@
     const [chosen,...alternatives] = clanMonCandidates(name);
     return chosen ? {...chosen,alternatives} : null;
   }
-  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, clanBanner, FAMILY_ART, familyArt, familyArtList, OFFICIAL_CLAN_NUMBERS, officialSourceUrl, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
+  const api = {TRAIT_GROUPS, TRAIT_NAMES, WEAPON_SKILLS, MACRO_SKILLS, WOUND_LEVELS, CLAN_MONS, MON_PRIORITY, MON_SOURCES, DEFAULT_MON, CLAN_COVERS, clanCover, clanBanner, clanIllustrations, FAMILY_ART, familyArt, familyArtList, OFFICIAL_CLAN_NUMBERS, officialSourceUrl, clanMon, clanMonInfo, clanMonCandidates, purchasedRankCost, skillIdentity, requiresSkillSubtype, allowedSchoolSkill, schoolGrants, skillTrait, skillTraitOptions, schools, school, ability, item};
   (globalThis.window || globalThis).CharacterCatalog = api;
 })();

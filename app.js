@@ -154,6 +154,23 @@ async function mountClanMons(element) {
     <h2>Clans without a mon (default five-rings mon)</h2><div class="mon-debug-grid">${missing}</div></div>`;
 }
 
+// Official images from the site's lore sections. The Shadowlands and Realm groupings are
+// based on what the images show (the site reuses file numbers across sections).
+const OFFICIAL_CDN = 'https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/';
+const OFFICIAL_LORE = [
+  {title:'The Shadowlands',note:'The mon, cover, and map are named Shadowlands on the site; the illustrations are placed here by their content.',items:[
+    ['shadowlands-mon.webp','Shadowlands mon',OFFICIAL_CDN+'06/00_Clan_Icon-1-900x900.webp'],
+    ['shadowlands-cover.webp','Shadowlands cover',OFFICIAL_CDN+'07/01_Cover_ShadowlandsOni-v3-1900x1781.webp',true],
+    ['shadowlands-map.webp','Map of the Shadowlands',OFFICIAL_CDN+'07/03_Background_ShadowlandsMap-1900x2477.webp',true],
+    ...['a','b','c','d','e'].map(l => [`shadowlands-${l}.webp`,`Illustration ${l}`,OFFICIAL_CDN+`06/04${l}_Clan_Squared_Illustrations-1-1200x1200.webp`]),
+    ['shadowlands-05a.webp','Illustration 05a',OFFICIAL_CDN+'06/05a_Clan_Families-1-900x900.webp']]},
+  {title:'The Realm of Rokugan',note:'Placed here by their content: places, palaces, and the wiki thumbnails.',items:[
+    ...['a','b','c'].map(l => [`realm-wiki-${l}.webp`,`Wiki thumbnail ${l}`,OFFICIAL_CDN+`06/02${l}_Wiki_Thumbnails-1900x1900.webp`]),
+    ...['a','b','c','d','e'].map(l => [`realm-${l}.webp`,`Illustration ${l}`,OFFICIAL_CDN+`06/04${l}_Clan_Squared_Illustrations-1200x1200.webp`]),
+    ...['a','b','c','d'].map(l => [`realm-05${l}.webp`,`Illustration 05${l}`,OFFICIAL_CDN+`06/05${l}_Clan_Families-900x900.webp`]),
+    ['clan-landscape.webp','Landscape background',OFFICIAL_CDN+'06/06_Clan_Landscape_Background_Bottom-1900x2019.webp',true]]}
+];
+
 // Every image downloaded from legendofthefiverings.com, grouped by Great Clan, each linked
 // to its original file. Family art shows which family each image was matched to.
 async function mountOfficialImages(element) {
@@ -171,6 +188,7 @@ async function mountOfficialImages(element) {
       tile({src:C.clanCover(clan),title:'Cover',wide:true,lines:[path(C.clanCover(clan)),original(C.officialSourceUrl('cover',clan))]}),
       tile({src:C.clanCover(clan,{tall:true}),title:'Tall cover',lines:[path(C.clanCover(clan,{tall:true})),original(C.officialSourceUrl('tall',clan))]}),
       tile({src:C.clanBanner(clan),title:'Banner',lines:[path(C.clanBanner(clan)),original(C.officialSourceUrl('banner',clan))]}),
+      ...C.clanIllustrations(clan).map(item => tile({src:item.src,title:`Illustration ${item.letter}`,lines:[path(item.src),original(C.officialSourceUrl('illustration',clan,item.letter))]})),
       ...C.familyArtList(clan).map(item => tile({src:item.src,title:item.family ? `${item.family} family` : 'Unidentified family',flag:item.guess,
         lines:[item.guess ? '<b>Best guess</b>' : '',item.family && !known.has(item.family) ? 'Not a family in the character catalog' : '',path(item.src),original(C.officialSourceUrl('family',clan,item.letter))]}))
     ].join('');
@@ -185,7 +203,8 @@ async function mountOfficialImages(element) {
   element.innerHTML = `<div class="workspace mon-debug official-images">${UI.sectionHeading({title:'Official images',level:1})}
     <p class="mon-debug-priority">Images downloaded from <a href="https://www.legendofthefiverings.com/" target="_blank" rel="noopener">legendofthefiverings.com</a> (© Legend of the Five Rings / Asmodee). The site does not label the family art; each image is matched to a family by its content, and red outlines mark guesses. Clan mons for every clan are on <a href="#/clan-mons">Clan mons</a>.</p>
     ${C.CLAN_COVERS.map(clanBlock).join('')}
-    <section class="official-clan"><h2>Site images</h2><div class="official-art">${site}</div></section></div>`;
+    <section class="official-clan"><h2>Site images</h2><div class="official-art">${site}</div></section>
+    ${OFFICIAL_LORE.map(group => `<section class="official-clan"><h2>${esc(group.title)}</h2><p class="mon-debug-priority">${esc(group.note)}</p><div class="official-art">${group.items.map(([file,title,url,wide]) => tile({src:`public/assets/lore/${file}`,title,wide,lines:[path(`public/assets/lore/${file}`),original(url)]})).join('')}</div></section>`).join('')}</div>`;
 }
 
 function renderCharacters() {
