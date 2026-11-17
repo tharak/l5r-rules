@@ -395,6 +395,8 @@
 .creator-journal-entry header time { font-weight: 600; color: var(--ink); }
 .creator-journal-visibility { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
 .creator-journal-text { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.creator-journal-title { margin: 8px 0 0; font-family: var(--serif, Georgia, serif); font-size: 1.05rem; font-weight: 600; overflow-wrap: anywhere; }
+.creator-journal-title + .creator-journal-text { margin-top: 4px; }
 .creator-journal-author { font-weight: 600; color: var(--ink); }
 .creator-journal-gm { border-left-color: var(--red); }
 /* "View public" preview: the public view inside a dialog. */

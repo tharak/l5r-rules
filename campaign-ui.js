@@ -129,14 +129,12 @@
     const plot=kind==='plot';
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
-      ...(plot?[{label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}}]:[]),
-      {label:plot?'Plot point':'Entry',kind:'textarea',value:draft.text,attrs:{...attrs('text'),maxlength:400000}},
-    ],extraHtml:plot?gallery(draft.images,{kind:'plot',editable:true}):'',actionsHtml:button(kind+'-save',plot?'Save plot':'Save entry','',!draft.text.trim()||(plot&&!draft.title.trim()))+button(kind+'-cancel','Cancel')});
+      {label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
+    ],extraHtml:gallery(draft.images,{kind:'plot',editable:true}),actionsHtml:button(kind+'-save','Save plot','',!draft.title.trim())+button(kind+'-cancel','Cancel')});
   }
   function sessionEditor(session,isGM) {
     return UI.recordEditor({fields:[
       {label:'Title',value:session.title,attrs:{'data-campaign-field':'session-title',maxlength:200,readonly:!isGM}},
-      {label:'Session notes',kind:'textarea',value:session.text,attrs:{class:'session-text','data-campaign-field':'session-text',readonly:!isGM}},
     ],extraHtml:gallery(session.images,{kind:'session',editable:isGM}),actionsHtml:isGM?button('session-save','Save session')+button('session-delete','Delete session',session.id):button('session-close','Close')});
   }
   function npcEditor(npc) {
@@ -174,31 +172,49 @@
       } catch (error) { movingNotes.delete(note.id); }
     }
   }
+  // Session and plot descriptions used to be a text field; each moves once into the first
+  // entry of its journal (written by the GM for sessions, by the creator for plots).
+  function migrateDescriptions() {
+    const uid = store().uid, now = new Date().toISOString();
+    const move = (kind,item,clear) => {
+      const noteId = `desc_${kind}_${item.id}`;
+      if (!store().get(path('notes',noteId))) store().queue(path('notes',noteId),{title:'',text:item.text,public:true,creatorUid:uid,
+        createdAt:item.createdAt || item.updatedAt || now,updatedAt:now,revision:crypto.randomUUID(),targetKind:kind,targetId:item.id,
+        ...(kind === 'plots' ? {targetCreatorUid:item.creatorUid} : {})});
+      clear();
+    };
+    if (gm()) for (const session of store().list(path('sessions',''))) if (String(session.text || '').trim()) {
+      const {id,...rest} = session;
+      move('sessions',session,() => store().queue(path('sessions',id),{...rest,text:'',updatedAt:rest.updatedAt || now}));
+    }
+    for (const plot of store().list(path('plots',''))) if (plot.creatorUid === uid && String(plot.text || '').trim()) {
+      const {id,...rest} = plot;
+      move('plots',plot,() => store().queue(path('plots',id),{...rest,text:'',revision:crypto.randomUUID()}));
+    }
+  }
   function canAddEntry(kind,id) {
     if (kind === 'sessions') return true;
     if (kind === 'npcs') return gm();
     if (kind === 'plots') return gm() || store().get(path('plots',id))?.creatorUid === store().uid;
     return false;
   }
-  // Session, NPC and plot journals use the same layout as a character's journal.
-  function journalEditor(draft) {
-    const attrs = key => ({'data-entry-field':key,'data-entry-kind':'note'});
-    return `<div class="creator-journal-editor">${UI.field({label:draft.id || noteId ? 'Edit entry' : 'New entry',kind:'textarea',value:draft.text,attrs:{...attrs('text'),rows:5,maxlength:400000}})}${UI.actionRow({bodyHtml:button('note-save','Save entry','',!draft.text.trim())+button('note-cancel','Cancel')})}</div>`;
-  }
+  // Sessions, plots and NPCs use the same journal as characters (UI.journal): titled entries.
   function notesFor(kind,id) {
-    const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+    const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id);
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
-    const add=canAddEntry(kind,id)&&!drafting?button('note-new','+ Entry',kind+':'+id):'';
-    if(!notes.length&&!add&&!drafting)return '';
-    const entries=notes.map(n=>`<article class="creator-journal-entry"><header><time${n.createdAt?` datetime="${e(n.createdAt)}"`:''}>${e(day(n.createdAt)||'Earlier')}</time><span class="creator-journal-author">${e(entryAuthor(n))}</span>${entryOwner(n)?UI.button({text:'Edit',variant:'quiet',size:'compact',attrs:{'data-campaign':'note-edit','data-id':n.id,'aria-label':'Edit journal entry'}})+UI.button({text:'Delete',variant:'quiet',size:'compact',attrs:{'data-campaign':'note-delete','data-id':n.id,'aria-label':'Delete journal entry'}}):''}</header><p class="creator-journal-text">${e(n.text)}</p></article>`).join('');
-    return `<div class="creator-journal campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}"><div class="creator-journal-head"><h3>Journal</h3>${add}</div>${drafting?journalEditor(noteDraft):''}${entries}</div>`;
+    const canAdd=canAddEntry(kind,id);
+    if(!notes.length&&!canAdd&&!drafting)return '';
+    const entries=notes.map(n=>({id:n.id,title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
+    const control=(name,entryId)=>({'data-campaign':`note-${name}`,'data-id':name==='new'?`${kind}:${id}`:entryId,disabled:busy});
+    const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
+    return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
   }
   function renderPlots(plots) {
     // A new plot is drafted above the list; an existing one is edited inside its entry.
     const fresh = plotDraft && !plotId ? `<div class="campaign-entry-new">${entryEditor('plot',plotDraft)}</div>` : '';
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
-        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
+        : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
     return `${sectionBar('Plots',button('plot-new','+ Plot'))}${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
   }
   // The GM can keep PCs and NPCs off the timeline picker (their existing pins stay).
@@ -227,7 +243,7 @@
     return null;
   };
   // A note's or journal entry's title is its first line; the popup shows the whole text.
-  const noteTitle = note => { const first = String(note?.text || '').trim().split('\n')[0].trim(); return first.length > 80 ? first.slice(0,79)+'…' : first || 'Untitled note'; };
+  const noteTitle = note => UI.entryTitle(note);
   const notesOf = (kind,id) => store().list(path('notes','')).filter(n => n.targetKind === kind && n.targetId === id);
   // Entries that can be pinned for a plot, PC or NPC: its campaign notes and, for a PC, the
   // public entries of the character's journal (ids prefixed "journal:").
@@ -285,7 +301,7 @@
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
-        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
+        : `${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
     return `${sectionBar('Sessions',isGM?button('session-new','+ Session'):'')}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
   }
   function renderNPCs(npcs,isGM) {
@@ -331,6 +347,7 @@
     if (!c) { reset(''); return '<div class="workspace"><h1>Campaign unavailable</h1><p>Loading, or membership is no longer active.</p><a href="#/campaigns">Campaigns</a></div>'; }
     const isGM = gm(), sessions = store().list(path('sessions','')), npcs = store().list(path('npcs','')), pcs = store().list(path('pcs',''));
     migratePCNotes();
+    migrateDescriptions();
     const plots=store().list(path('plots',''));
     if(plotId&&!plots.some(p=>p.id===plotId)){plotId='';plotDraft=null;if(noteTarget?.kind==='plots'){noteTarget=noteDraft=null;noteId='';}}
     if (sessionId && !sessions.some(s=>s.id===sessionId)) sessionId = '';
@@ -403,16 +420,17 @@
         if (kind==='plot' && plotDraft) plotDraft.images=(plotDraft.images||[]).filter((_,i)=>i!==Number(index));
         if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:(session.images||[]).filter((_,i)=>i!==Number(index)),updatedAt:new Date().toISOString()}); }
       }
-      else if (action==='note-new') {const [kind,targetId]=id.split(':');if(!canAddEntry(kind,targetId))return;noteId='';noteTarget={kind,id:targetId};noteDraft={text:'',public:true};}
+      else if (action==='note-new') {const [kind,targetId]=id.split(':');if(!canAddEntry(kind,targetId))return;noteId='';noteTarget={kind,id:targetId};noteDraft={title:'',text:'',public:true};}
       else if (action==='note-edit') {const data=store().get(path('notes',id));if(data&&entryOwner(data)){noteId=id;noteTarget={kind:data.targetKind,id:data.targetId};noteDraft={...data};}}
       else if (action==='note-cancel') {noteDraft=noteTarget=null;noteId='';}
       else if (action==='plot-save'||action==='note-save') {
         const plot=action==='plot-save',draft=plot?plotDraft:noteDraft;
-        if(!draft?.text.trim()||(plot&&!draft.title.trim()))return;
+        if(plot?!draft?.title?.trim():!draft?.text?.trim())return;
         const now=new Date().toISOString(),entryId=(plot?plotId:noteId)||crypto.randomUUID();
         // Privacy is paused: every plot and note is shared, including ones saved as private before.
         const data={...draft,public:true,creatorUid:store().uid,createdAt:draft.createdAt||now,updatedAt:now,revision:crypto.randomUUID()};
-        if(plot)data.title=data.title.trim();else {
+        data.title=(data.title||'').trim();data.text=data.text||'';
+        if(plot){} else {
           Object.assign(data,{targetKind:noteTarget.kind,targetId:noteTarget.id});
           if(noteTarget.kind==='plots')data.targetCreatorUid=store().get(path('plots',noteTarget.id))?.creatorUid;
         }

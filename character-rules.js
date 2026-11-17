@@ -19,9 +19,9 @@
   const JOURNAL_ID = /^[A-Za-z0-9_-]{1,80}$/;
   function journal(input) {
     const entries = (Array.isArray(input.journal) ? input.journal : []).filter(entry => entry && JOURNAL_ID.test(entry.id || '') && typeof entry.text === 'string')
-      .map(entry => ({id:entry.id,text:entry.text.slice(0,20000),createdAt:String(entry.createdAt || ''),updatedAt:String(entry.updatedAt || entry.createdAt || ''),public:entry.public === true}));
+      .map(entry => ({id:entry.id,title:typeof entry.title === 'string' ? entry.title.slice(0,200) : '',text:entry.text.slice(0,20000),createdAt:String(entry.createdAt || ''),updatedAt:String(entry.updatedAt || entry.createdAt || ''),public:entry.public === true}));
     const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
-    if (notes && !entries.some(entry => entry.id === 'legacy-notes')) entries.unshift({id:'legacy-notes',text:notes,createdAt:'',updatedAt:'',public:false});
+    if (notes && !entries.some(entry => entry.id === 'legacy-notes')) entries.unshift({id:'legacy-notes',title:'Earlier notes',text:notes,createdAt:'',updatedAt:'',public:false});
     return entries;
   }
   function normalize(input = {}) {

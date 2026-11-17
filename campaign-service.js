@@ -38,6 +38,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     }
     const body = {text:data.text,revision};
     if (entry[2] === 'plots') body.title = data.title;
+    if (entry[2] === 'notes' && data.title) body.title = data.title;
     if (entry[2] === 'plots' && Array.isArray(data.images) && data.images.length) body.images = data.images;
     return commit([[path,metadata],[bodyPath,body]]);
   }

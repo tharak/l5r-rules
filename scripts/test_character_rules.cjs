@@ -122,7 +122,7 @@ test('editable starting XP defaults to 40 and preserves awards and current purch
  assert.equal(R.normalize({startingXP:-5}).startingXP,0);
 });
 test('section resets preserve identity, privacy and unrelated purchases while recalculating school grants',()=>{
- const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.journal=[{id:'j1',text:'Keep my notes',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}];s.traitBuys.Strength=1;s.skills.Defense=3;
+ const s=starting();s.id='preserved-sheet-id';s.startingXP=80;s.journal=[{id:'j1',title:'',text:'Keep my notes',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}];s.traitBuys.Strength=1;s.skills.Defense=3;
  s.advantages=[{id:'large',name:'Large',baseCost:4}];s.purchases=[{id:'custom',name:'Other purchase',cost:2}];s.abilities=[{id:'power',kind:'custom',name:'Custom power',cost:3}];
  s.exceptions=[{id:'trait-approval',code:'rank:trait:Strength',explanation:'Old trait approval'},{id:'power-approval',code:'ability:power',explanation:'Keep power approval'}];
  const original=JSON.stringify(s);
@@ -263,7 +263,7 @@ test('memorization and school changes recalculate current costs and grants',()=>
 });
 test('legacy migration preserves selections, custom charges, notes and six privacy choices without duplicate costs',()=>{
  const original={name:'Legacy',school:'sccrab#toc1',clan:'Crab',notes:'a\n\nb',skills:{'Lore:Shadowlands':3},schoolChoices:['Battle'],equipmentChoices:['Light Armor','Tetsubo'],purchases:[{name:'Kenjutsu emphasis',cost:2}],visibility:{identity:false,traits:true,skills:false,options:false,story:false,summary:true},customLegacyField:'keep'};
- const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility,undefined);assert.equal(s.notes,'');assert.deepEqual(plain(s.journal),[{id:'legacy-notes',text:original.notes,createdAt:'',updatedAt:'',public:false}]);
+ const s=R.normalize(original),again=R.normalize(plain(s));assert.deepEqual(plain(s),plain(again));assert.equal(s.customLegacyField,'keep');assert.equal(s.phase,undefined);assert.equal(s.visibility,undefined);assert.equal(s.notes,'');assert.deepEqual(plain(s.journal),[{id:'legacy-notes',title:'Earlier notes',text:original.notes,createdAt:'',updatedAt:'',public:false}]);
  const p=trained(s);assert.equal(calc(p).xpSpent,calc(s).xpSpent);assert.deepEqual(plain(p.purchases),plain(s.purchases));assert.equal(calc(p).xpSpent,7);
 });
 test('equipment applies armor, weapon skills/masteries, bow strength and arrows without charging XP',()=>{
@@ -313,7 +313,7 @@ test('the public profile holds always-public details and only the items ticked P
  assert.equal(p.name,'Hida Kenta');assert.equal(p.clan,'Crab');assert.ok(p.school);assert.equal(p.insightRank,d.insightRank);
  assert.deepEqual(Object.keys(p.stats),['glory','status']);
  assert.deepEqual(plain(p.advantages),[{name:'Fame',selection:''}]);assert.deepEqual(plain(p.disadvantages),[{name:'Missing Limb',selection:''}]);
- assert.deepEqual(plain(p.journal),[{id:'p',text:'Public entry',createdAt:'2026-11-02'}]);
+ assert.deepEqual(plain(p.journal),[{id:'p',title:'',text:'Public entry',createdAt:'2026-11-02'}]);
  for(const secret of ['SECRET','PRIVATE','taint','sheetJson','history','exceptions'])assert.ok(!json.includes(secret),secret);
  // Gear lists only equipped weapons and armour.
  for(const name of p.gear)assert.ok(d.equipment.some(e=>e.name===name&&e.equipped&&['weapon','armor'].includes(e.item?.kind)),name);
@@ -561,5 +561,5 @@ test('public flags default to private and older notes move once into a private j
  // Normalizing again neither duplicates nor loses the migrated entry.
  assert.deepEqual(plain(R.normalize(plain(s))),plain(s));
  const kept=R.normalize({journal:[{id:'a',text:'Hello',createdAt:'2026-11-01',public:true},{id:'bad id!',text:'x'},{id:'b'}]});
- assert.deepEqual(plain(kept.journal),[{id:'a',text:'Hello',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}]);
+ assert.deepEqual(plain(kept.journal),[{id:'a',title:'',text:'Hello',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}]);
 });

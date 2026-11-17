@@ -225,5 +225,24 @@
       image.src = url;
     });
   }
-  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  // One journal for characters, sessions, plots and NPCs: entries with a title and text,
+  // newest first. Callers supply the data and how controls are wired:
+  //   entries: [{id,title,text,date,author,visibility,isPublic,canEdit,canDelete,canToggle,className}]
+  //   draft: {id,title,text,public} while editing; withPublic shows a Public checkbox in it
+  //   control(name,id) → attributes for 'new','edit','delete','save','cancel','public'
+  //   field(name) → attributes for the editor's 'title', 'text' and 'public' inputs
+  const journalDate = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier'; };
+  const entryTitle = entry => String(entry?.title || '').trim() || String(entry?.text || '').trim().split('\n')[0].trim().slice(0,80) || 'Untitled entry';
+  function journal({entries = [],draft = null,canAdd = false,withPublic = false,heading = '',emptyText = '',control,field} = {}) {
+    const publicBox = (attrs,checked,label) => checkbox({label:'Public',attrs:{type:'checkbox',...attrs,checked:!!checked,'aria-label':label},labelAttrs:{class:'creator-check creator-public-check'}});
+    const editor = draft ? `<div class="creator-journal-editor">${field_({label:'Title',attrs:{...field('title'),type:'text',value:draft.title || '',maxlength:200,placeholder:'Title'}})}${field_({label:draft.id ? 'Edit entry' : 'New entry',kind:'textarea',value:draft.text || '',attrs:{...field('text'),rows:5,maxlength:20000}})}${withPublic ? publicBox(field('public'),draft.public,'Entry is public') : ''}${actionRow({bodyHtml:button({text:'Save entry',attrs:{...control('save',draft.id || ''),disabled:!String(draft.text || '').trim()}})+button({text:'Cancel',variant:'secondary',attrs:control('cancel',draft.id || '')})})}</div>` : '';
+    const list = [...entries].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(entry => {
+      const tools = `${entry.canToggle ? publicBox(control('public',entry.id),entry.isPublic,'Entry is public') : ''}${entry.canEdit ? button({text:'Edit',variant:'quiet',size:'compact',attrs:{...control('edit',entry.id),'aria-label':'Edit journal entry'}}) : ''}${entry.canDelete ? button({text:'Delete',variant:'quiet',size:'compact',attrs:{...control('delete',entry.id),'aria-label':'Delete journal entry'}}) : ''}`;
+      return `<article class="creator-journal-entry${entry.className ? ' '+entry.className : ''}" data-journal-id="${escape(entry.id)}"><header><time${entry.date ? ` datetime="${escape(entry.date)}"` : ''}>${escape(journalDate(entry.date))}</time>${entry.author ? `<span class="creator-journal-author">${escape(entry.author)}</span>` : ''}${entry.visibility && !entry.canToggle ? `<span class="creator-journal-visibility">${escape(entry.visibility)}</span>` : ''}${tools}</header><h4 class="creator-journal-title">${escape(entryTitle(entry))}</h4><p class="creator-journal-text">${escape(entry.text || '')}</p></article>`;
+    }).join('');
+    const head = heading || (canAdd && !draft) ? `<div class="creator-journal-head">${heading ? `<h3>${escape(heading)}</h3>` : '<span></span>'}${canAdd && !draft ? button({text:'+ Entry',attrs:control('new','')}) : ''}</div>` : '';
+    return `<div class="creator-journal">${head}${editor}${list || (draft || !emptyText ? '' : `<div class="creator-empty">${escape(emptyText)}</div>`)}</div>`;
+  }
+  const field_ = (...args) => field(...args);
+  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

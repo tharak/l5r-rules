@@ -16,7 +16,7 @@
     stats:Object.fromEntries(STATS.filter(key => s.publicStats?.[key]).map(key => [key,Number(d[key] ?? s[key]) || 0])),
     advantages:d.advantages.filter(a => a.public).map(option),
     disadvantages:d.disadvantages.filter(a => a.public).map(option),
-    journal:(s.journal || []).filter(e => e.public).map(e => ({id:e.id,text:e.text,createdAt:e.createdAt}))
+    journal:(s.journal || []).filter(e => e.public).map(e => ({id:e.id,title:e.title || '',text:e.text,createdAt:e.createdAt}))
   });
   const encode = async (sheet,updatedAt = new Date().toISOString()) => {
     sheet = window.CharacterBuilder.normalize?.(structuredClone(sheet)) || structuredClone(sheet);

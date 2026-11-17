@@ -5,15 +5,11 @@
   const UI = window.UI, esc = UI.escape;
   const STAT_LABELS = {honor:'Honor',glory:'Glory',status:'Status',taint:'Taint'};
   let stop = null, stopJournal = null, root = null;
-  const date = value => {
-    const parsed = value ? new Date(value) : null;
-    return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier notes';
-  };
   const options = (title,items) => items?.length ? `<section class="public-pc-block"><h2>${title}</h2><ul>${items.map(item => `<li>${esc(item.name)}${item.selection ? ` <small>(${esc(item.selection)})</small>` : ''}</li>`).join('')}</ul></section>` : '';
   // Journal entries from the player (in the profile) and the GM (added later), newest first.
   function journal(entries) {
-    const sorted = [...entries].sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    return `<section class="public-pc-block public-pc-journal"><h2>Journal</h2>${sorted.length ? sorted.map(entry => `<article class="creator-journal-entry"><header><time>${esc(date(entry.createdAt))}</time>${entry.authorName ? `<span class="creator-journal-visibility">${esc(entry.authorName)}</span>` : ''}</header><p class="creator-journal-text">${esc(entry.text)}</p></article>`).join('') : '<p class="creator-empty">No public journal entries yet.</p>'}</section>`;
+    const list = entries.map(entry => ({id:entry.id,title:entry.title,text:entry.text,date:entry.createdAt,author:entry.authorName || ''}));
+    return `<section class="public-pc-block public-pc-journal"><h2>Journal</h2>${UI.journal({entries:list,emptyText:'No public journal entries yet.'})}</section>`;
   }
   // `compact` renders the profile without the page wrapper and title, for campaign lists.
   function page(data,extraJournal = [],{compact = false} = {}) {
@@ -43,7 +39,7 @@
       let data, gm = [], loaded = false;
       const show = () => { if (root === element && loaded) element.innerHTML = page(data,gm); };
       stop = window.PublicSheets.watch(owner,id,next => { data = next; loaded = true; show(); },() => { data = null; loaded = true; show(); });
-      stopJournal = window.SheetJournal?.watch(owner,id,{publicOnly:true},entries => { gm = entries.map(entry => ({id:entry.id,text:entry.text,createdAt:entry.createdAt,authorName:entry.authorName || 'GM'})); show(); },() => {}) || null;
+      stopJournal = window.SheetJournal?.watch(owner,id,{publicOnly:true},entries => { gm = entries.map(entry => ({id:entry.id,title:entry.title || '',text:entry.text,createdAt:entry.createdAt,authorName:entry.authorName || 'GM'})); show(); },() => {}) || null;
       return true;
     };
     if (!start()) window.addEventListener('public-sheets-ready',start,{once:true});

@@ -358,3 +358,27 @@ test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on 
  d.store.uid='alice';await d.click('section','pcs');
  assert.doesNotMatch(render(),/timeline-visibility/,'only the GM sees the checkbox');
 });
+test('session and plot descriptions become their first journal entry; entries carry titles',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'We met at the inn.',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/plots/p',{title:'Seal',text:'Someone stole the seal.',creatorUid:'gm',createdAt:'2026-11-02'});
+ d.data.set('campaigns/c/plots/q',{title:'Other',text:'Not mine.',creatorUid:'alice',createdAt:'2026-11-02'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();
+ assert.equal(d.data.get('campaigns/c/notes/desc_sessions_s').text,'We met at the inn.');
+ assert.equal(d.data.get('campaigns/c/sessions/s').text,'');
+ assert.equal(d.data.get('campaigns/c/notes/desc_plots_p').targetCreatorUid,'gm');
+ assert.equal(d.data.get('campaigns/c/plots/p').text,'');
+ assert.equal(d.data.has('campaigns/c/notes/desc_plots_q'),false,'only the creator moves a plot description');
+ await d.click('section','sessions');await d.click('note-new','sessions:s');
+ let html=render();
+ assert.match(html,/data-entry-field="title"/);
+ for(const [entryField,value] of [['title','Arrival'],['text','The rain had stopped.']])d.documentListeners.input({target:{dataset:{entryField,entryKind:'note'},value}});
+ await d.click('note-save','');
+ const saved=[...d.data].find(([k,v])=>k.startsWith('campaigns/c/notes/')&&v.title==='Arrival');
+ assert.ok(saved,'title saved');
+ html=render();
+ assert.match(html,/<h4 class="creator-journal-title">Arrival<\/h4>/);
+ assert.match(html,/<h4 class="creator-journal-title">We met at the inn.<\/h4>/,'untitled entries use their first line');
+});

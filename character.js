@@ -325,7 +325,6 @@
   }
   // A small "Public" checkbox: ticked items appear in the character's public view.
   const publicToggle = (label,attrs,checked) => UI.checkbox({label:'Public',attrs:{type:'checkbox',...attrs,checked:!!checked,'aria-label':label},labelAttrs:{class:'creator-check creator-public-check'}});
-  const journalDate = value => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier notes'; };
   // The journal merges the player's entries (stored in the sheet) with the GM's (stored
   // beside it in Firestore), newest first. Each is private unless marked Public. The owner
   // manages their own entries and may delete the GM's; the GM, viewing the sheet read-only,
@@ -347,21 +346,18 @@
   }
   function renderJournal() {
     const gm = viewerIsGM(), me = window.SheetJournal?.user?.uid;
+    const gmIds = new Set(gmEntries.map(entry => entry.id));
     const entries = [
-      ...sheet.journal.map(entry => ({...entry,author:'Player',mine:!gm,gm:false})),
-      ...gmEntries.map(entry => ({...entry,author:entry.authorName || 'GM',mine:gm && entry.authorUid === me,gm:true}))
-    ].sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      ...sheet.journal.map(entry => ({...entry,author:'Player',mine:!gm})),
+      ...gmEntries.map(entry => ({...entry,author:entry.authorName || 'GM',mine:gm && entry.authorUid === me,className:'creator-journal-gm'}))
+    ].map(entry => ({id:entry.id,title:entry.title,text:entry.text,date:entry.createdAt,author:entry.author,className:entry.className,
+      visibility:entry.public ? 'Public' : 'Private',isPublic:entry.public,canToggle:entry.mine,canEdit:entry.mine,canDelete:entry.mine || (!gm && gmIds.has(entry.id))}));
     const marker = gm ? {'data-journal-gm':true} : {};
-    const editor = journalDraft ? `<div class="creator-journal-editor">${UI.field({label:journalDraft.id ? 'Edit entry' : 'New entry',kind:'textarea',value:journalDraft.text,attrs:{...marker,'data-journal-text':true,rows:5,maxlength:20000,placeholder:gm ? 'A note for the player or the table…' : 'Write to the table: what happened, plans, questions for the GM…'}})}${publicToggle('Entry is public',{...marker,'data-journal-draft-public':true},journalDraft.public)}${UI.actionRow({bodyHtml:`${UI.button({text:'Save entry',attrs:{...marker,'data-action':'journal-save',disabled:!journalDraft.text.trim()}})}${UI.button({text:'Cancel',variant:'secondary',attrs:{...marker,'data-action':'journal-cancel'}})}`})}</div>` : '';
-    const list = entries.map(entry => {
-      const source = entry.gm ? {'data-journal-source':'gm'} : {};
-      const controls = entry.mine
-        ? `${publicToggle('Entry is public',{...marker,...source,'data-journal-public':entry.id},entry.public)}${UI.button({text:'Edit',variant:'quiet',size:'compact',attrs:{...marker,...source,'data-action':'journal-edit','data-id':entry.id,'aria-label':'Edit journal entry'}})}${UI.button({text:'Delete',variant:'quiet',size:'compact',attrs:{...marker,...source,'data-action':'journal-delete','data-id':entry.id,'aria-label':'Delete journal entry'}})}`
-        : !gm && entry.gm ? UI.button({text:'Delete',variant:'quiet',size:'compact',attrs:{...source,'data-action':'journal-delete','data-id':entry.id,'aria-label':'Delete the GM\'s journal entry'}}) : '';
-      return `<article class="creator-journal-entry${entry.gm ? ' creator-journal-gm' : ''}" data-journal-id="${escapeHtml(entry.id)}"><header><time${entry.createdAt?` datetime="${escapeHtml(entry.createdAt)}"`:''}>${escapeHtml(journalDate(entry.createdAt))}</time><span class="creator-journal-author">${escapeHtml(entry.author)}</span><span class="creator-journal-visibility">${entry.public ? 'Public' : 'Private'}</span>${controls}</header><p class="creator-journal-text">${escapeHtml(entry.text)}</p></article>`;
-    }).join('');
-    const canAdd = !external?.readOnly || gm;
-    return `<div class="creator-journal"><div class="creator-journal-head"><h3>Journal</h3>${journalDraft || !canAdd ? '' : UI.button({text:'+ Entry',attrs:{...marker,'data-action':'journal-new'}})}</div><p class="creator-rule">${gm ? 'You are viewing this sheet as the GM. Your entries are private to you and the player unless you tick Public.' : 'Notes for you, the GM, and the table. Entries are private unless you tick Public.'}</p>${editor}${list || (journalDraft ? '' : '<div class="creator-empty">No journal entries yet.</div>')}</div>`;
+    const control = (name,id) => name === 'public'
+      ? {...marker,'data-journal-public':id,...(gmIds.has(id) ? {'data-journal-source':'gm'} : {})}
+      : {...marker,'data-action':`journal-${name}`,'data-id':id,...(gmIds.has(id) ? {'data-journal-source':'gm'} : {})};
+    const field = name => ({...marker,[name === 'public' ? 'data-journal-draft-public' : `data-journal-${name}`]:true});
+    return UI.journal({entries,draft:journalDraft,canAdd:!external?.readOnly || gm,withPublic:true,heading:'Journal',emptyText:'No journal entries yet.',control,field});
   }
   async function writeGMEntry(entryId,data) {
     const context = journalContext();
@@ -373,19 +369,19 @@
     const gm = viewerIsGM();
     if (external?.readOnly && !gm) return false;
     const now = new Date().toISOString(), fromGM = button.dataset.journalSource === 'gm';
-    if (action === 'journal-new') journalDraft = {id:'',text:'',public:false};
-    else if (action === 'journal-edit') { const entry = (gm ? gmEntries : sheet.journal).find(item => item.id === button.dataset.id); if (entry) journalDraft = {id:entry.id,text:entry.text,public:!!entry.public,createdAt:entry.createdAt}; }
+    if (action === 'journal-new') journalDraft = {id:'',title:'',text:'',public:false};
+    else if (action === 'journal-edit') { const entry = (gm ? gmEntries : sheet.journal).find(item => item.id === button.dataset.id); if (entry) journalDraft = {id:entry.id,title:entry.title || '',text:entry.text,public:!!entry.public,createdAt:entry.createdAt}; }
     else if (action === 'journal-cancel') journalDraft = null;
     else if (action === 'journal-save') {
       if (!journalDraft?.text.trim()) return true;
       if (gm) {
         const user = window.SheetJournal?.user;
         if (!user) return true;
-        writeGMEntry(journalDraft.id || makeId(),{authorUid:user.uid,authorName:user.name,text:journalDraft.text,public:!!journalDraft.public,createdAt:journalDraft.createdAt || now,updatedAt:now});
+        writeGMEntry(journalDraft.id || makeId(),{authorUid:user.uid,authorName:user.name,title:journalDraft.title.trim(),text:journalDraft.text,public:!!journalDraft.public,createdAt:journalDraft.createdAt || now,updatedAt:now});
       } else {
         const existing = sheet.journal.find(item => item.id === journalDraft.id);
-        if (existing) Object.assign(existing,{text:journalDraft.text,public:journalDraft.public,updatedAt:now});
-        else sheet.journal.push({id:makeId(),text:journalDraft.text,createdAt:now,updatedAt:now,public:!!journalDraft.public});
+        if (existing) Object.assign(existing,{title:journalDraft.title.trim(),text:journalDraft.text,public:journalDraft.public,updatedAt:now});
+        else sheet.journal.push({id:makeId(),title:journalDraft.title.trim(),text:journalDraft.text,createdAt:now,updatedAt:now,public:!!journalDraft.public});
         save();
       }
       journalDraft = null;
@@ -939,7 +935,7 @@
     const flags = event.target.dataset;
     if (flags.publicStat && flags.publicStat in sheet.publicStats) { sheet.publicStats[flags.publicStat] = event.target.checked; commitEdit(); return; }
     if (flags.optionPublic) { const entry = sheet[flags.optionPublic === 'advantage' ? 'advantages' : 'disadvantages'][Number(flags.index)]; if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
-    if (flags.journalPublic && flags.journalSource === 'gm') { const entry = gmEntries.find(item => item.id === flags.journalPublic); if (entry && viewerIsGM()) writeGMEntry(entry.id,{authorUid:entry.authorUid,authorName:entry.authorName,text:entry.text,public:event.target.checked,createdAt:entry.createdAt,updatedAt:new Date().toISOString()}); return; }
+    if (flags.journalPublic && flags.journalSource === 'gm') { const entry = gmEntries.find(item => item.id === flags.journalPublic); if (entry && viewerIsGM()) writeGMEntry(entry.id,{authorUid:entry.authorUid,authorName:entry.authorName,title:entry.title || '',text:entry.text,public:event.target.checked,createdAt:entry.createdAt,updatedAt:new Date().toISOString()}); return; }
     if (flags.journalPublic) { const entry = sheet.journal.find(item => item.id === flags.journalPublic); if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
     if (flags.journalDraftPublic !== undefined) { if (journalDraft) journalDraft.public = event.target.checked; return; }
     if (event.target.dataset.portrait !== undefined) {
@@ -977,6 +973,7 @@
     if(kind){const select=root.querySelector('#'+kind+'-select');for(const option of select.options)option.hidden=!!option.value && !option.textContent.toLowerCase().includes(event.target.value.toLowerCase());return;}
     if(event.target.dataset.optionDetail){if(event.target.tagName==='SELECT')return;const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;save();}return;}
     const field = event.target.dataset.field;
+    if (event.target.dataset.journalTitle !== undefined) { if (journalDraft) journalDraft.title = event.target.value; return; }
     if (event.target.dataset.journalText !== undefined) { if (journalDraft) journalDraft.text = event.target.value; const saveButton = root.querySelector('[data-action="journal-save"]'); if (saveButton) saveButton.disabled = !event.target.value.trim(); return; }
     if (!['name','concept','heritage'].includes(field)) return;
     sheet[field] = event.target.value;
