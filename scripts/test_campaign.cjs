@@ -572,3 +572,17 @@ test('the GM sees join requests and approves or declines them',async()=>{
  await d.click('request-approve','alice');for(let i=0;i<3;i++)await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls,[['publish','c','Campaign'],['c','alice',true]]);
 });
+test('the map shows every session\'s pins; pins from other sessions are greyed out',()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s1',{title:'One',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/sessions/s2',{title:'Two',text:'',createdAt:'2026-11-08'});
+ d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
+ for(const id of ['a','b'])d.data.set(`campaigns/c/notes/${id}`,{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'n',title:`Note ${id}`,text:'x',createdAt:'2026-11-01',updatedAt:'2026-11-01',revision:'r'});
+ d.data.set('campaigns/c/timeline/p1',{sessionId:'s1',kind:'npcs',targetId:'n',noteId:'a',x:10,y:10,createdAt:'1'});
+ d.data.set('campaigns/c/timeline/p2',{sessionId:'s2',kind:'npcs',targetId:'n',noteId:'b',x:20,y:20,createdAt:'2'});
+ const html=d.window.CampaignUI.render('campaigns/c'); // newest session (Two) is selected
+ assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-other" data-pin-id="p1"/);
+ assert.match(html,/class="timeline-pin timeline-pin-npcs" data-pin-id="p2"/);
+ assert.ok(html.indexOf('data-pin-id="p1"')<html.indexOf('data-pin-id="p2"'),'the selected session\'s pins are drawn on top');
+});
