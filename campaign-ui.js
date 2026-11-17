@@ -433,7 +433,7 @@
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head">${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
+    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       <div class="campaign-rows">
       <section class="home-row campaign-row" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
@@ -484,7 +484,8 @@
   function refresh(renderPage) {
     renderAgain = renderPage;
     const focused = document.activeElement;
-    if (focused && document.getElementById('app')?.contains(focused) && ['INPUT','TEXTAREA','SELECT'].includes(focused.tagName)) {
+    // The title field may sit in the top strip; keep typing there undisturbed too.
+    if (focused && (document.getElementById('app')?.contains(focused) || document.getElementById('topbar-page')?.contains(focused)) && ['INPUT','TEXTAREA','SELECT'].includes(focused.tagName)) {
       const status = document.querySelector('.campaign-status'); if(status){status.textContent=statusMessage();status.hidden=!statusMessage();}
       return;
     }

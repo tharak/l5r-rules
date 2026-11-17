@@ -378,6 +378,9 @@ function render() {
   if (officialImages) mountOfficialImages($('#app'));
   if (publicPC) { const [,owner,id] = slug.split('/'); window.PublicCharacter.mount($('#app'),decodeURIComponent(owner),decodeURIComponent(id)); } else window.PublicCharacter?.unmount();
   renderNavigation();
+  // A page can lift its heading row (title and actions) into the top strip, beside "← Start".
+  const topbarHead = $('#app [data-topbar-head]');
+  $('#topbar-page').replaceChildren(...(topbarHead ? [topbarHead] : []));
   // The top strip links back to Start everywhere except on Start itself.
   $('#home-link').hidden = slug === 'start';
   if (campaignRoute) window.CampaignUI.mountEditor();
@@ -419,7 +422,8 @@ function openSearch() { $('#search-overlay').hidden = false; document.body.class
 function closeSearch() { $('#search-overlay').hidden = true; document.body.classList.remove('search-open'); $('#search-input').value = ''; }
 function closeMenu() {}
 
-$('#search-button').addEventListener('click', openSearch);
+// Search has no button; it opens with / or Ctrl+K.
+$('#search-button')?.addEventListener('click', openSearch);
 $('#search-close').addEventListener('click', closeSearch);
 $('#search-backdrop').addEventListener('click', closeSearch);
 $('#search-input').addEventListener('input', renderSearchResults);
