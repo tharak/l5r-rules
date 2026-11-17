@@ -483,7 +483,7 @@ test('macro-skills require a nonempty subtype while ordinary and custom skills r
     assert.match(c.root.innerHTML,/creator-subskill-dialog/);
     c.click({action:'close-subskills'});
   }
-  const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];
+  const suggestions=c.root.innerHTML.match(/<select[^>]*id="skill-choice"[^>]*>([\s\S]*?)<\/select>/)[1];
   for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons'])assert.ok(!suggestions.includes(`value="${name}"`),name);
   for(const name of ['Lore: History','Games: Go','Artisan: Custom art','Craft: Custom craft','Perform: Custom performance','Courtier','Custom skill','Games (Shogi)','Weapons (Crossbow)']) {
     c.inputs['#new-skill']={value:name};c.click({action:'add-skill'});
@@ -711,7 +711,7 @@ test('a school macro-skill grants a chosen subtype rather than a bare skill or e
 
 test('all listed macro specialties appear in skill suggestions and eligible school choices',async()=>{
   const c=await character();c.school('Crane','Kakita Artisan');
-  const suggestions=c.root.innerHTML.match(/<datalist id="skill-suggestions">([\s\S]*?)<\/datalist>/)[1];
+  const suggestions=c.root.innerHTML.match(/<select[^>]*id="skill-choice"[^>]*>([\s\S]*?)<\/select>/)[1];
   const schoolSuggestions=c.root.innerHTML.match(/<datalist id="school-suggestions-0">([\s\S]*?)<\/datalist>/)[1];
   for(const [name,count] of [['Artisan',8],['Craft',18],['Games',6],['Lore',19],['Perform',9]]) {
     const skill=catalog.skills.find(s=>s.name===name);
@@ -1123,4 +1123,17 @@ test('abilities: one subsection per type, lists grouped by element or Shadowland
   assert.match(html,/creator-ability-group" data-ring="Air"><h4>Air<\/h4>[\s\S]*Blessed Wind · Mastery 1/);
   assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth"><h4>Earth</h4>[\\s\\S]*${earth.name} · Mastery 1`));
   assert.match(html,/<h3>Spells <small>5<\/small><\/h3>/,'two chosen plus the three universal spells');
+});
+
+test('skills use the shared picker: search, a list grouped by skill type, Add; typed text still adds a custom skill',async()=>{
+  const c=await character({skills:{Courtier:1}});
+  let html=sectionHtml(c,'skills');
+  const list=html.match(/<select[^>]*id="skill-choice"[^>]*>([\s\S]*?)<\/select>/)[1];
+  assert.deepEqual([...list.matchAll(/<optgroup label="([^"]+)"/g)].map(m=>m[1]),['High','Bugei','Merchant','Low']);
+  assert.match(html,/<input[^>]*id="new-skill"[^>]*data-search-target="skill-choice"/);
+  assert.match(list,/value="Courtier" disabled title="Already known"/);
+  c.inputs['#skill-choice']={value:'Etiquette'};c.inputs['#new-skill']={value:''};c.click({action:'add-skill'});
+  assert.equal((await c.data()).character.skills.Etiquette,1);
+  c.inputs['#skill-choice']={value:''};c.inputs['#new-skill']={value:'Custom skill'};c.click({action:'add-skill'});
+  assert.equal((await c.data()).character.skills['Custom skill'],1);
 });

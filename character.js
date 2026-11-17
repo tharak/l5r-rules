@@ -251,13 +251,26 @@
     return {suggestions,untrainedSkills};
   }
 
+  // The same picker as Advantages and Abilities: search, a list grouped by skill type, Add.
+  // Typing a name that is not in the list and pressing Add records a custom skill.
+  const SKILL_GROUPS = ['High','Bugei','Merchant','Low'];
+  function renderSkillPicker(suggestions,data) {
+    const groupOf = name => catalog.skills.find(skill => skill.name === name.split(':')[0].trim())?.group || 'Other';
+    const known = name => (data.skills[name]?.rank || 0) > 0;
+    const groups = [...SKILL_GROUPS,'Other'].map(group => [group,suggestions.filter(name => groupOf(name) === group).sort((a,b)=>a.localeCompare(b))]).filter(([,names]) => names.length);
+    const optionsHtml = option('','Choose a skill',true)+groups.map(([group,names]) => `<optgroup label="${escapeHtml(group)}">${names.map(name => UI.option({value:name,label:name,attrs:{disabled:known(name),...(known(name)?{title:'Already known'}:{})}})).join('')}</optgroup>`).join('');
+    return `<div class="creator-ability-picker">${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:
+      UI.field({attrs:{'id':'new-skill','type':'search','data-option-search':'skill','data-search-target':'skill-choice','placeholder':'Search or type a new skill','aria-label':'Search skills'}})+
+      UI.field({kind:'select',attrs:{'id':'skill-choice','aria-label':'Skill'},optionsHtml})+
+      UI.button({text:'Add',attrs:{'data-action':'add-skill','aria-label':'Add skill'}})})}</div>`;
+  }
   function renderSkills(data) {
     const {suggestions} = skillOptions();
     const skills = R.calculate(sheet,catalog,{untrainedSkills:catalog.skills.map(skill=>skill.name).filter(name=>!C.requiresSkillSubtype(name))}).skills;
     const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>isSkillVisible(name,skills,skillFilters.skills)).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
     const choicesComplete = choices.every((choice,index) => sheet.schoolChoices[index]?.trim() && !data.skillChoiceErrors[index]);
-    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',actionsHtml:sectionRules('skills','Skill rules')})}${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-skill','type':'text','list':'skill-suggestions','placeholder':'Add a skill, e.g. Courtier or Lore: History'}})}<datalist id="skill-suggestions">${suggestions.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>${UI.button({text:'Add skill',attrs:{'data-action':'add-skill'}})}`})}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin. Uncheck a filter to see untrained skills.</div>'}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',actionsHtml:sectionRules('skills','Skill rules')})}${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${renderSkillPicker(suggestions,data)}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin. Uncheck a filter to see untrained skills.</div>'}`});
   }
 
   function renderMacroSkill(name) {
@@ -921,7 +934,8 @@
       root.querySelector('[data-portrait]')?.focus();
       return;
     } else if (action === 'add-skill') {
-      const name = skillIdentity(root.querySelector('#new-skill').value).name;
+      // The list choice wins; with none, the typed text becomes a (possibly custom) skill.
+      const name = skillIdentity(root.querySelector('#skill-choice')?.value || root.querySelector('#new-skill').value).name;
       if (!name) return;
       if (C.requiresSkillSubtype(name)) {
         macroSkill = name.split(':')[0].trim(); render(); return;
@@ -992,7 +1006,7 @@
   }
 
   function onChange(event) {
-    if (event.target.id === 'new-skill') return;
+    if (['new-skill','skill-choice'].includes(event.target.id)) return;
     const {dataset} = event.target;
     if (dataset.hideZeroSkills !== undefined || dataset.hideZeroMacroSkills !== undefined) {
       const view = dataset.skillFilterView === 'skills' ? 'skills' : 'rolls';
