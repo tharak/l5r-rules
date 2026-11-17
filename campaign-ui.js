@@ -8,7 +8,7 @@
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -251,7 +251,7 @@
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
         : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
-    return `${sectionBar('Plots',button('plot-new','+ Plot'))}${fresh}<div class="campaign-entries">${list || ''}</div>`;
+    return `${sectionBar('Plots',button('plot-new','+ Plot'),'plots')}${fresh}<div class="campaign-entries">${list || ''}</div>`;
   }
   // The GM can keep PCs and NPCs off the timeline picker (their existing pins stay).
   const hiddenOnPicker = () => new Set(store().get(`campaigns/${active}`)?.timelineHidden || []);
@@ -265,14 +265,24 @@
     if (!details?.dataset?.entry) return;
     // A re-render that restores an already open entry also fires "toggle"; only real changes move the address.
     if (details.open === openEntries.has(details.dataset.entry)) return;
-    if (details.open) openEntries.add(details.dataset.entry); else openEntries.delete(details.dataset.entry);
+    // One entry opens at a time, as a panel over the page.
+    if (details.open) {
+      for (const key of openEntries) document.querySelector(`.campaign-entry[data-entry="${key}"]`)?.removeAttribute('open');
+      openEntries.clear(); openEntries.add(details.dataset.entry);
+    } else openEntries.delete(details.dataset.entry);
     // The address names the open entry, so it can be copied and shared.
     const [kind,id] = details.dataset.entry.split(':');
-    if (!active || kind !== section || !decodedRoute().startsWith('campaigns/')) return;
-    go(details.open ? campaignHref(active,section,kind,id) : campaignHref(active,section),false);
+    if (!active || !decodedRoute().startsWith('campaigns/')) return;
+    if (details.open) section = kind;
+    go(details.open ? campaignHref(active,kind,kind,id) : campaignHref(active),false);
   },true);
+  // Escape, or a click on the dimmed page around the panel, closes the open entry.
+  const closeEntry = details => { if (details?.open) details.open = false; };
+  document.addEventListener('keydown',event => { if (event.key === 'Escape') closeEntry(document.querySelector('.campaign-entry[open]')); });
+  document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
   const day = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : ''; };
-  const entry = (key,summaryHtml,bodyHtml) => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}><summary>${summaryHtml}</summary><div class="campaign-entry-body">${bodyHtml}</div></details>`;
+  // Each entry is a tile; opened, its body is a panel over the page with its own title and close.
+  const entry = (key,summaryHtml,bodyHtml) => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}><summary>${summaryHtml}</summary><div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">${summaryHtml}${button('entry-close','✕',key)}</div>${bodyHtml}</div></details>`;
   const entryTitle = (title,meta) => `<span class="campaign-entry-title">${e(title)}</span>${meta?`<small class="campaign-entry-meta">${meta}</small>`:''}`;
   const avatar = (src,clan) => { const mon = window.CharacterCatalog?.clanMon(clan || ''); const img = UI.isPortrait(src) ? src : mon; return img ? `<img class="campaign-entry-avatar" src="${img}" alt="">` : '<span class="campaign-entry-avatar" aria-hidden="true"></span>'; };
   const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
@@ -339,12 +349,14 @@
     return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
   }
   // Section titles are visually hidden; the tabs already name the section. Actions sit on top.
-  const sectionBar = (title,actionsHtml) => `<h2 class="visually-hidden">${e(title)}</h2>${actionsHtml ? `<div class="campaign-toolbar">${actionsHtml}</div>` : ''}`;
+  // Each kind is a row like the start page: its title and add button, then a grid of tiles.
+  // Sessions and plots carry the unread "!" on their heading when something changed since you read it.
+  const sectionBar = (title,actionsHtml,kind = '') => `<div class="home-row-head"><h2>${e(title)}${READ_KINDS.includes(kind) && unreadIn(active,kind) ? ` ${unreadMark}` : ''}</h2>${actionsHtml || ''}</div>`;
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
         : `${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit',session.id)+button('session-delete','Delete',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
-    return `${sectionBar('Sessions',isGM?button('session-new','+ Session'):'')}<div class="campaign-entries">${list}</div>`;
+    return `${sectionBar('Sessions',isGM?button('session-new','+ Session'):'','sessions')}<div class="campaign-entries">${list}</div>`;
   }
   function renderNPCs(npcs,isGM) {
     const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
@@ -421,14 +433,14 @@
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace${section==='timeline'?' campaign-workspace-wide':''}"><div class="workspace-head">${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
-      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['timeline','Timeline'],['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label:READ_KINDS.includes(value)&&unreadIn(active,value)?`${label} !`:label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
-      ${section==='sessions'?renderSessions(sessions,isGM):''}
-      ${section==='plots'?renderPlots(plots):''}
-      ${section==='npcs'?renderNPCs(npcs,isGM):''}
-      ${section==='pcs'?renderPCs(pcs,isGM,invitation):''}
-      ${section==='timeline'?renderTimeline(isGM,pcs,npcs,plots):''}`})}
-      </div>${section==='pcs'&&selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head">${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
+      <div class="campaign-rows">
+      <section class="home-row campaign-row" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
+      <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
+      <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
+      <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
+      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<div class="home-row-head"><h2>Timeline</h2></div>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
+      </div>${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -490,6 +502,7 @@
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
+      else if (action==='entry-close') {openEntries.delete(id);go(campaignHref(active),false);}
       else if (action==='section') {if(SECTIONS.includes(id)){section=id;notePopup='';go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
       else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};}

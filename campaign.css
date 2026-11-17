@@ -104,3 +104,24 @@
 .book-sections>summary::before{content:'▸';font-size:12px}
 .book-sections[open]>summary::before{content:'▾'}
 .book-sections[open]{display:block}
+
+/* One campaign view: a row per kind like the start page; entries are tiles in an auto-fit grid. */
+.campaign-rows{display:grid;gap:28px;margin-top:20px}
+.campaign-row .campaign-entries{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:12px;margin:0}
+.campaign-row .campaign-entry-new,.campaign-row .pc-picker,.campaign-row .invite-settings{margin:0 0 12px}
+.campaign-entry>summary::before,.campaign-entry[open]>summary::before{content:none}
+.campaign-entry>summary{height:100%;min-height:64px;border-radius:3px}
+.campaign-entry:hover{border-color:var(--red)}
+.campaign-entry[open]{border-color:var(--red)}
+/* The open entry is a panel over a dimmed page; the dimmed area closes it. */
+.campaign-entry[open]::after{content:'';position:fixed;inset:0;z-index:80;background:#1c1a1466;cursor:pointer}
+.campaign-entry[open]>.campaign-entry-body{position:fixed;z-index:81;top:5vh;left:50%;transform:translateX(-50%);width:min(880px,94vw);max-height:90vh;overflow:auto;margin:0;padding:0 20px 20px;border:1px solid var(--line);border-radius:6px;background:var(--paper,#f7f6f2);box-shadow:0 24px 60px #0005;cursor:auto}
+.campaign-entry-panel-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:10px;margin:0 -20px 12px;padding:14px 20px;border-bottom:1px solid var(--line);background:inherit}
+.campaign-entry-panel-head .campaign-entry-title{font-size:22px}
+.campaign-entry-panel-head>button{margin-left:auto}
+body:has(.campaign-entry[open]){overflow:hidden}
+/* Tiles: title on its own line, the date / author underneath. */
+.campaign-row .campaign-entry>summary{flex-wrap:wrap;align-content:center;row-gap:2px}
+.campaign-row .campaign-entry>summary .campaign-entry-title{font-size:17px}
+.campaign-row .campaign-entry>summary .campaign-entry-meta{order:3;flex-basis:100%;font-size:12px}
+.campaign-row .campaign-entry>summary:has(.campaign-entry-avatar) .campaign-entry-meta{padding-left:46px}
