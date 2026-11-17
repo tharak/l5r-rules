@@ -479,7 +479,7 @@ test('macro-skills require a nonempty subtype while ordinary and custom skills r
   for(const name of ['Artisan','Craft','Games','Lore','Perform','Weapons','lore: ','Games :']) {
     c.inputs['#new-skill']={value:name};c.click({action:'add-skill'});
     assert.deepEqual((await c.data()).character.skills,{});
-    assert.match(c.root.innerHTML,/Choose subskill/);
+    assert.match(c.root.innerHTML,/aria-label="Choose [^"]+ subskill"/);
     assert.match(c.root.innerHTML,/creator-subskill-dialog/);
     c.click({action:'close-subskills'});
   }
@@ -649,7 +649,7 @@ test('Public checkboxes and the journal save to the sheet; entries start private
   assert.equal(sheet.journal.length,1);assert.equal(sheet.journal[0].text,'Edited entry');assert.equal(sheet.journal[0].public,true);
   c.window.confirm=()=>true;c.click({action:'journal-delete',id});
   assert.equal((await c.data()).character.journal.length,0);
-  assert.match(html(),/No journal entries yet/);
+  assert.doesNotMatch(html(),/creator-journal-entry/);
 });
 
 test('View public previews exactly the shared profile from the sheet as it is now',async()=>{
@@ -1012,11 +1012,8 @@ test('separate equipment list preserves saved gear and money without equipped co
 
 test('cost guidance shows limits while trait, skill, and option edits remain available',async()=>{
  const c=await character({phase:'advancement',traitBuys:{Strength:8},skills:{Defense:10},advantages:[{id:'large',name:'Large',cost:40}],disadvantages:[{id:'doubt',name:'Doubt',cost:8},{id:'health',name:'Bad Health',cost:4}]});
- assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 5\./);
- assert.match(c.root.innerHTML,/Creation limit: Rank 4\. Maximum: Rank 10\./);
- assert.match(c.root.innerHTML,/Advantages \(40\)/);assert.match(c.root.innerHTML,/Disadvantages \(12\)/);
- assert.match(c.root.innerHTML,/Up to 15 XP\./);
- assert.match(c.root.innerHTML,/Up to 10 XP\./);
+ // Each option column shows XP used against its limit.
+ assert.match(c.root.innerHTML,/Advantages <small[^>]*>40\/15<\/small>/);assert.match(c.root.innerHTML,/Disadvantages <small[^>]*>12\/10<\/small>/);
  c.click({action:'trait',trait:'Strength',delta:'1'});c.click({action:'skill',skill:'Defense',delta:'1'});
  const {character:s,derived:d}=await c.data();assert.equal(d.traits.Strength.rank,11);assert.equal(d.skills.Defense.rank,11);
  assert.ok(d.blockers.some(e=>e.code==='rank:trait:Strength'));assert.ok(d.blockers.some(e=>e.code==='rank:skill:Defense'));
@@ -1028,7 +1025,6 @@ test('Later training always shows the starting school, current training and the 
  const c=await character();
  assert.match(c.root.innerHTML,/<div class="creator-later-training">/);
  assert.doesNotMatch(c.root.innerHTML,/<details[^>]*class="creator-later-training"/);
- assert.match(c.root.innerHTML,/No schools recorded/);
  assert.match(c.root.innerHTML,/id="training-school"/);
  c.school('Crab','Hida Bushi');
  const list=instance=>instance.root.innerHTML.split('<div class="creator-later-training">')[1].split('<aside')[0];

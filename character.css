@@ -315,8 +315,12 @@
 }
 
 @media screen {
-  .creator-ability-pickers { display: grid; gap: 16px; margin: 20px 0; }
-  .creator-ability-picker { min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .creator-ability-pickers { display: grid; gap: 8px; margin: 16px 0; }
+  .creator-ability-picker { min-width: 0; }
+  .creator-ability-picker .creator-add-row > select:first-child, .creator-ability-picker .creator-add-row > .ui-field:first-child { flex: 1 1 auto; min-width: 0; }
+  .creator-ability-picker .creator-add-row { flex-wrap: nowrap; }
+  .creator-ability-picker .creator-add-row > select:first-child { width: auto; }
+  .creator-ability-picker .creator-add-row > select[id^="ability-payment"] { flex: 0 0 8.5em; width: 8.5em; }
   .creator-ability-picker h3 { margin: 0 0 10px; color: var(--ink); font: 18px var(--serif); }
   .creator-ability-picker .ui-field-label { display: grid; gap: 6px; flex: 1; min-width: min(220px,100%); }
   .creator-ability-picker .ui-field-label:first-child { flex: 2; }
