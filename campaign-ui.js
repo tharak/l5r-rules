@@ -180,12 +180,18 @@
     if (kind === 'plots') return gm() || store().get(path('plots',id))?.creatorUid === store().uid;
     return false;
   }
+  // Session, NPC and plot journals use the same layout as a character's journal.
+  function journalEditor(draft) {
+    const attrs = key => ({'data-entry-field':key,'data-entry-kind':'note'});
+    return `<div class="creator-journal-editor">${UI.field({label:draft.id || noteId ? 'Edit entry' : 'New entry',kind:'textarea',value:draft.text,attrs:{...attrs('text'),rows:5,maxlength:400000}})}${UI.actionRow({bodyHtml:button('note-save','Save entry','',!draft.text.trim())+button('note-cancel','Cancel')})}</div>`;
+  }
   function notesFor(kind,id) {
     const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
     const add=canAddEntry(kind,id)&&!drafting?button('note-new','+ Entry',kind+':'+id):'';
     if(!notes.length&&!add&&!drafting)return '';
-    return `<section class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}"><div class="workspace-head"><h3>Journal</h3>${add}</div>${drafting?entryEditor('note',noteDraft):''}${notes.map(n=>`<article class="campaign-note"><div class="workspace-head"><small>${e(entryAuthor(n))}${n.createdAt?` · ${e(day(n.createdAt))}`:''}</small>${entryOwner(n)?UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('note-edit','Edit',n.id)}${button('note-delete','Delete',n.id)}`}):''}</div><p class="entry-text">${e(n.text)}</p></article>`).join('')}</section>`;
+    const entries=notes.map(n=>`<article class="creator-journal-entry"><header><time${n.createdAt?` datetime="${e(n.createdAt)}"`:''}>${e(day(n.createdAt)||'Earlier')}</time><span class="creator-journal-author">${e(entryAuthor(n))}</span>${entryOwner(n)?UI.button({text:'Edit',variant:'quiet',size:'compact',attrs:{'data-campaign':'note-edit','data-id':n.id,'aria-label':'Edit journal entry'}})+UI.button({text:'Delete',variant:'quiet',size:'compact',attrs:{'data-campaign':'note-delete','data-id':n.id,'aria-label':'Delete journal entry'}}):''}</header><p class="creator-journal-text">${e(n.text)}</p></article>`).join('');
+    return `<div class="creator-journal campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}"><div class="creator-journal-head"><h3>Journal</h3>${add}</div>${drafting?journalEditor(noteDraft):''}${entries}</div>`;
   }
   function renderPlots(plots) {
     // A new plot is drafted above the list; an existing one is edited inside its entry.
