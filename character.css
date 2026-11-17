@@ -468,3 +468,7 @@
 .creator-ability-kind .creator-option-heading > .creator-ability-locked { margin: 0; }
 .creator-ability-kind .creator-option-heading > .creator-source { margin-left: auto; }
 .creator-ability-permission { display: inline-flex; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+
+/* Spells known in a ring, split by Mastery level. */
+.creator-ability-level { margin: 6px 0 0; }
+.creator-ability-level h5 { margin: 6px 0 2px; font: 600 11px var(--sans); color: var(--muted); }

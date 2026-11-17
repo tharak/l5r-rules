@@ -604,7 +604,7 @@
   }
   function renderAbility(a,d) {
     // The group already names the element or kind; the row shows rank, cost and how it was gained.
-    const summary = `${escapeHtml(a.name)}${a.mastery?` · ${a.kind==='spell'?'Mastery':'Rank'} ${a.mastery}`:''} · ${a.cost} XP${a.grant?' · School grant':''}${a.memorized?' · Memorized':''}`;
+    const summary = `${escapeHtml(a.name)}${a.mastery && a.kind!=='spell'?` · Rank ${a.mastery}`:''} · ${a.cost} XP${a.grant?' · School grant':''}${a.memorized?' · Memorized':''}`;
     const rules = `${Object.keys(a.fields || {}).length?`<dl>${Object.entries(a.fields).map(([key,value])=>`<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('')}</dl>`:''}<p>${escapeHtml(a.description || '')}</p>${a.spellRoll?`<p>Spell Casting Roll: ${escapeHtml(a.spellRoll.notation)} · TN ${a.mastery*5+5}</p>`:''}${a.reasons?.length?`<p class="creator-error">${a.reasons.map(escapeHtml).join(' ')}</p>`:''}${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}">Local rules ↗</a>${a.kind==='spell'?UI.button({text:a.memorized?'Remove memorization':'Memorize · '+a.mastery+' XP',attrs:{'data-action':'memorize','data-id':a.selectionId}}):''}${['spell','kiho'].includes(a.kind) && sheet.abilities.some(e=>e.id===a.selectionId)?UI.checkbox({label:'School grant',attrs:{type:'checkbox','data-ability-grant':a.selectionId,checked:a.grant,'aria-label':`${a.name}: free school grant`},labelAttrs:{class:'creator-check'}}):''}${sheet.abilities.some(e=>e.id===a.selectionId)?UI.button({text:'Remove ability',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ability','data-id':a.selectionId}}):''}`})}`;
     return UI.disclosure({attrs:{},titleHtml:`${summary}`,bodyHtml:`${rules}`});
   }
@@ -632,7 +632,7 @@
   }
   function abilityOption(a,offer,free) {
     const price = ['kata','kiho'].includes(a.kind) ? (free ? ' · Free' : ` · ${offer.cost} XP`) : '';
-    return `${a.name}${a.mastery?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}${price}`;
+    return `${a.name}${a.mastery && a.kind!=='spell'?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}${price}`;
   }
   // Table permissions that open optional rules, shown in the subsection they affect. They stay
   // visible while the type is closed, since ticking one is what opens it.
@@ -674,12 +674,21 @@
     const shared = closedGroups.length === groups.length && groups.length > 1 ? closedGroups[0].reasons.filter(reason => closedGroups.every(entry => entry.reasons.includes(reason))) : [];
     const blocks = groups.map(({group,offers,addable,reasons}) => {
       const id = `ability-choice-${kind}-${group.key}`, name = group.title || title;
-      const optionsHtml = option('',`Choose a ${label}`,true)+offers.map(([a,offer]) => UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}})).join('');
+      const optionHtml = ([a,offer]) => UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}});
+      // Spells split further by Mastery level: list sections and headings over the known ones.
+      const byLevel = kind === 'spell';
+      const levels = items => [...new Set(items.map(a => a.mastery || 0))].sort((x,y) => x-y);
+      const optionsHtml = option('',`Choose a ${label}`,true)+(byLevel
+        ? levels(offers.map(([a]) => a)).map(level => `<optgroup label="Mastery ${level}">${offers.filter(([a]) => (a.mastery || 0) === level).map(optionHtml).join('')}</optgroup>`).join('')
+        : offers.map(optionHtml).join(''));
       const known = ownedGroups.find(entry => entry.key === group.key)?.items || [];
+      const knownHtml = byLevel
+        ? levels(known).map(level => `<div class="creator-ability-level"><h5>Mastery ${level}</h5>${known.filter(a => (a.mastery || 0) === level).map(a=>renderAbility(a,d)).join('')}</div>`).join('')
+        : known.map(a=>renderAbility(a,d)).join('');
       return `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:
         UI.field({kind:'select',attrs:{id,'aria-label':name,disabled:!addable},optionsHtml})+
         UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'data-ability-group':group.key,'aria-label':`Add ${label}${group.title?` (${group.title})`:''}`,disabled:!addable}})
-      })}${locked(reasons.filter(reason => !shared.includes(reason)).join(' '))}${known.map(a=>renderAbility(a,d)).join('')}</div>`;
+      })}${locked(reasons.filter(reason => !shared.includes(reason)).join(' '))}${knownHtml}</div>`;
     }).join('');
     // Owned entries outside every catalog group (e.g. a renamed catalog entry) still show.
     const stray = owned.filter(a => !catalogGroups.some(group => group.key === abilityGroups(kind,[a])[0]?.key));

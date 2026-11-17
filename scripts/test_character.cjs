@@ -1131,8 +1131,8 @@ test('abilities: one subsection per type, lists grouped by element or Shadowland
   const earth=catalog.abilities.find(a=>a.kind==='spell'&&a.ring==='Earth'&&a.mastery===1&&a.slug==='earth-spells');
   for(const [id,group] of [['spell:air-spells:Blessed Wind','Air'],[earth.id,'Earth']]){c.inputs[`#ability-choice-spell-${group}`]={value:id};c.click({action:'add-ability',abilityKind:'spell',abilityGroup:group});}
   html=sectionHtml(c,'abilities');
-  assert.match(html,/creator-ability-group" data-ring="Air" data-ability-group="Air"><h4>Air<\/h4>[\s\S]*Blessed Wind · Mastery 1/);
-  assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth" data-ability-group="Earth"><h4>Earth</h4>[\\s\\S]*${earth.name} · Mastery 1`));
+  assert.match(html,/creator-ability-group" data-ring="Air" data-ability-group="Air"><h4>Air<\/h4>[\s\S]*<h5>Mastery 1<\/h5>[\s\S]*Blessed Wind · 0 XP/);
+  assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth" data-ability-group="Earth"><h4>Earth</h4>[\\s\\S]*<h5>Mastery 1</h5>[\\s\\S]*${earth.name} · 0 XP`));
   assert.match(html,/<h3>Spells <small>5<\/small><\/h3>/,'two chosen plus the three universal spells');
 });
 
@@ -1182,4 +1182,15 @@ test('optional ability permissions sit in the subsection they open; closed reaso
   assert.match(html,/creator-purchases creator-ability-kind" data-ability-kind="shadowlands"/);
   const shugenja=await character();shugenja.school('Crab','Kuni Shugenja');
   assert.match(sectionHtml(shugenja,'abilities').split('data-ability-kind="kiho"><div class="creator-option-heading">')[1],/^[\s\S]*?data-school-decision="nonBrotherhoodKiho"/);
+});
+
+test('spell lists and known spells split by Mastery level inside each ring',async()=>{
+  const c=await character();c.school('Crane','Asahina Shugenja');
+  const html=sectionHtml(c,'abilities');
+  const air=html.match(/<select[^>]*id="ability-choice-spell-Air"[^>]*>([\s\S]*?)<\/select>/)[1];
+  const levels=[...air.matchAll(/<optgroup label="Mastery (\d+)"/g)].map(m=>Number(m[1]));
+  assert.ok(levels.length>2);assert.deepEqual(levels,[...levels].sort((a,b)=>a-b));
+  assert.doesNotMatch(air,/Blessed Wind · 1</,'the level heading carries the Mastery');
+  const kata=await character();kata.school('Crab','Hida Bushi');
+  assert.doesNotMatch(sectionHtml(kata,'abilities'),/id="ability-choice-kata-Air"[^>]*>[\s\S]*?<optgroup/,'kata keep one flat list per ring');
 });
