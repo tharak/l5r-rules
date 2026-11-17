@@ -481,4 +481,12 @@
 .creator-ability-option[aria-pressed="true"]:not(:disabled):hover { text-decoration: line-through; }
 .creator-ability-option:disabled { opacity: .45; cursor: not-allowed; }
 #creator-abilities .creator-ability-option[aria-pressed="true"]:disabled { opacity: .75; cursor: default; }
-.creator-ability-details { margin-top: 8px; }
+
+/* Bought abilities in section 00: spells roll from their ring card; kata, kiho and the rest open their rules. */
+.creator-ring-abilities { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.creator-roll-abilities .creator-ring-abilities { border-top: 0; margin-top: 4px; padding-top: 0; }
+.creator-roll-ability { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: #fffdf8; color: var(--ink); font-size: 13px; text-decoration: none; }
+.creator-roll-ability small { font-size: 11px; color: var(--muted); }
+button.creator-roll-ability { cursor: pointer; font: inherit; font-size: 13px; }
+.creator-roll-ability:hover { border-color: currentColor; }
+.creator-ring > .creator-ring-abilities { margin-top: 0; padding: 8px 10px 10px; }

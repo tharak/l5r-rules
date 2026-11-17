@@ -187,7 +187,7 @@
       if (!rolling) return control;
       return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list creator-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${renderSkillRow(name,skills[name],'rings')}</li>`).join('')}</ul></div>`;
     };
-    return UI.panel({attrs:{'class':'creator-panel','id':rolling?'creator-rolls':'creator-traits'},bodyHtml:`${UI.sectionHeading({step:rolling?'00':'02',title:rolling?'Rolls':sectionTitle('traits'),actionsHtml:rolling?sectionRules('rolls','Roll rules'):sectionRules('traits','Ring and trait rules')})}${rolling?renderSkillFilter():''}<div class="creator-ring-grid">${groups.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring ring-watermark" data-ring="${group.ring}">${rolling?`<button type="button" class="creator-ring-head creator-roll-ring" data-action="open-roll" data-roll-kind="ring" data-roll-name="${group.ring}" aria-label="Roll ${group.ring} Ring">`:'<div class="creator-ring-head">'}<${rolling?'span':'div'}><strong>${group.ring}</strong></${rolling?'span':'div'}><b>${data.rings[group.ring]}</b>${rolling?'</button>':'</div>'}${rolling?`<div class="creator-ring-traits">${traits}${group.traits.length===1?`<div class="creator-ring-trait-spacer" aria-hidden="true" inert>${[0,1].map(()=>`<div class="creator-ring-trait-column"><span class="creator-rank-row creator-trait-display creator-roll-trait"><strong>${group.traits[0]}</strong><output>0</output></span></div>`).join('')}</div>`:''}</div>`:traits}</div>`; }).join('')}</div>${rolling?`<div class="creator-roll-details">${renderWounds(data)}${renderCombat(data)}</div>`:''}`});
+    return UI.panel({attrs:{'class':'creator-panel','id':rolling?'creator-rolls':'creator-traits'},bodyHtml:`${UI.sectionHeading({step:rolling?'00':'02',title:rolling?'Rolls':sectionTitle('traits'),actionsHtml:rolling?sectionRules('rolls','Roll rules'):sectionRules('traits','Ring and trait rules')})}${rolling?renderSkillFilter():''}<div class="creator-ring-grid">${groups.map(group => { const traits=group.traits.map(renderTrait).join(''); return `<div class="creator-ring ring-watermark" data-ring="${group.ring}">${rolling?`<button type="button" class="creator-ring-head creator-roll-ring" data-action="open-roll" data-roll-kind="ring" data-roll-name="${group.ring}" aria-label="Roll ${group.ring} Ring">`:'<div class="creator-ring-head">'}<${rolling?'span':'div'}><strong>${group.ring}</strong></${rolling?'span':'div'}><b>${data.rings[group.ring]}</b>${rolling?'</button>':'</div>'}${rolling?`<div class="creator-ring-traits">${traits}${group.traits.length===1?`<div class="creator-ring-trait-spacer" aria-hidden="true" inert>${[0,1].map(()=>`<div class="creator-ring-trait-column"><span class="creator-rank-row creator-trait-display creator-roll-trait"><strong>${group.traits[0]}</strong><output>0</output></span></div>`).join('')}</div>`:''}</div>`:traits}${rolling?renderRingAbilities(group.ring,data):''}</div>`; }).join('')}</div>${rolling?`<div class="creator-roll-details">${renderWounds(data)}${renderCombat(data)}${renderOtherAbilities(data)}</div>`:''}`});
   }
 
   function renderSkillRoll(name, skill, view = 'skills') {
@@ -470,6 +470,20 @@
     return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}" aria-label="Wound levels and current wounds"><div class="creator-ring-head"><strong>Wounds</strong>${renderNumber('woundsTaken',wounds.current,{...numericFields.woundsTaken,showLabel:false})}</div><div class="creator-wounds creator-value-tiles">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span${index===levelIndex?' class="creator-wound-status" role="status"':''}>${escapeHtml(level.label)}</span>: <strong>${level.total}</strong></div>`).join('')}<div${levelIndex<0?' aria-current="true"':''}><span${levelIndex<0?' class="creator-wound-status" role="status"':''}>Dead</span>: <strong>${Math.floor(wounds.maximum)+1}</strong></div>${UI.button({text:`Heal · ${data.combat.healing}`,variant:'secondary',size:'compact',attrs:{'data-action':'heal-wounds','aria-label':`Heal ${data.combat.healing} wounds`,'disabled':wounds.current<=0 || data.combat.healing<=0}})}</div></div>`;
   }
 
+  // Bought abilities in Rolls: spells roll their Spell Casting Roll (universal spells in each of
+  // Air, Earth, Fire and Water); kata and kiho sit in their ring and open their rules.
+  const abilityRule = a => `<a class="creator-roll-ability" data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}" title="${escapeHtml(a.kind === 'kata' ? 'Kata' : a.kind === 'kiho' ? 'Kiho' : 'Rules')}"><span>${escapeHtml(a.name)}</span><small>${escapeHtml(a.kind === 'kata' ? 'Kata' : a.kind === 'kiho' ? 'Kiho' : a.kind === 'tattoo' ? 'Tattoo' : 'Shadowlands')}</small></a>`;
+  function renderRingAbilities(ring,data) {
+    const spells = data.abilities.filter(a => a.kind === 'spell' && a.spellRolls?.[ring]).sort((a,b) => (a.mastery || 0)-(b.mastery || 0) || a.name.localeCompare(b.name));
+    const others = data.abilities.filter(a => ['kata','kiho'].includes(a.kind) && a.ring === ring).sort((a,b) => a.name.localeCompare(b.name));
+    if (!spells.length && !others.length) return '';
+    const spellHtml = spells.map(a => `<button type="button" class="creator-roll-skill creator-roll-ability" data-action="open-roll" data-roll-kind="spell" data-roll-name="${escapeHtml(a.selectionId)}" data-roll-skill="${ring}" aria-label="Cast ${escapeHtml(a.name)} (${ring})"><span>${escapeHtml(a.name)}</span><small>${a.spellRolls[ring].notation} · TN ${(a.mastery || 0)*5+5}</small></button>`).join('');
+    return `<div class="creator-ring-abilities">${spellHtml}${others.map(abilityRule).join('')}</div>`;
+  }
+  function renderOtherAbilities(data) {
+    const items = data.abilities.filter(a => ['tattoo','shadowlands'].includes(a.kind)).sort((a,b) => a.name.localeCompare(b.name));
+    return items.length ? `<div class="creator-roll-abilities creator-ring"><div class="creator-ring-head"><strong>Abilities</strong></div><div class="creator-ring-abilities">${items.map(abilityRule).join('')}</div></div>` : '';
+  }
   function renderCombat(data) {
     return `<div class="creator-roll-combat creator-ring"><div class="creator-ring-head"><strong>Combat values</strong></div><div class="creator-combat creator-value-tiles"><div><button type="button" class="creator-roll-skill" data-action="open-roll" data-roll-kind="initiative" data-roll-name="Initiative" aria-label="Roll Initiative"><span>Initiative roll</span>: <strong>${data.combat.initiative.notation}</strong></button></div><div><span>Armor TN (equipped)</span>: <strong>${data.combat.armorTN}</strong></div><div><span>Reduction</span>: <strong>${data.combat.reduction}</strong></div></div></div>`;
   }
@@ -689,10 +703,8 @@
       return unit.level == null ? body : `<div class="creator-ability-level" data-ability-level="${unit.level}"><h5>${unit.title}</h5>${body}</div>`;
     };
     const blocks = catalogGroups.map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${units.filter(unit => unit.group === group).map(renderUnit).join('')}</div>`).join('');
-    // Rules, School grant and Memorize for what was bought live in one collapsed Details list.
-    const details = owned.length ? UI.disclosure({attrs:{class:'creator-ability-details','id':`ability-details-${kind}`},titleHtml:'Details',bodyHtml:`<div class="creator-ability-list">${owned.map(a=>renderAbility(a,d)).join('')}</div>`}) : '';
     const heading = `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${shared.length?`<span class="creator-ability-locked">${escapeHtml(shared.join(' '))}</span>`:''}${rulesLink(rulesPage,'',`${title} rules`)}</div>${abilityPermission(kind,d)}`;
-    return `<div class="creator-purchases creator-ability-kind${closed?' creator-ability-closed':''}" data-ability-kind="${kind}">${heading}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}</div>${details}</div>`;
+    return `<div class="creator-purchases creator-ability-kind${closed?' creator-ability-closed':''}" data-ability-kind="${kind}">${heading}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}</div></div>`;
   }
   function renderAbilities(d) {
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
@@ -851,6 +863,12 @@
       if (kind === 'initiative') {
         base = data.combat.initiativeBase;
         title = 'Initiative';
+      } else if (kind === 'spell') {
+        // A bought spell, cast in the ring of the card it sits in.
+        const ring = button.dataset.rollSkill, spell = data.abilities.find(a => a.selectionId === name), pool = spell?.spellRolls?.[ring];
+        if (!pool) return true;
+        base = {rolled:pool.rolled,kept:pool.kept,bonus:pool.bonus};
+        title = `${spell.name} · ${ring} · TN ${(spell.mastery || 0)*5+5}`;
       } else if (kind === 'ring' || kind === 'trait') {
         const rank = kind === 'ring' ? data.rings[name] : data.traits[name]?.rank;
         if (!rank) return true;

@@ -212,10 +212,18 @@
     } else cost = positive(entry.cost);
     if (entry.grant && a.kind!=='spell' || entry.grant && !entry.memorized) cost=0;
     if (entry.customCost!=null) cost=positive(entry.customCost);
-    const castRing=d.rings[ring],elements=spellElements(s,school);
-    const castingRank=a.slug==='maho' ? d.insightRank : sr+number(elements.affinities.includes(ring))-number(elements.deficiencies.includes(ring));
-    const spellRoll=a.kind==='spell' && castRing ? dicePool(castingRank+castRing+number(d.skills.Spellcraft?.rank>=5),castRing) : null;
-    return {...a,spellRoll,selectionId:entry.id,memorized:!!entry.memorized,grant:!!entry.grant,cost,reasons};
+    // Spell Casting Roll: (casting rank + Ring)k(Ring), casting rank adjusted by affinity and
+    // deficiency (maho uses Insight Rank). Universal spells can be cast in any element save Void.
+    const elements=spellElements(s,school);
+    const castFor=element=>{
+      const castRing=d.rings[element];
+      if(!castRing)return null;
+      const castingRank=a.slug==='maho' ? d.insightRank : sr+number(elements.affinities.includes(element))-number(elements.deficiencies.includes(element));
+      return dicePool(castingRank+castRing+number(d.skills.Spellcraft?.rank>=5),castRing);
+    };
+    const spellRolls=a.kind==='spell' ? Object.fromEntries((ring==='All'?['Air','Earth','Fire','Water']:[ring]).map(element=>[element,castFor(element)]).filter(([,pool])=>pool)) : null;
+    const spellRoll=spellRolls?.[ring] || null;
+    return {...a,spellRoll,spellRolls,selectionId:entry.id,memorized:!!entry.memorized,grant:!!entry.grant,cost,reasons};
   }
   function calculate(input, catalog, {untrainedSkills = []} = {}) {
     const s = normalize(input);
@@ -270,7 +278,7 @@
     d.ancestors=s.ancestors.map(a=>({...catalog.ancestors?.find(e=>e.id===a.catalogId),...a}));
     const abilities=s.abilities.map(e=>abilityQuote(e,s,d,catalog));
     // Universal spells are free school grants, stored in the private Abilities section.
-    if(school?.spells && /Sense|Commune|Summon/i.test(school.spells))for(const a of catalog.abilities || [])if(a.slug==='universal-spells' && /^(Sense|Commune|Summon)$/i.test(a.name) && !abilities.some(e=>e.id===a.id))abilities.push({...a,selectionId:`school-${a.id}`,grant:true,cost:0,reasons:[]});
+    if(school?.spells && /Sense|Commune|Summon/i.test(school.spells))for(const a of catalog.abilities || [])if(a.slug==='universal-spells' && /^(Sense|Commune|Summon)$/i.test(a.name) && !abilities.some(e=>e.id===a.id))abilities.push({...abilityQuote({id:`school-${a.id}`,catalogId:a.id,kind:'spell',grant:true},s,d,catalog),cost:0,reasons:[]});
     for(const a of abilities) {
       const memorization=a.kind==='spell' && a.memorized ? a.mastery : 0;
       addCost(`ability:${a.selectionId}`,Math.max(0,a.cost-memorization),a.name);

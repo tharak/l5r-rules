@@ -1151,9 +1151,9 @@ test('abilities are button lists: bought, then available, then unavailable; clic
   // A blocked spell cannot be bought; clicking a bought one sells it.
   buy(c,'spell',id('spell','Everburning Rage'));assert.equal((await c.data()).character.abilities.length,1);
   sell(c,'spell',id('spell','Blessed Wind'));assert.equal((await c.data()).character.abilities.length,0);
-  // Details keep rules, the School grant switch and Memorize for bought abilities.
+  // No Details list under the buttons.
   buy(c,'spell',id('spell','Blessed Wind'));
-  assert.match(section(c,'spell'),/id="ability-details-spell"[\s\S]*data-ability-grant=[\s\S]*data-action="memorize"/);
+  assert.doesNotMatch(section(c,'spell'),/ability-details|<details/);
   // Kata are closed for a shugenja: all disabled under "Bushi only.".
   html=section(c,'kata');
   assert.match(html,/<h3>Kata<\/h3><span class="creator-ability-locked">Bushi only\.<\/span>/);
@@ -1169,4 +1169,21 @@ test('abilities are button lists: bought, then available, then unavailable; clic
   assert.match(sectionHtml(bushi,'abilities'),/<input[^>]*data-search-scope="kata"/);
   const tainted=await character({taint:1,schoolDecisions:{shadowlands:true}});tainted.school('Crab','Hida Bushi');
   assert.deepEqual([...section(tainted,'shadowlands').matchAll(/data-ability-group="([^"]+)"/g)].map(m=>m[1]),['mutations','minor-shadowlands-powers','major-shadowlands-powers','akutenshi-powers']);
+});
+
+test('bought abilities appear in Rolls: spells roll from their ring card, kata and kiho open their rules',async()=>{
+  const id=(kind,name)=>catalog.abilities.find(a=>a.kind===kind&&a.name===name).id;
+  const c=await character();c.school('Crane','Asahina Shugenja');
+  c.click({action:'buy-ability',abilityKind:'spell',id:id('spell','Blessed Wind')});
+  const rolls=sectionHtml(c,'rolls');
+  const air=rolls.split('ring-watermark" data-ring="Air"')[1].split('creator-ring ring-watermark')[0];
+  const derived=(await c.data()).derived,blessed=derived.abilities.find(a=>a.name==='Blessed Wind');
+  assert.match(air,new RegExp(`data-roll-kind="spell" data-roll-name="${blessed.selectionId}" data-roll-skill="Air"[^>]*>[^]*?${blessed.spellRolls.Air.notation} · TN 10`));
+  // Universal spells (school grants) can be cast in each of the four elements.
+  for(const ring of ['Air','Earth','Fire','Water'])assert.match(rolls.split(`ring-watermark" data-ring="${ring}"`)[1].split('creator-ring ring-watermark')[0],/aria-label="Cast Commune \(/,ring);
+  assert.doesNotMatch(rolls.split('ring-watermark" data-ring="Void"')[1].split('creator-ring ring-watermark')[0].split('creator-roll-details')[0],/Cast Commune/);
+  // A bushi's kata sits in its ring card and links to its rules.
+  const bushi=await character();bushi.school('Crab','Hida Bushi');
+  bushi.click({action:'buy-ability',abilityKind:'kata',id:id('kata','Striking as Earth')});
+  assert.match(sectionHtml(bushi,'rolls').split('ring-watermark" data-ring="Earth"')[1].split('creator-ring ring-watermark')[0],/<a class="creator-roll-ability" data-rule-reference href="#\/katas#[^"]*"[^>]*><span>Striking as Earth<\/span><small>Kata<\/small>/);
 });
