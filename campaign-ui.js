@@ -14,7 +14,7 @@
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -162,7 +162,7 @@
   function gallery(images,{kind = '',editable = false} = {}) {
     const list = (images || []).filter(UI.isPortrait);
     const thumbs = list.map((src,index) => `<figure class="campaign-image"><img src="${src}" alt="Image ${index+1}">${editable ? button('image-remove','Remove',`${kind}:${index}`) : ''}</figure>`).join('');
-    const add = editable && list.length < MAX_IMAGES ? `<label class="campaign-image-add ui-button ui-button--secondary ui-button--compact">Add image<input type="file" accept="image/*" class="ui-portrait-input" data-entry-image="${kind}" aria-label="Add image"></label>` : '';
+    const add = editable && list.length < MAX_IMAGES ? `<label class="campaign-image-add ui-button ui-button--secondary ui-button--compact">Add image<input type="file" accept="image/*" class="ui-portrait-input" data-entry-image="${kind}" aria-label="Add image"></label>${window.MediaLibrary ? button('image-library','Library',kind) : ''}` : '';
     return thumbs || add ? `<div class="campaign-images">${thumbs}${add}</div>` : '';
   }
   function entryEditor(kind,draft) {
@@ -178,7 +178,7 @@
     ],extraHtml:gallery(session.images,{kind:'session',editable:isGM}),actionsHtml:isGM?button('session-save','Save')+button('session-delete','Delete',session.id):button('session-close','Close')});
   }
   function npcEditor(npc) {
-    const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')});
+    const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')+(window.MediaLibrary?button('npc-portrait-library','Library'):'')});
     return picture+UI.recordEditor({fields:[
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
       {label:'Role',value:npc.role || '',attrs:{'data-campaign-field':'npc-role',maxlength:200,placeholder:'e.g. Magistrate of the Lion'}},
@@ -350,8 +350,19 @@
     const placing = isGM && selected && pickTarget && pickNote;
     const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
     // The selectors float over the map's top-left corner (above it on narrow screens).
-    const map = `<div class="timeline-stage">${controls}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div></div>`;
+    const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}${store().get(`campaigns/${active}`)?.mapId ? button('map-reset','Default map') : ''}</div>` : '';
+    const map = `<div class="timeline-stage">${controls}${mapActions}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="${e(mapSrc())}" alt="Campaign map">${pinHtml}</div></div>`;
     return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
+  }
+  // The campaign map: a media library picture the GM chose, else the map of Rokugan.
+  const loadingMaps = new Set();
+  function mapSrc() {
+    const id = store().get(`campaigns/${active}`)?.mapId;
+    if (!id || !window.MediaLibrary) return 'public/assets/rokugan-map.webp';
+    const src = window.MediaLibrary.cachedSrc(id);
+    if (src) return src;
+    if (!loadingMaps.has(id)) { loadingMaps.add(id); window.MediaLibrary.imageSrc(id).then(() => changed()).catch(() => {}); }
+    return 'public/assets/rokugan-map.webp';
   }
   // The full entry behind a timeline event, in an overlay dialog.
   // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).
@@ -746,6 +757,22 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
+      else if (action==='npc-portrait-library') {
+        const editing=npcDraft || npcId, file=await window.MediaLibrary?.pickFile('Choose a picture');
+        const url=file && await UI.readPortrait(file);
+        if (url && (npcDraft || npcId) === editing) setNPCPortrait(url);
+      }
+      else if (action==='image-library') {
+        const file=await window.MediaLibrary?.pickFile('Choose an image'), picture=file && await UI.readPortrait(file);
+        if (picture) addEntryImage(id,picture);
+      }
+      else if (action==='map-pick'||action==='map-reset') {
+        if (!gm()) return;
+        const c=store().get(`campaigns/${active}`), mapId=action==='map-pick' ? await window.MediaLibrary?.pickId('Choose a map') : '';
+        if (action==='map-pick' && !mapId) return;
+        const {mapId:previous,...rest}=c;
+        store().queue(`campaigns/${active}`,mapId ? {...rest,mapId} : rest);
+      }
       else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {
@@ -785,6 +812,11 @@
     store().queue(path('timeline',existing?.id||crypto.randomUUID()),{sessionId,kind,targetId,noteId:pickNote,x:Math.min(100,Math.max(0,x)),y:Math.min(100,Math.max(0,y)),createdAt:existing?.createdAt||now,updatedAt:now});
     pickTarget='';pickNote='';changed();
   }
+  // An image added to the plot being drafted, or to the session being edited (GM).
+  function addEntryImage(kind,picture) {
+    if (kind==='plot' && plotDraft) plotDraft.images=[...(plotDraft.images||[]),picture].slice(0,MAX_IMAGES);
+    if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
+  }
   document.addEventListener('change',async event=>{
     const imageKind=event.target.dataset?.entryImage;
     if (imageKind) {
@@ -793,8 +825,7 @@
       try {
         const picture=await UI.readPortrait(file);
         if (!picture) return;
-        if (imageKind==='plot' && plotDraft) plotDraft.images=[...(plotDraft.images||[]),picture].slice(0,MAX_IMAGES);
-        if (imageKind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
+        addEntryImage(imageKind,picture);
       } catch (err) { error=err.message || 'This image could not be read.'; }
       changed(); return;
     }

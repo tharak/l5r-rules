@@ -241,6 +241,24 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       token ||= await this.invite(c);
       await sdk.updateDoc(ref(`campaigns/${c}/requests/${who}`),{inviteToken:token});
     },
+    // Media library, shared by every signed-in user: a small thumbnail record per picture (for
+    // browsing) and the full image in a separate record, loaded only when picked.
+    watchLibrary(receive,fail = () => {}) {
+      return sdk.onSnapshot(sdk.query(sdk.collection(db,'library'),sdk.orderBy('createdAt','desc'),sdk.limit(500)),
+        s=>receive(s.docs.map(doc=>({id:doc.id,...doc.data()}))),fail);
+    },
+    async addLibrary({title,thumb,image,width,height}) {
+      const id = crypto.randomUUID();
+      await commit([[`libraryFull/${id}`,{image,uploaderUid:uid}],[`library/${id}`,{title:String(title || 'Picture').slice(0,200),thumb,width,height,uploaderUid:uid,uploaderName:playerName(),createdAt:new Date().toISOString()}]]);
+      return id;
+    },
+    async addLibraryLink({title,url}) {
+      const id = crypto.randomUUID();
+      await sdk.setDoc(ref(`library/${id}`),{title:String(title || 'Picture').slice(0,200),url:String(url).slice(0,2000),uploaderUid:uid,uploaderName:playerName(),createdAt:new Date().toISOString()});
+      return id;
+    },
+    async libraryImage(id) { return (await get(`libraryFull/${id}`))?.image || ''; },
+    async deleteLibrary(id,{link = false} = {}) { await commit(link ? [[`library/${id}`,null]] : [[`library/${id}`,null],[`libraryFull/${id}`,null]]); },
     // GM handover: another current member becomes GM at once; this account stays a member.
     async handOver(c,to) {
       if (!(await get(memberPath(c,to)))) throw new Error('That player is no longer in the campaign.');

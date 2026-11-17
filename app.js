@@ -241,7 +241,8 @@ function renderHome() {
   return `<div class="workspace home"><h1 class="visually-hidden">l5r-rules</h1>${
     row('Campaigns','#/campaigns',campaigns.html,campaigns.create || '')}${
     row('Characters','#/characters',pcs.join(''),UI.button({text:'+ PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${
-    row('Books','#/books',books.join(''))}</div>`;
+    row('Books','#/books',books.join(''))}${
+    window.CampaignStorage?.uid ? row('Library','#/library',window.MediaLibrary.homeTiles()) : ''}</div>`;
 }
 
 function renderCharacters() {
@@ -370,7 +371,7 @@ function render() {
   // The start landscape is already pale, so it takes a lighter wash.
   if (slug === 'start') setPageArt('public/assets/lore/clan-landscape.webp','#f2e9d659');
   else setPageArt(SHADOWLANDS_PAGES.includes(slug) ? 'public/assets/lore/shadowlands-map.webp' : '');
-  const title = slug === 'start' ? 'Start' : designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = slug === 'start' ? 'Start' : slug === 'library' ? 'Library' : designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // The page label only appears on rule pages; elsewhere the heading and nav already say it.
   $('#breadcrumb').hidden = !page || slug === 'start';
@@ -378,8 +379,9 @@ function render() {
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
-  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : slug === 'start' ? renderHome() : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : characterMissing ? '<div class="workspace"><h1>Character not found</h1><a href="#/characters">Characters</a></div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : slug === 'start' ? renderHome() : slug === 'library' ? window.MediaLibrary.render() : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : characterMissing ? '<div class="workspace"><h1>Character not found</h1><a href="#/characters">Characters</a></div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
+  if (slug === 'library') window.MediaLibrary.mount($('#app'));
   if (characterEditor) window.CharacterBuilder.mount($('#app'));
   if (portraitCreator) window.PortraitCreator.mount($('#app'));
   if (clanMons) mountClanMons($('#app'));
@@ -451,6 +453,8 @@ $('#app').addEventListener('click', async event => {
 });
 window.addEventListener('characters-changed', () => { if (state.data && (['characters','start'].includes(currentSlug()) || characterMissing)) render();
   else if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
+// The library page and the start page's Library row follow new and removed pictures.
+window.addEventListener('library-changed', () => { if (state.data && ['library','start'].includes(currentSlug())) render(); });
 window.addEventListener('campaigns-changed', () => { if (state.data && /^(start$|campaigns|invite\/)/.test(currentSlug())) window.CampaignUI.refresh(render); });
 window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug()==='campaigns' || currentSlug()==='start' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('hashchange', () => {if(rulesDialog?.open)rulesDialog.close();render();});

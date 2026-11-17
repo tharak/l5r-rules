@@ -355,3 +355,29 @@
   .home-tile[data-tile-mon], .campaign-entry[data-tile-mon] > summary { position: relative; overflow: hidden; isolation: isolate; }
   .home-tile[data-tile-mon]::before, .campaign-entry[data-tile-mon] > summary::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--tile-mon) center / cover no-repeat; opacity: .22; pointer-events: none; }
 }
+
+/* Media library: a grid per source; tiles are the picture with its title. */
+@media screen {
+  .library { display: grid; gap: 22px; }
+  .library-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .library-head h1 { margin: 0 12px 0 0; font: 32px var(--serif); }
+  .library-head > input[type="search"] { margin-left: auto; width: min(260px,100%); }
+  .library-link { display: flex; gap: 6px; flex: 1 1 280px; max-width: 460px; }
+  .library-link input { flex: 1; min-width: 0; }
+  .library-group h2 { margin: 0 0 10px; font: 22px var(--serif); }
+  .library-group h2 small { font: 13px var(--sans); color: var(--muted); }
+  .library-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: 10px; }
+  .library-tile { position: relative; margin: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: #fffdf8; }
+  .library-tile img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--line); }
+  .library-tile figcaption { display: grid; padding: 6px 8px; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+  .library-tile figcaption small { color: var(--muted); }
+  .library-tile > .ui-button { position: absolute; top: 6px; right: 6px; }
+  .library-tile-pick { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+  .library-tile:has(.library-tile-pick:hover) { border-color: var(--red); }
+  .library-dialog { width: min(1000px,94vw); max-height: 90vh; padding: 0; }
+  .library-dialog header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .library-dialog header h2 { margin: 0 auto 0 0; font: 22px var(--serif); }
+  .library-dialog-body { display: grid; gap: 18px; padding: 16px 18px; max-height: calc(90vh - 80px); overflow: auto; }
+  .library-home-tile img { width: 44px; height: 44px; flex: none; border-radius: 4px; object-fit: cover; }
+  .timeline-map-actions { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 6px; }
+}

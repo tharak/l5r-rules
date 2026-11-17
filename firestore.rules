@@ -102,8 +102,10 @@ service cloud.firestore {
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
         && getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid)).data.gmUid == request.auth.uid;
       // The GM edits the title and which PCs/NPCs appear on the timeline picker.
-      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden'])
+      // The GM edits the title, the timeline picker, and the map (a media library picture).
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden','mapId'])
         && (!('timelineHidden' in request.resource.data) || (request.resource.data.timelineHidden is list && request.resource.data.timelineHidden.size() <= 1000))
+        && (!('mapId' in request.resource.data) || (request.resource.data.mapId is string && request.resource.data.mapId.size() <= 80))
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
       // GM handover: the GM passes the campaign to another current member, at once.
       allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gmUid'])
@@ -271,6 +273,37 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.token)).data.campaignId == c;
         allow delete: if gm(c);
       }
+    }
+    // Media library: every signed-in user browses it and uploads to it; only the uploader removes a
+    // picture. The thumbnail record is listed; the full image is read one at a time when picked.
+    match /library/{id} {
+      allow read: if signed();
+      // A link: the picture stays on its own site (nothing stored but the address).
+      allow create: if signed() && request.resource.data.keys().hasOnly(['title','url','uploaderUid','uploaderName','createdAt'])
+        && request.resource.data.uploaderUid == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+        && request.resource.data.uploaderName is string && request.resource.data.uploaderName.size() <= 200
+        && request.resource.data.url is string && request.resource.data.url.size() <= 2000 && request.resource.data.url.matches('^https://[^\\s"<>]+$')
+        && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40;
+      // An upload: the thumbnail here, the full image in libraryFull.
+      allow create: if signed() && request.resource.data.keys().hasOnly(['title','thumb','width','height','uploaderUid','uploaderName','createdAt'])
+        && request.resource.data.uploaderUid == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+        && request.resource.data.uploaderName is string && request.resource.data.uploaderName.size() <= 200
+        && request.resource.data.thumb is string && request.resource.data.thumb.size() <= 120000
+        && request.resource.data.thumb.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$')
+        && request.resource.data.width is int && request.resource.data.height is int
+        && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40
+        && getAfter(/databases/$(database)/documents/libraryFull/$(id)).data.uploaderUid == request.auth.uid;
+      allow delete: if signed() && resource.data.uploaderUid == request.auth.uid;
+    }
+    match /libraryFull/{id} {
+      allow get: if signed();
+      allow create: if signed() && request.resource.data.keys().hasOnly(['image','uploaderUid'])
+        && request.resource.data.uploaderUid == request.auth.uid
+        && request.resource.data.image is string && request.resource.data.image.size() <= 1000000
+        && request.resource.data.image.matches('^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$');
+      allow delete: if signed() && resource.data.uploaderUid == request.auth.uid;
     }
     // Campaign links carry the first 8 characters of the campaign id. This lookup lets someone who
     // is not a member see which campaign a link names (its id and title, nothing else) so they can
