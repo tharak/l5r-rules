@@ -147,3 +147,12 @@ body:has(.campaign-entry[open]){overflow:hidden}
 /* Invite players, inside the + PC popup (GM only). */
 .campaign-invite{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
 .campaign-invite h4{margin:0 0 8px;font:17px var(--serif)}
+
+/* Campaign lists: tiles size to their content and wrap (long titles wrap within a cap). */
+.campaign-row .campaign-entries{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
+.campaign-row .campaign-entries>.campaign-entry,.campaign-row .campaign-entries>.campaign-add-tile{flex:0 1 auto;width:auto;max-width:min(360px,100%)}
+.campaign-row .campaign-add-tile{padding:10px 16px}
+.campaign-row .campaign-entry>summary{padding-right:16px}
+.campaign-row .campaign-entry>summary .campaign-entry-title{flex:0 1 auto}
+/* The date line wraps under the title and never widens the tile. */
+.campaign-row .campaign-entry>summary .campaign-entry-meta{contain:inline-size;min-width:0}
