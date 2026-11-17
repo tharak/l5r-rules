@@ -90,3 +90,5 @@
 .timeline-arrow-head::after{content:'';position:absolute;top:50%;right:-9px;margin-top:-8px;border:8px solid transparent;border-left:11px solid var(--arrow,var(--red));border-right:0;filter:drop-shadow(0 1px 2px #0006)}
 .timeline-arrow-pcs{--arrow:#3d6f9b}.timeline-arrow-npcs{--arrow:#7a5296}.timeline-arrow-plots{--arrow:#b8892e}
 .timeline-arrow-pcs img,.timeline-arrow-pcs .timeline-arrow-dot{border-color:#3d6f9b}.timeline-arrow-npcs img,.timeline-arrow-npcs .timeline-arrow-dot{border-color:#7a5296}.timeline-arrow-plots img,.timeline-arrow-plots .timeline-arrow-dot{border-color:#b8892e}
+/* On the timeline, everything around the map uses the whole window width too. */
+.campaign-workspace-wide{max-width:none}
