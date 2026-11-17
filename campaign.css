@@ -97,3 +97,10 @@
 /* The GM edits the campaign title in place; it reads as the page heading. */
 .campaign-workspace>.workspace-head>input[data-campaign-field="title"]{flex:1;max-width:720px;margin:0;padding:4px 8px;font:32px var(--serif);background:transparent;border:1px solid transparent;border-radius:3px}
 .campaign-workspace>.workspace-head>input[data-campaign-field="title"]:hover,.campaign-workspace>.workspace-head>input[data-campaign-field="title"]:focus{border-color:var(--line);background:#fffbf2}
+/* Books: a bare caret beside a page opens its sections. */
+.books-grid li>a+.book-sections{display:inline}
+.book-sections>summary{display:inline-block;margin-left:6px;padding:0 4px;color:var(--muted);cursor:pointer;list-style:none}
+.book-sections>summary::-webkit-details-marker{display:none}
+.book-sections>summary::before{content:'▸';font-size:12px}
+.book-sections[open]>summary::before{content:'▾'}
+.book-sections[open]{display:block}

@@ -99,7 +99,7 @@ function renderNavigation() {
   });
 }
 function renderBooks() {
-  const entries = items => `<ul>${items.map(item => `<li>${UI.link({href:navHref(item),text:item.title})}${item.children?.length ? UI.disclosure({attrs:{},titleHtml:`Sections`,bodyHtml:`${entries(item.children)}`}) : ''}</li>`).join('')}</ul>`;
+  const entries = items => `<ul>${items.map(item => `<li>${UI.link({href:navHref(item),text:item.title})}${item.children?.length ? `<details class="book-sections"><summary aria-label="${esc(item.title)} sections"></summary>${entries(item.children)}</details>` : ''}</li>`).join('')}</ul>`;
   return `<div class="workspace"><h1>Books</h1><div class="books-grid">${bookSections().map(book => UI.panel({attrs:{'class':'panel'},bodyHtml:`<h2>${bookMark(book.slug)}<a href="${pageHref(book.slug)}">${esc(book.title)}</a></h2>${entries(book.children)}`})).join('')}</div><a href="#/all-pages">All pages</a></div>`;
 }
 
@@ -209,7 +209,7 @@ async function mountOfficialImages(element) {
 
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
-  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Create PC',attrs:{'data-dashboard':'new'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2><button type="button" class="character-open" data-dashboard="open" data-id="${esc(c.id)}">${esc(c.name || 'Unnamed PC')}</button></h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
+  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'+ PC',attrs:{'data-dashboard':'new','aria-label':'Create PC'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2><button type="button" class="character-open" data-dashboard="open" data-id="${esc(c.id)}">${esc(c.name || 'Unnamed PC')}</button></h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
 }
 
 function renderArticle(page) {
@@ -310,8 +310,8 @@ function render() {
   document.body.classList.toggle('route-campaigns', campaignRoute);
   const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
-  // Campaign pages show no page label; the map and their own content identify them.
-  $('#breadcrumb').hidden = campaignRoute;
+  // The page label only appears on rule pages; elsewhere the heading and nav already say it.
+  $('#breadcrumb').hidden = !page;
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
