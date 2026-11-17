@@ -299,3 +299,9 @@
   .home-book .book-mark { width: 40px; height: 40px; flex: none; margin: 0; }
 }
 @media screen { .topbar-slim #search-button { color: var(--ink); border-color: var(--line); background: #fffdf8cc; } .topbar-slim .account-menu summary { background: #fffdf8cc; } }
+/* Start page rows wrap into an auto-fitting grid instead of scrolling sideways. */
+@media screen {
+  .home-row-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px,100%), 1fr)); overflow: visible; scroll-snap-type: none; padding: 2px; }
+  .home-row-items > *, .home-row-items > .campaign-card, .home-tile, .home-book { width: auto; min-width: 0; }
+  .home-row-items:has(> .ui-button:only-child) { display: block; }
+}
