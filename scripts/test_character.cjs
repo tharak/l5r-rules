@@ -166,8 +166,8 @@ test('Rolls macro filter covers all six categories at rank zero and preserves tr
  for(const name of trained)assert.ok(rows(c).includes(`data-ring-skill="${name}"`),name);
  toggle(c,{hideZeroSkills:''},false);
  const restored=await c.reload();
- assert.match(rows(restored),/data-hide-zero-skills="true">Hide 0 rank skills/);
- assert.match(rows(restored),/data-hide-zero-macro-skills="true">Hide macro-skills 0/);
+ assert.match(rows(restored),/data-hide-zero-skills="true" aria-label="Hide 0 rank skills">Rank 0/);
+ assert.match(rows(restored),/data-hide-zero-macro-skills="true" aria-label="Hide macro-skills 0">Macro 0/);
  assert.ok(rows(restored).includes('data-ring-skill="War Fan"'));
  toggle(restored,{hideZeroMacroSkills:''},true);
  assert.ok(!rows(restored).includes('data-ring-skill="War Fan"'));
@@ -533,8 +533,8 @@ test('section 03 filters independently hide rank zero and macro skills, retain t
   const rows=()=>sectionHtml(c,'skills');
   const has=name=>rows().includes(`data-skill-name="${name}"`);
   const toggle=(macro,checked)=>c.root.onchange({target:{dataset:{skillFilterView:'skills',[macro?'hideZeroMacroSkills':'hideZeroSkills']:''},checked}});
-  assert.match(rows(),/data-hide-zero-skills="true">Hide 0 rank skills/);
-  assert.match(rows(),/data-hide-zero-macro-skills="true">Hide macro-skills 0/);
+  assert.match(rows(),/data-hide-zero-skills="true" aria-label="Hide 0 rank skills">Rank 0/);
+  assert.match(rows(),/data-hide-zero-macro-skills="true" aria-label="Hide macro-skills 0">Macro 0/);
   for(const [hideZero,hideMacro] of [[false,true],[true,false],[true,true],[false,false]]) {
     toggle(false,hideZero);toggle(true,hideMacro);
     for(const name of ['Courtier','Lore: History','Kenjutsu'])assert.ok(has(name),name);

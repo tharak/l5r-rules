@@ -191,8 +191,7 @@
   :is(#creator-traits,#creator-rolls) .creator-ring-head > b { width: 28px; height: 28px; flex: none; }
   #creator-rolls .creator-ring-head { justify-content: flex-start; }
   #creator-rolls .creator-ring-head > span { flex: none; }
-  #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
-  #creator-rolls .creator-skill-filter { margin: 0; color: var(--muted); }
+  #creator-rolls .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 8px; }
   #creator-traits .creator-rank-row { flex-direction: column; align-items: flex-start; }
   #creator-rolls .creator-ring-grid { display: flex; flex-wrap: wrap; align-items: flex-start; overflow-x: visible; padding-bottom: 0; }
   #creator-rolls .creator-ring:nth-child(n) { grid-column: auto; grid-row: auto; min-width: 44px; width: 100%; justify-self: stretch; }
@@ -341,7 +340,7 @@
 }
 
 @media screen {
-  #creator-skills .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 16px 0 8px; }
+  #creator-skills .creator-skill-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 8px; }
   #creator-skills .creator-skill-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(280px,100%),1fr)); gap: 8px; border: 0; background: transparent; }
   #creator-skills .creator-skill-grid .creator-skill-row { display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 3px; }
   #creator-skills .creator-skill-grid .creator-skill-row > div:first-child { flex: none; max-width: 100%; }
@@ -412,3 +411,10 @@
 .creator-public-preview-body { min-height: 0; overflow: auto; padding: 12px 16px; }
 .creator-public-preview-body .workspace { padding: 0; }
 .creator-public-preview > footer { display: flex; justify-content: flex-end; padding: 0 16px 14px; }
+
+/* Skill filters: compact strike-through chips; a struck chip means that group is hidden. */
+.creator-skill-filter { position: relative; display: inline-flex; align-items: center; margin: 0; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); cursor: pointer; user-select: none; }
+.creator-skill-filter input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.creator-skill-filter:has(input:checked) { text-decoration: line-through; opacity: .7; }
+.creator-skill-filter:has(input:not(:checked)) { color: var(--ink, inherit); border-color: currentColor; }
+.creator-skill-filter:has(input:focus-visible) { outline: 2px solid var(--red); outline-offset: 2px; }

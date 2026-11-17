@@ -198,7 +198,8 @@
 
   function renderSkillFilter(view = 'rolls') {
     const filters = skillFilters[view], attrs = {'type':'checkbox','data-skill-filter-view':view};
-    return `<div class="creator-skill-filters">${UI.checkbox({label:'Hide 0 rank skills',attrs:{...attrs,'data-hide-zero-skills':true,'checked':filters.zero},labelAttrs:{'class':'creator-check creator-skill-filter'}})}${UI.checkbox({label:'Hide macro-skills 0',attrs:{...attrs,'data-hide-zero-macro-skills':true,'checked':filters.macro},labelAttrs:{'class':'creator-check creator-skill-filter'}})}</div>`;
+    const chip = (label,title,flag,checked) => UI.checkbox({label,attrs:{...attrs,[flag]:true,checked,'aria-label':title},labelAttrs:{'class':'creator-skill-filter',title}});
+    return `<div class="creator-skill-filters" role="group" aria-label="Skill filters">${chip('Rank 0','Hide 0 rank skills','data-hide-zero-skills',filters.zero)}${chip('Macro 0','Hide macro-skills 0','data-hide-zero-macro-skills',filters.macro)}</div>`;
   }
 
   function isMacroSkill(name) {
