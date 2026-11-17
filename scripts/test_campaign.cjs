@@ -121,7 +121,7 @@ test('campaign cards display PC - player, escape names, and handle empty and pri
  d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});d.data.set('campaigns/c/members/alice',{displayName:'Alice & Bob'});
  d.setCharacters([{id:'own',name:'Hida <Kenta>'}]);
  let html=d.render();
- assert.match(html,/Hida &lt;Kenta&gt; - Game Master/);assert.match(html,/Private PC - Alice &amp; Bob/);assert.match(html,/No PCs linked yet/);
+ assert.match(html,/Hida &lt;Kenta&gt; - Game Master/);assert.match(html,/Private PC - Alice &amp; Bob/);
  assert.equal(d.watches.length,1);assert.equal(d.watches[0].full,false);
  d.watches[0].receive({sections:{identity:{name:'Doji Rei'}}},null,{fromCache:false});
  assert.match(d.render(),/Doji Rei - Alice &amp; Bob/);
@@ -228,14 +228,14 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  assert.match(d.window.CampaignUI.render('campaigns'),/campaign-unread/);
  render();await d.click('section','sessions');
  let html=render();
- assert.match(html,/Sessions !/);assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/Not read yet/);
+ assert.match(html,/Sessions !/);assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/data-campaign="mark-read"/);
  await d.click('mark-read','sessions:s');
  assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-01T10:00:00Z');
  html=render();
- assert.doesNotMatch(html,/Sessions !/);assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/Read by Alice/);
+ assert.doesNotMatch(html,/Sessions !/);assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/aria-label="Read by Alice"/);
  // A new note on the session makes it unread again.
  d.data.set('campaigns/c/notes/n',{creatorUid:'gm',targetKind:'sessions',targetId:'s',text:'More',createdAt:'2026-11-02',updatedAt:'2026-11-02T10:00:00Z'});
- assert.match(render(),/Sessions !/);assert.match(render(),/Not read yet/);
+ assert.match(render(),/Sessions !/);assert.match(render(),/data-campaign="mark-read"/);
 });
 
 test('timeline: newest sessions first, an always-visible map, entries chosen with selectors, used entries disabled, and a popup',async()=>{
