@@ -8,9 +8,9 @@ const context = {window:{}};
 for(const file of ['ui-components.js','design-guideline.js']) vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),context);
 const {entries,examples} = context.window.DesignGuideline;
 
-test('32 families retain all 117 permanent example IDs exactly once',()=>{
+test('32 families retain all 118 permanent example IDs exactly once',()=>{
   assert.equal(entries.length,32);
-  assert.equal(examples.length,117);
+  assert.equal(examples.length,118);
   assert.equal(new Set(entries.map(item=>item.id)).size,entries.length);
   const mapped=entries.flatMap(item=>item.exampleIds);
   assert.equal(mapped.length,examples.length);

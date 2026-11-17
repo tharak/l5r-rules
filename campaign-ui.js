@@ -290,6 +290,7 @@
   document.addEventListener('keydown',event => {
     if (event.key !== 'Escape') return;
     if (transferPopup) { transferPopup = ''; changed(); return; }
+    if (linkDraft || linkPopup || boardLinking) { linkDraft = null; linkPopup = ''; boardLinking = false; linkFrom = ''; changed(); return; }
     if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
@@ -455,6 +456,65 @@
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
   const renderInvitePopup = () => '';
+  // Investigation board: a manual corkboard of NPC, PC and plot cards joined by strings. Every
+  // member moves cards and adds strings; a string is drawn in its maker's colour (shown once in
+  // the legend, so names are not repeated on every string).
+  const BOARD = {w:2400,h:1600,cardW:210,cardH:64};
+  const PALETTE = ['#b23a2e','#2f6f9f','#3b7d3a','#8a5a9e','#c47a1c','#1f8a87','#a8456f','#5e6b2e'];
+  let boardLinking = false, linkFrom = '', linkDraft = null, linkPopup = '', boardSearch = '';
+  function memberColor(uid) {
+    const member = store().get(path('members',uid));
+    if (/^#[0-9a-f]{6}$/.test(member?.color || '')) return member.color;
+    // Members who have not picked one get the palette in turn, skipping colours already picked.
+    const members = store().list(path('members','')), picked = new Set(members.map(m => m.color).filter(Boolean));
+    const free = PALETTE.filter(c => !picked.has(c)), ids = members.filter(m => !m.color).map(m => m.id).sort(), index = Math.max(0,ids.indexOf(uid));
+    return (free.length ? free : PALETTE)[index % (free.length || PALETTE.length)];
+  }
+  const canEditLink = link => !!link && (gm() || link.creatorUid === store().uid);
+  // A colour is named once, by the player's PCs (the GM as "GM"), so strings need no names.
+  const legendName = member => member.id === store().get(`campaigns/${active}`)?.gmUid ? 'GM'
+    : store().list(path('pcs','')).filter(pc => pc.ownerUid === member.id).map(label).filter(name => name !== 'Private PC').join(', ') || member.displayName || 'Player';
+  function boardCards(npcs,pcs,plots) {
+    const pcCards = pcs.map(pc => { const profile = sheets.get(pc.id+':public')?.data?.profile, mine = own(pc) ? window.CharacterBuilder?.list().find(c => c.id === pc.characterId) : null;
+      return {key:`pcs:${pc.id}`,kind:'pcs',name:label(pc),meta:profile?.family || mine?.family || '',portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan}; });
+    const npcCards = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(n => ({key:`npcs:${n.id}`,kind:'npcs',name:n.name || 'Unnamed NPC',meta:n.role || '',portrait:n.portrait}));
+    const plotCards = plots.map(p => ({key:`plots:${p.id}`,kind:'plots',name:p.title || 'Untitled plot',meta:'Plot',portrait:(p.images || []).find(UI.isPortrait)}));
+    // Cards nobody has placed yet start in a grid: plots, then PCs, then NPCs.
+    let slot = 0;
+    return [...plotCards,...pcCards,...npcCards].map(card => {
+      const saved = store().get(path('board',card.key));
+      if (saved) return {...card,x:Number(saved.x),y:Number(saved.y)};
+      // Gaps wide enough for a string's label to sit between neighbouring cards.
+      const index = slot++, col = index % 8, row = Math.floor(index / 8);
+      return {...card,x:40 + col * (BOARD.cardW + 80),y:50 + row * (BOARD.cardH + 110)};
+    });
+  }
+  const centre = card => [card.x + BOARD.cardW / 2,card.y + BOARD.cardH / 2];
+  function renderBoard(npcs,pcs,plots) {
+    const cards = boardCards(npcs,pcs,plots), byKey = new Map(cards.map(card => [card.key,card]));
+    const links = store().list(path('links','')).filter(link => byKey.has(link.from) && byKey.has(link.to));
+    const strings = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
+      return `<line data-link="${e(link.id)}" data-from="${e(link.from)}" data-to="${e(link.to)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${memberColor(link.creatorUid)}"/>`; }).join('');
+    const tags = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
+      return `<button type="button" class="board-tag" data-campaign="board-link" data-id="${e(link.id)}" data-tag-from="${e(link.from)}" data-tag-to="${e(link.to)}" style="left:${(x1+x2)/2}px;top:${(y1+y2)/2}px;--string:${memberColor(link.creatorUid)}" aria-label="${e(byKey.get(link.from).name)} – ${e(byKey.get(link.to).name)}${link.label ? `: ${e(link.label)}` : ''}">${link.label ? e(link.label) : '·'}</button>`; }).join('');
+    const query = boardSearch.trim().toLowerCase();
+    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" style="left:${card.x}px;top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
+    const members = store().list(path('members','')).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
+    const legend = `<div class="board-legend" aria-label="String colours">${members.map(m => `<span class="board-legend-item"><i style="background:${memberColor(m.id)}"></i>${e(legendName(m))}${m.id === store().uid ? `<input type="color" data-board-color value="${memberColor(m.id)}" aria-label="Your string colour" title="Your string colour">` : ''}</span>`).join('')}</div>`;
+    const hint = boardLinking ? `<span class="board-hint">${linkFrom ? 'Now click the card to link to.' : 'Click the first card.'}</span>` : '';
+    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}${hint}${UI.field({attrs:{type:'search','data-board-search':true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
+      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="width:${BOARD.w}px;height:${BOARD.h}px"><svg class="board-strings" width="${BOARD.w}" height="${BOARD.h}" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
+  }
+  // Popups: a new string (optional label), or an existing one (label, remove).
+  function renderBoardPopup(npcs,pcs,plots) {
+    const byKey = new Map(boardCards(npcs,pcs,plots).map(card => [card.key,card]));
+    const between = (from,to) => `<p class="campaign-invite-note">${e(byKey.get(from)?.name || '?')} – ${e(byKey.get(to)?.name || '?')}</p>`;
+    if (linkDraft) return popup('board-popup-title','Link',`${between(linkDraft.from,linkDraft.to)}${UI.field({attrs:{'data-board-label':true,maxlength:120,placeholder:'How are they linked? (optional)','aria-label':'Link label'}})}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('board-link-save','Save')})}`,'board-close');
+    const link = linkPopup && store().get(path('links',linkPopup));
+    if (!link) return '';
+    const editable = canEditLink(link);
+    return popup('board-popup-title','Link',`${between(link.from,link.to)}<p class="board-made-by"><i style="background:${memberColor(link.creatorUid)}"></i>${e(memberName(active,link.creatorUid))}</p>${editable ? `${UI.field({attrs:{'data-board-label':true,maxlength:120,value:link.label || '',placeholder:'How are they linked? (optional)','aria-label':'Link label'}})}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('board-link-update','Save',linkPopup)+button('board-link-remove','Remove link',linkPopup)})}` : `<p>${e(link.label || '')}</p>`}`,'board-close');
+  }
   // A pin is moved or removed by whoever placed it, or by the GM (older pins count as the GM's).
   const canMovePin = item => !!item && (gm() || (!!item.creatorUid && item.creatorUid === store().uid));
   function renderNotePopup() {
@@ -562,8 +622,9 @@
       <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
       <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
+      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs,plots)}</section>
       <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${renderBoardPopup(npcs,pcs,plots)}${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -770,6 +831,23 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
+      else if (action==='board-link-mode') {boardLinking=!boardLinking;linkFrom='';}
+      else if (action==='board-card') {
+        if (!boardLinking) { const [kind,targetId]=id.split(':');openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);return; }
+        if (!linkFrom) linkFrom=id;
+        else if (linkFrom!==id) {linkDraft={from:linkFrom,to:id};linkFrom='';boardLinking=false;focusPopup=true;}
+      }
+      else if (action==='board-link-save'&&linkDraft) {
+        const now=new Date().toISOString(),label=(document.querySelector('[data-board-label]')?.value||'').trim().slice(0,120);
+        store().queue(path('links',crypto.randomUUID()),{from:linkDraft.from,to:linkDraft.to,label,creatorUid:store().uid,createdAt:now,updatedAt:now});linkDraft=null;
+      }
+      else if (action==='board-link') {linkPopup=id;focusPopup=true;}
+      else if (action==='board-link-update') {
+        const link=store().get(path('links',id));if(!canEditLink(link))return;
+        const {id:_,...rest}=link;store().queue(path('links',id),{...rest,label:(document.querySelector('[data-board-label]')?.value||'').trim().slice(0,120),updatedAt:new Date().toISOString()});linkPopup='';
+      }
+      else if (action==='board-link-remove') {const link=store().get(path('links',id));if(canEditLink(link)&&window.confirm('Remove this link?')){store().queue(path('links',id),null);linkPopup='';}}
+      else if (action==='board-close') {linkDraft=null;linkPopup='';}
       else if (action==='pin-remove') {
         const item=store().get(path('timeline',id));
         if (!canMovePin(item)) return;
@@ -812,6 +890,41 @@
   // Drag a pin to move it (yours, or any as GM). A drag that moved suppresses the click that
   // would open the pin's note.
   let drag=null, swallowClick=false;
+  // Board cards drag the same way (any member); their strings and tags follow.
+  let cardDrag=null;
+  function moveStrings(key,x,y) {
+    const cx=x+BOARD.cardW/2, cy=y+BOARD.cardH/2;
+    for (const line of document.querySelectorAll(`.board-strings line[data-from="${CSS.escape(key)}"]`)) {line.setAttribute('x1',cx);line.setAttribute('y1',cy);}
+    for (const line of document.querySelectorAll(`.board-strings line[data-to="${CSS.escape(key)}"]`)) {line.setAttribute('x2',cx);line.setAttribute('y2',cy);}
+    for (const tag of document.querySelectorAll(`.board-tag[data-tag-from="${CSS.escape(key)}"], .board-tag[data-tag-to="${CSS.escape(key)}"]`)) {
+      const line=document.querySelector(`.board-strings line[data-link="${CSS.escape(tag.dataset.id)}"]`);
+      if(line){tag.style.left=`${(Number(line.getAttribute('x1'))+Number(line.getAttribute('x2')))/2}px`;tag.style.top=`${(Number(line.getAttribute('y1'))+Number(line.getAttribute('y2')))/2}px`;}
+    }
+  }
+  document.addEventListener('pointerdown',event=>{
+    const card=event.target.closest?.('.board-card[data-id]');
+    if(!card||boardLinking||event.button!==0)return;
+    cardDrag={card,key:card.dataset.id,x0:event.clientX,y0:event.clientY,left:parseFloat(card.style.left)||0,top:parseFloat(card.style.top)||0,moved:false};
+  });
+  document.addEventListener('pointermove',event=>{
+    if(!cardDrag)return;
+    if(!cardDrag.moved&&Math.hypot(event.clientX-cardDrag.x0,event.clientY-cardDrag.y0)<5)return;
+    cardDrag.moved=true;event.preventDefault();
+    cardDrag.x=Math.min(BOARD.w-BOARD.cardW,Math.max(0,Math.round(cardDrag.left+event.clientX-cardDrag.x0)));
+    cardDrag.y=Math.min(BOARD.h-BOARD.cardH,Math.max(0,Math.round(cardDrag.top+event.clientY-cardDrag.y0)));
+    cardDrag.card.style.left=`${cardDrag.x}px`;cardDrag.card.style.top=`${cardDrag.y}px`;cardDrag.card.classList.add('board-card-dragging');
+    moveStrings(cardDrag.key,cardDrag.x,cardDrag.y);
+  });
+  // Pictures inside a card would start the browser's own image drag and cancel ours.
+  document.addEventListener('dragstart',event=>{if(event.target.closest?.('.board-card'))event.preventDefault();});
+  document.addEventListener('pointercancel',()=>{if(cardDrag){cardDrag.card.classList.remove('board-card-dragging');cardDrag=null;changed();}});
+  document.addEventListener('pointerup',()=>{
+    if(!cardDrag)return;
+    const done=cardDrag;cardDrag=null;
+    if(!done.moved)return;
+    swallowClick=true;setTimeout(()=>{swallowClick=false;},400);
+    store().queue(path('board',done.key),{x:done.x,y:done.y,updatedAt:new Date().toISOString()});
+  });
   document.addEventListener('pointerdown',event=>{
     const pin=event.target.closest?.('.timeline-pin[data-pin-id]'), map=pin?.closest('.timeline-map');
     if(!pin||!map||event.button!==0)return;

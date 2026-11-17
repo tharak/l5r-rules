@@ -113,7 +113,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
             if (indexed.gmUid !== data.gmUid) { indexed.gmUid = data.gmUid; sdk.updateDoc(ref(indexPath(id)),{gmUid:data.gmUid}).catch(()=>{}); }
           },fail));
           // NPCs are public to every member.
-          const collections = ['members','sessions','pcs','npcs','reads','timeline'];
+          const collections = ['members','sessions','pcs','npcs','reads','timeline','board','links'];
           collections.push('plots','notes');
           for (const collection of collections) {
             const path = `campaigns/${id}/${collection}`;
@@ -210,7 +210,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
         const items=await records(`campaigns/${c}/${kind}`);
         for(let offset=0;offset<items.length;offset+=200)await commit(items.slice(offset,offset+200).flatMap(d=>[[`campaigns/${c}/${kind}/${d.id}/content/body`,null],[`campaigns/${c}/${kind}/${d.id}`,null]]));
       }
-      for (const collection of ['sessions','npcs','pcs','reads','timeline']) {
+      for (const collection of ['sessions','npcs','pcs','reads','timeline','board','links']) {
         const items = await records(`campaigns/${c}/${collection}`);
         for (let offset=0;offset<items.length;offset+=400) await commit(items.slice(offset,offset+400).map(d=>[`campaigns/${c}/${collection}/${d.id}`,null]));
       }
