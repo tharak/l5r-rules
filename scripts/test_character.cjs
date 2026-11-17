@@ -1075,3 +1075,17 @@ test('Insight card shows the current formula and cumulative Courtier and Etiquet
  assert.equal((await c.data()).derived.insight,134);
  const restored=await c.reload();assert.match(restored.root.innerHTML,/Insight:<\/span><strong>134<\/strong>/);
 });
+
+test('every ability is its own catalog entry: no merged spells, no paragraphs read as titles',()=>{
+  for (const ability of catalog.abilities) {
+    assert.ok(ability.name.length <= 45, `name looks like a paragraph: ${ability.name.slice(0,60)}`);
+    assert.ok(ability.description.trim(), `${ability.id} has no rules text`);
+    assert.doesNotMatch(ability.description,/\[(CR|IH)\]|Ring\s*\/\s*Master/,`${ability.id} contains another entry`);
+    assert.ok(!('ring/master' in (ability.fields || {})),ability.id);
+  }
+  const byId = id => catalog.abilities.find(ability => ability.id === id);
+  assert.match(byId('spell:universal-spells:Commune').description,/Water spirits communicate/);
+  assert.doesNotMatch(byId('spell:universal-spells:Sense').description,/Summon/);
+  assert.equal(byId('spell:water-spells:Hands of the Tides').fields.duration,'Instantaneous');
+  assert.match(byId('kata:katas:Art of Ninjutsu').description,/Stealth Skill Rank/);
+});

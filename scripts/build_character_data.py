@@ -341,6 +341,14 @@ def clean_name(value):
     return re.sub(r"\s*\[[^]]*\]", "", value).strip().rstrip(":")
 
 
+# Some headers are misspelled "Ring/Master" in the archive; both mark a new entry.
+MASTERY_FIELD = re.compile(r'Ring\s*/\s*Master|Mastery\s*:')
+
+
+def is_title(node):
+    return node.name == 'p' and bool(node.find('strong') or node.find('span', style=re.compile('underline')))
+
+
 def fields_after(node):
     fields, paragraphs = {}, []
     for sibling in node.next_siblings:
@@ -348,16 +356,23 @@ def fields_after(node):
             continue
         if sibling.name in ('h1', 'h2', 'h3'):
             break
-        if sibling.name == 'p' and (sibling.find('strong') or sibling.find('span', style=re.compile('underline'))):
+        if is_title(sibling):
             following = sibling.find_next_sibling()
-            if following and following.name == 'ul' and re.search(r'Ring/Mastery|Mastery:', following.get_text()):
+            if following and following.name == 'ul' and MASTERY_FIELD.search(following.get_text()):
                 break
         if sibling.name == 'ul':
             for li in sibling.find_all('li', recursive=False):
                 text = li.get_text(' ', strip=True)
-                m = re.match(r'([^:]+):\s*(.*)', text)
+                # A few bullets drop the colon after a known label ("Duration 1 Round").
+                m = re.match(r'([^:.]{1,30}):\s*(.*)', text, re.S) or re.match(r'(Range|Area of Effect|Duration|Raises)\s+(.*)', text, re.S)
                 if m:
-                    fields[m[1].strip().lower()] = m[2]
+                    key = m[1].strip().lower()
+                    fields['ring/mastery' if key == 'ring/master' else key] = m[2]
+                elif 'duration' not in fields and re.fullmatch(r'Instantaneous|Permanent|Concentration', text):
+                    fields['duration'] = text
+                else:
+                    # An unlabelled bullet is part of the rules text (an effect or a list in it).
+                    paragraphs.append(text)
         else:
             paragraphs.append(sibling.get_text(' ', strip=True))
     return fields, '\n'.join(paragraphs)
@@ -373,7 +388,8 @@ def powers_for(slug, kind):
             if m: ring = m[1]
             continue
         next_node = node.find_next_sibling()
-        if not next_node or next_node.name != 'ul':
+        # An entry starts at a bold or underlined title followed by its field list.
+        if not is_title(node) or not next_node or next_node.name != 'ul':
             continue
         fields, description = fields_after(node)
         mastery = fields.get('ring/mastery', fields.get('ring/master', fields.get('mastery', '')))
