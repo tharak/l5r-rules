@@ -189,3 +189,11 @@ test('GM journal entries: public ones are readable by anyone, private ones by th
  await assertSucceeds(deleteDoc(r(db('alice'),path('public'))));
  await assertSucceeds(deleteDoc(r(db('gm'),path('private'))));
 });
+test('read marks: members read everyone\'s marks and write only their own',async()=>{
+ await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/reads/alice'),{name:'Alice',marks:{'sessions:s':'2026-11-01'}}));
+ await assertFails(setDoc(r(db('bob'),'campaigns/c/reads/alice'),{name:'Forged',marks:{}}));
+ await assertFails(setDoc(r(db('alice'),'campaigns/c/reads/alice'),{name:'Alice',marks:{},extra:true}));
+ for(const u of ['gm','bob'])await assertSucceeds(getDoc(r(db(u),'campaigns/c/reads/alice')));
+ for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c/reads/alice')));
+ await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/reads/alice')));
+});

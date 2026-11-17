@@ -33,3 +33,5 @@
 .campaign-image{margin:0;display:grid;gap:4px;justify-items:start}
 .campaign-image img{width:128px;height:128px;object-fit:cover;border:1px solid var(--line);border-radius:3px}
 .campaign-image-add{position:relative;cursor:pointer}
+.campaign-unread{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font:700 12px var(--sans)}
+.campaign-read-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;color:var(--muted)}

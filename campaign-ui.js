@@ -15,6 +15,32 @@
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
   const cardKey = pc => `${pc.ownerUid}/${pc.characterId}`;
+  // Read marks: campaigns/{c}/reads/{uid} keeps, per member, the update each session or plot
+  // was last read at. An entry's update time is the latest of its own and its notes'.
+  const READ_KINDS = ['sessions','plots'];
+  const readKey = (kind,id) => `${kind}:${id}`;
+  function entryStamp(campaign,kind,item) {
+    const notes = store().list(`campaigns/${campaign}/notes/`).filter(n => n.targetKind === kind && n.targetId === item.id);
+    return [item.updatedAt || '',...notes.map(n => n.updatedAt || '')].sort().pop() || '';
+  }
+  const readsOf = campaign => store().list(`campaigns/${campaign}/reads/`);
+  const myMarks = campaign => readsOf(campaign).find(r => r.id === store().uid)?.marks || {};
+  const isUnread = (campaign,kind,item) => { const stamp = entryStamp(campaign,kind,item); return !!stamp && !((myMarks(campaign)[readKey(kind,item.id)] || '') >= stamp); };
+  const unreadIn = (campaign,kind) => store().list(`campaigns/${campaign}/${kind}/`).some(item => isUnread(campaign,kind,item));
+  const memberName = (campaign,uid) => store().get(`campaigns/${campaign}/members/${uid}`)?.displayName || 'Player';
+  const readersOf = (campaign,kind,item) => { const stamp = entryStamp(campaign,kind,item); return readsOf(campaign).filter(r => stamp && (r.marks?.[readKey(kind,item.id)] || '') >= stamp).map(r => r.name || memberName(campaign,r.id)); };
+  function markRead(kind,id) {
+    const item = store().get(path(kind,id));
+    if (!item || !store().uid) return;
+    const marks = {...myMarks(active),[readKey(kind,id)]:entryStamp(active,kind,{...item,id})};
+    store().queue(path('reads',store().uid),{name:memberName(active,store().uid),marks});
+  }
+  const unreadMark = '<span class="campaign-unread" title="Updated since you last marked it read" aria-label="Unread update">!</span>';
+  // "Read by" names (visible to everyone) and a Mark as read button while it is unread.
+  function readStatus(kind,item) {
+    const readers = readersOf(active,kind,item), unread = isUnread(active,kind,item);
+    return `<p class="campaign-read-status"><small>${readers.length ? `Read by ${readers.map(e).join(', ')}` : 'Not read yet'}</small>${unread ? button('mark-read','Mark as read',readKey(kind,item.id)) : ''}</p>`;
+  }
   function clearCardSheets() {
     for (const item of cardSheets.values()) item.stop?.();
     cardSheets.clear();
@@ -55,7 +81,7 @@
       const player = store().get(`campaigns/${campaign.id}/members/${pc.ownerUid}`)?.displayName || 'Player';
       return `<li>${e(name || 'Private PC')} - ${e(player)}</li>`;
     }).join('');
-    return UI.card({attrs:{'class':'panel campaign-card'},href:`#/campaigns/${campaign.id}`,bodyHtml:`<h2>${e(campaign.title)}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:'<p class="campaign-card-empty">No PCs linked yet.</p>'}`});
+    return UI.card({attrs:{'class':'panel campaign-card'},href:`#/campaigns/${campaign.id}`,bodyHtml:`<h2>${e(campaign.title)}${READ_KINDS.some(kind => unreadIn(campaign.id,kind)) ? ` ${unreadMark}` : ''}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:'<p class="campaign-card-empty">No PCs linked yet.</p>'}`});
   }
   function reset(next) {
     if (next === active) return;
@@ -126,9 +152,9 @@
   function renderPlots(plots) {
     // A new plot is drafted above the list; an existing one is edited inside its entry.
     const fresh = plotDraft && !plotId ? `<div class="campaign-entry-new">${entryEditor('plot',plotDraft)}</div>` : '';
-    const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`),
+    const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
-        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
+        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
     return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p>${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
   }
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
@@ -145,9 +171,9 @@
   const avatar = (src,clan) => { const mon = window.CharacterCatalog?.clanMon(clan || ''); const img = UI.isPortrait(src) ? src : mon; return img ? `<img class="campaign-entry-avatar" src="${img}" alt="">` : '<span class="campaign-entry-avatar" aria-hidden="true"></span>'; };
   const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
   function renderSessions(sessions,isGM) {
-    const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,entryTitle(session.title || 'Untitled session',day(session.updatedAt)),
+    const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
-        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${gallery(session.images)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
+        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
     return `${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:isGM?button('session-new','+ Session'):''})}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
   }
   function renderNPCs(npcs,isGM) {
@@ -202,7 +228,7 @@
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({label:'Campaign title',labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
-      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
+      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label:READ_KINDS.includes(value)&&unreadIn(active,value)?`${label} !`:label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
       ${section==='sessions'?renderSessions(sessions,isGM):''}
       ${section==='plots'?renderPlots(plots):''}
       ${section==='npcs'?renderNPCs(npcs,isGM):''}
@@ -243,6 +269,7 @@
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
+      else if (action==='mark-read') {const [kind,entryId]=id.split(':');if(READ_KINDS.includes(kind))markRead(kind,entryId);}
       else if (action==='image-remove') {
         const [kind,index]=id.split(':');
         if (kind==='plot' && plotDraft) plotDraft.images=(plotDraft.images||[]).filter((_,i)=>i!==Number(index));
@@ -263,6 +290,8 @@
         }
         delete data.id;
         store().queue(path(plot?'plots':'notes',entryId),data);
+        // Your own changes count as read by you.
+        if(plot)markRead('plots',entryId);else if(READ_KINDS.includes(noteTarget.kind))markRead(noteTarget.kind,noteTarget.id);
         if(plot){plotId=entryId;plotDraft=null;openEntries.add(`plots:${entryId}`);}else{noteId='';noteDraft=noteTarget=null;}
         store().flush();
       }
@@ -279,6 +308,7 @@
         const session=store().get(path('sessions',sessionId));
         if(!gm() || !session)return;
         store().queue(path('sessions',sessionId),{...session,updatedAt:new Date().toISOString()});
+        markRead('sessions',sessionId);
         sessionId='';store().flush();
       }
       else if (action==='session-close') sessionId='';

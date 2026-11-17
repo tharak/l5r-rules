@@ -129,6 +129,14 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
+      // Read marks: every member sees who has read what; each member writes only their own.
+      match /reads/{u} {
+        allow read: if joined(c);
+        allow create, update: if owner(u) && joined(c) && request.resource.data.keys().hasOnly(['name','marks'])
+          && request.resource.data.name is string && request.resource.data.name.size() <= 200
+          && request.resource.data.marks is map && request.resource.data.marks.size() <= 2000;
+        allow delete: if owner(u) || gm(c);
+      }
       // NPCs are public to every member; only the GM writes them.
       match /npcs/{id} {
         allow read: if joined(c);

@@ -217,3 +217,22 @@ test('the GM adds and removes session images; plot drafts carry their images to 
  await d.documentListeners.change({target:{dataset:{entryImage:'plot'},files:[{type:'image/png'}],value:'x'}});
  assert.match(render(),/data-campaign="image-remove" data-id="plot:0"/);
 });
+
+test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it; everyone sees who read',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'Hi',createdAt:'2026-11-01',updatedAt:'2026-11-01T10:00:00Z'});
+ d.store.uid='alice';
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ assert.match(d.window.CampaignUI.render('campaigns'),/campaign-unread/);
+ let html=render();
+ assert.match(html,/Sessions !/);assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/Not read yet/);
+ await d.click('mark-read','sessions:s');
+ assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-01T10:00:00Z');
+ html=render();
+ assert.doesNotMatch(html,/Sessions !/);assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/Read by Alice/);
+ // A new note on the session makes it unread again.
+ d.data.set('campaigns/c/notes/n',{creatorUid:'gm',targetKind:'sessions',targetId:'s',text:'More',createdAt:'2026-11-02',updatedAt:'2026-11-02T10:00:00Z'});
+ assert.match(render(),/Sessions !/);assert.match(render(),/Not read yet/);
+});
