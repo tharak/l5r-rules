@@ -180,47 +180,57 @@
     if (kind === 'plots') { const plot = store().get(path('plots',id)); return plot ? {name:plot.title || 'Untitled plot',image:(plot.images || []).find(UI.isPortrait) || ''} : null; }
     return null;
   };
-  // A note's title is its first line; the popup shows the whole note.
+  // A note's or journal entry's title is its first line; the popup shows the whole text.
   const noteTitle = note => { const first = String(note?.text || '').trim().split('\n')[0].trim(); return first.length > 80 ? first.slice(0,79)+'…' : first || 'Untitled note'; };
-  const notesOf = (kind,id) => store().list(path('notes','')).filter(n => n.targetKind === kind && n.targetId === id).sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  const playOrder = (a,b) => (a.createdAt || a.updatedAt || '').localeCompare(b.createdAt || b.updatedAt || '');
-  // Timeline events still pointing at an existing session, target and note.
+  const notesOf = (kind,id) => store().list(path('notes','')).filter(n => n.targetKind === kind && n.targetId === id);
+  // Entries that can be pinned for a plot, PC or NPC: its campaign notes and, for a PC, the
+  // public entries of the character's journal (ids prefixed "journal:").
+  function entriesOf(kind,id) {
+    const notes = notesOf(kind,id).map(n => ({id:n.id,title:noteTitle(n),text:n.text || '',author:entryAuthor(n),date:n.updatedAt || n.createdAt || ''}));
+    const journal = kind === 'pcs' ? (sheets.get(id+':public')?.data?.profile?.journal || []).map(j => ({id:`journal:${j.id}`,title:noteTitle(j),text:j.text || '',author:playerName(store().get(path('pcs',id)) || {}),date:j.createdAt || ''})) : [];
+    return [...journal,...notes].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+  }
+  const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
+  // Timeline events still pointing at an existing session, item and entry.
   function timelineEvents(sessionId) {
-    return store().list(path('timeline','')).filter(item => item.sessionId === sessionId).map(item => {
-      const target = pinTarget(item.kind,item.targetId), note = store().get(path('notes',item.noteId));
-      return target && note && note.targetKind === item.kind && note.targetId === item.targetId ? {...item,target,note} : null;
+    return store().list(path('timeline','')).filter(item => !sessionId || item.sessionId === sessionId).map(item => {
+      const target = pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
+      return target && note ? {...item,target,note} : null;
     }).filter(Boolean).sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   }
-  // The timeline is the game's sessions in play order; each session's events pin notes about
-  // PCs, NPCs or plots on the map. The map is always shown; only the GM adds or removes events.
+  // The timeline is the game's sessions, newest first in a scrolling row; each session's events
+  // pin entries about PCs, NPCs or plots on the always-visible map. Only the GM edits it.
   function renderTimeline(isGM,pcs,npcs,plots) {
-    const sessions = store().list(path('sessions','')).sort(playOrder);
+    const sessions = store().list(path('sessions','')).sort(newestFirst);
     if (timelineSession && !sessions.some(item => item.id === timelineSession)) timelineSession = '';
-    const selected = sessions.find(item => item.id === timelineSession) || sessions[sessions.length-1] || null;
+    const selected = sessions.find(item => item.id === timelineSession) || sessions[0] || null;
     const events = selected ? timelineEvents(selected.id) : [];
     const list = sessions.map(session => { const count = timelineEvents(session.id).length; return `<li>${UI.button({html:`<small>${e(day(session.createdAt || session.updatedAt))}</small><span>${e(session.title || 'Untitled session')}</span><small>${count} event${count===1?'':'s'}</small>`,variant:'quiet',attrs:{class:'timeline-event','data-campaign':'timeline-session','data-id':session.id,'aria-current':selected?.id === session.id ? 'true' : false}})}</li>`; }).join('');
-    const pinHtml = events.map(item => `<span class="timeline-pin" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(noteTitle(item.note))}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${noteTitle(item.note)}`}})}${isGM ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${noteTitle(item.note)} from the map`}}) : ''}</span>`).join('');
+    const pinHtml = events.map(item => `<span class="timeline-pin" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${isGM ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
     let controls = '';
     if (isGM && selected) {
+      // An entry already pinned in any session cannot be added again.
+      const used = new Set(store().list(path('timeline','')).map(item => `${item.kind}:${item.targetId}:${item.noteId}`));
       const groups = [['plots','Plots',plots.map(p => [p.id,p.title || 'Untitled plot'])],['pcs','PCs',pcs.map(pc => [pc.id,label(pc)])],['npcs','NPCs',npcs.map(n => [n.id,n.name || 'Unnamed NPC'])]]
-        .map(([kind,group,items]) => items.length ? `<optgroup label="${group}">${items.map(([id,name]) => UI.option({value:`${kind}:${id}`,label:`${name} (${notesOf(kind,id).length})`,selected:pickTarget === `${kind}:${id}`})).join('')}</optgroup>` : '').join('');
-      const [kind,id] = pickTarget.split(':'), notes = pickTarget ? notesOf(kind,id) : [];
-      const help = !pickTarget ? 'Choose a plot, PC or NPC, then one of its notes, then click the map.' : !notes.length ? 'This has no notes yet. Add one in its section first.' : !pickNote ? 'Now choose one of its notes.' : 'Click the map to place this note.';
-      controls = `<div class="timeline-pin-controls">${UI.field({label:'Add an event: plot, PC or NPC',kind:'select',attrs:{'data-timeline-target':true},optionsHtml:`${UI.option({value:'',label:'Choose…',selected:!pickTarget})}${groups}`})}${UI.field({label:'Note',kind:'select',attrs:{'data-timeline-note':true,disabled:!notes.length},optionsHtml:`${UI.option({value:'',label:notes.length ? 'Choose a note…' : 'No notes',selected:!pickNote})}${notes.map(n => UI.option({value:n.id,label:noteTitle(n),selected:pickNote === n.id})).join('')}`})}<p class="entry-help">${help}</p></div>`;
+        .map(([kind,group,items]) => items.length ? `<div class="timeline-target-group"><span>${group}</span>${items.map(([id,name]) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:'timeline-target','data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`}})).join('')}</div>` : '').join('');
+      const [kind,id] = pickTarget.split(':'), entries = pickTarget ? entriesOf(kind,id) : [];
+      const entryButtons = entries.map(entry => UI.button({text:entry.title,variant:'quiet',size:'compact',attrs:{class:'timeline-entry','data-campaign':'timeline-entry','data-id':entry.id,'aria-pressed':pickNote === entry.id,disabled:used.has(`${kind}:${id}:${entry.id}`),title:used.has(`${kind}:${id}:${entry.id}`) ? 'Already on the timeline' : ''}})).join('');
+      const help = !pickTarget ? 'Choose a plot, PC or NPC, then one of its entries, then click the map.' : !entries.length ? 'This has no notes or public journal entries yet.' : !pickNote ? 'Now choose one of its entries.' : 'Click the map to place this entry.';
+      controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}<p class="entry-help">${help}</p></div>`;
     }
     const placing = isGM && selected && pickTarget && pickNote;
     const head = selected ? `<p class="timeline-date">${e(day(selected.createdAt || selected.updatedAt))}</p><h3>${e(selected.title || 'Untitled session')}</h3>` : '<p class="entry-help">Sessions appear here once the GM adds them.</p>';
-    const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${noteTitle(item.note)}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : selected ? '<p class="entry-help">No events on the map for this session yet.</p>' : '';
+    const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : selected ? '<p class="entry-help">No events on the map for this session yet.</p>' : '';
     const map = `<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div>`;
-    return `${UI.sectionHeading({title:'Timeline',level:2})}<div class="timeline">${sessions.length ? `<ol class="timeline-list">${list}</ol>` : ''}<div class="timeline-main"><article class="timeline-detail">${head}${controls}${map}${eventList}</article></div></div>${renderNotePopup()}`;
+    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${head}${controls}${map}${eventList}</article></div>${renderNotePopup()}`;
   }
-  // The full note behind a timeline event, in an overlay dialog.
+  // The full entry behind a timeline event, in an overlay dialog.
   function renderNotePopup() {
     if (!notePopup) return '';
-    const item = store().get(path('timeline',notePopup)), note = item && store().get(path('notes',item.noteId)), target = item && pinTarget(item.kind,item.targetId);
-    if (!note || !target) return '';
+    const item = store().get(path('timeline',notePopup)), target = item && pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
+    if (!note) return '';
     const sectionName = {plots:'Plots',npcs:'NPC',pcs:'PC'}[item.kind];
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(noteTitle(note))}</h3><small>${e(target.name)} · ${e(entryAuthor(note))}${note.updatedAt ? ` · ${e(day(note.updatedAt))}` : ''}</small></div></header><p class="entry-text">${e(note.text || '')}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
   }
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
@@ -325,6 +335,8 @@
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
       else if (action==='timeline-session') {timelineSession=id;pickTarget='';pickNote='';}
+      else if (action==='timeline-target' && gm()) {pickTarget=pickTarget===id?'':id;pickNote='';}
+      else if (action==='timeline-entry' && gm()) pickNote=pickNote===id?'':id;
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
       else if (action==='note-popup-close') {const back=notePopup;notePopup='';setTimeout(()=>document.querySelector(`[data-campaign="note-popup"][data-id="${back}"]`)?.focus(),0);}
       else if (action==='timeline-unpin' && gm()) {if(window.confirm('Remove this event from the map?'))store().queue(path('timeline',id),null);}
@@ -453,13 +465,11 @@
     if(!map||!pickTarget||!pickNote||!gm()||event.target.closest('.timeline-pin'))return;
     const sessionId=map.dataset.timelineMap,[kind,targetId]=pickTarget.split(':');
     const rect=map.getBoundingClientRect(),x=Math.round((event.clientX-rect.left)/rect.width*1000)/10,y=Math.round((event.clientY-rect.top)/rect.height*1000)/10;
-    const now=new Date().toISOString(),existing=store().list(path('timeline','')).find(item=>item.sessionId===sessionId&&item.noteId===pickNote);
+    const now=new Date().toISOString(),existing=store().list(path('timeline','')).find(item=>item.kind===kind&&item.targetId===targetId&&item.noteId===pickNote);
     store().queue(path('timeline',existing?.id||crypto.randomUUID()),{sessionId,kind,targetId,noteId:pickNote,x:Math.min(100,Math.max(0,x)),y:Math.min(100,Math.max(0,y)),createdAt:existing?.createdAt||now,updatedAt:now});
     pickTarget='';pickNote='';changed();
   }
   document.addEventListener('change',async event=>{
-    if(event.target.dataset?.timelineTarget!==undefined){pickTarget=event.target.value;pickNote='';changed();return;}
-    if(event.target.dataset?.timelineNote!==undefined){pickNote=event.target.value;changed();return;}
     const imageKind=event.target.dataset?.entryImage;
     if (imageKind) {
       const file=event.target.files?.[0]; event.target.value='';

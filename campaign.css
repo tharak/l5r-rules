@@ -36,15 +36,23 @@
 .campaign-unread{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font:700 12px var(--sans)}
 .campaign-read-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;color:var(--muted)}
 /* Timeline: sessions beside an always-visible map of Rokugan; events pin notes on the map. */
-.timeline{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:16px;align-items:start}
-.timeline-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.timeline-event.ui-button{display:grid;width:100%;justify-items:start;text-align:left;gap:2px;min-width:0}
+.timeline{display:grid;gap:12px;min-width:0}
+.timeline-list{list-style:none;margin:0;padding:0 0 6px;display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity}
+.timeline-list li{flex:0 0 auto;scroll-snap-align:start}
+.timeline-event.ui-button{display:grid;width:190px;justify-items:start;text-align:left;gap:2px}
+.timeline-event span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .timeline-event[aria-current="true"]{border-color:var(--red)!important;background:var(--wash)!important}
 .timeline-event small{color:var(--muted)}
 .timeline-date{margin:0;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .timeline-detail h3{margin:2px 0 6px;font:22px var(--serif)}
-.timeline-pin-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0}
-.timeline-pin-controls .entry-help{grid-column:1/-1;margin:0}
+.timeline-pin-controls{display:grid;gap:8px;margin:8px 0}
+.timeline-pin-controls .entry-help{margin:0}
+.timeline-targets{display:grid;gap:6px}
+.timeline-target-group{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.timeline-target-group>span{min-width:48px;font-size:12px;font-weight:600;color:var(--muted)}
+.timeline-entries{display:flex;flex-wrap:wrap;gap:6px;padding-top:6px;border-top:1px solid var(--line)}
+.timeline-target[aria-pressed="true"],.timeline-entry[aria-pressed="true"]{border-color:var(--red)!important;background:var(--wash)!important;font-weight:700}
+.timeline-entry:disabled{opacity:.5;text-decoration:line-through}
 .timeline-map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:3px;overflow:hidden}
 .timeline-map>img{display:block;width:100%;height:auto}
 .timeline-map-placing{cursor:crosshair;outline:2px solid var(--red)}
@@ -60,4 +68,4 @@
 .timeline-popup header{display:flex;gap:12px;align-items:center}
 .timeline-popup header img{width:56px;height:56px;object-fit:cover;border-radius:3px}
 .timeline-popup h3{margin:0;font:20px var(--serif)}
-@media(max-width:700px){.timeline{grid-template-columns:minmax(0,1fr)}.timeline-pin img,.timeline-pin-dot{width:30px;height:30px}}
+@media(max-width:700px){.timeline-event.ui-button{width:150px}.timeline-pin img,.timeline-pin-dot{width:30px;height:30px}}
