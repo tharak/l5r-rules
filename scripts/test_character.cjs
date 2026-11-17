@@ -963,15 +963,22 @@ test('specific choice is shown only for parameterized options and variants',asyn
   assert.equal((await (await c.reload()).data()).character.advantages[0].selection,'Legacy detail');
 });
 
-test('ability sections show only what the character can learn; Add decides Free or XP; unmet requirements are disabled',async()=>{
+test('ability sections stay visible but closed with a reason; Add decides Free or XP; unmet requirements are disabled',async()=>{
   const id=(kind,name)=>catalog.abilities.find(a=>a.kind===kind&&a.name===name).id;
   const esc=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const add=(c,kind,value)=>{c.inputs['#ability-choice-'+kind]={value};c.click({action:'add-ability',abilityKind:kind});};
+  const groupOf=value=>{const a=catalog.abilities.find(e=>e.id===value);return a.kind==='tattoo'?'tattoos':a.kind==='shadowlands'?a.slug:a.ring;};
+  const add=(c,kind,value)=>{const group=groupOf(value);c.inputs[`#ability-choice-${kind}-${group}`]={value};c.click({action:'add-ability',abilityKind:kind,abilityGroup:group});};
+  // Every type is always shown; the ones this character cannot learn are closed with a reason.
+  const all=c=>[...sectionHtml(c,'abilities').matchAll(/creator-ability-kind[^"]*" data-ability-kind="([^"]+)"/g)].map(m=>m[1]);
   const kinds=c=>[...sectionHtml(c,'abilities').matchAll(/creator-ability-kind" data-ability-kind="([^"]+)"/g)].map(m=>m[1]);
-  assert.deepEqual(kinds(await character()),[],'no school: nothing to learn');
+  const blank=await character();
+  assert.deepEqual(all(blank),['spell','kata','kiho','tattoo','shadowlands']);
+  assert.deepEqual(kinds(blank),[],'no school: everything closed');
+  assert.match(sectionHtml(blank,'abilities'),/creator-ability-locked">Choose a school first\.</);
   // A bushi buys kata with XP; spells and kiho stay hidden.
   const bushi=await character();bushi.school('Crab','Hida Bushi');
   assert.deepEqual(kinds(bushi),['kata']);
+  assert.match(sectionHtml(bushi,'abilities'),/data-ability-kind="spell"><div class="creator-option-heading">[\s\S]*?creator-ability-locked">Shugenja only\.</);
   assert.doesNotMatch(sectionHtml(bushi,'abilities'),/ability-payment/);
   add(bushi,'kata',id('kata','Striking as Earth'));
   let saved=(await bushi.data()).character.abilities;
@@ -982,8 +989,10 @@ test('ability sections show only what the character can learn; Add decides Free 
   add(bushi,'kata',foreign.id);assert.equal((await bushi.data()).character.abilities.length,1);
   // A shugenja's spells are free school picks; a spell above their rank is disabled.
   const shugenja=await character();shugenja.school('Crane','Asahina Shugenja');
-  // Kiho stay hidden: a new shugenja needs Air 3 from the Ring alone and table permission.
-  assert.deepEqual(kinds(shugenja),['spell']);
+  // Kiho are open to shugenja, but each element block is disabled and says why (Ring 3 needed).
+  assert.deepEqual(kinds(shugenja),['spell','kiho']);
+  assert.match(sectionHtml(shugenja,'abilities'),/<select[^>]*id="ability-choice-kiho-Air"[^>]*disabled/);
+  assert.match(sectionHtml(shugenja,'abilities'),/data-ability-group="Air"><h4>Air<\/h4>[\s\S]*?creator-ability-locked">[^<]*Air rank/);
   const html=sectionHtml(shugenja,'abilities');
   assert.match(html,new RegExp(`value="${esc(id('spell','Everburning Rage'))}" disabled`));
   assert.doesNotMatch(html,new RegExp(`value="${esc(id('spell','Blessed Wind'))}" disabled`));
@@ -995,6 +1004,7 @@ test('ability sections show only what the character can learn; Add decides Free 
   // Shadowlands powers appear with Taint.
   const tainted=await character({taint:1,schoolDecisions:{shadowlands:true}});tainted.school('Crab','Hida Bushi');
   assert.deepEqual(kinds(tainted),['kata','shadowlands']);
+  assert.match(sectionHtml(tainted,'abilities'),/id="ability-choice-shadowlands-mutations"/);
   add(tainted,'shadowlands',catalog.abilities.find(a=>a.kind==='shadowlands').id);
   assert.equal((await tainted.data()).character.abilities[0].grant,false);
 });
@@ -1106,22 +1116,23 @@ test('every ability is its own catalog entry: no merged spells, no paragraphs re
 });
 
 test('abilities: one subsection per type, lists grouped by element or Shadowlands list, owned entries in ring colours',async()=>{
-  const picker=(html,kind)=>html.match(new RegExp(`<select[^>]*id="ability-choice-${kind}"[^>]*>([\\s\\S]*?)</select>`))[1];
-  const groups=(html,kind)=>[...picker(html,kind).matchAll(/<optgroup label="([^"]+)"/g)].map(m=>m[1]);
+  // Each element or Shadowlands list is its own block with its own list.
+  const groups=(html,kind)=>[...html.split(`data-ability-kind="${kind}"><div class="creator-option-heading">`)[1].split('creator-purchases creator-ability-kind')[0].matchAll(/id="ability-choice-[a-z]+-([^"]+)"/g)].map(m=>m[1]);
   const bushi=await character({taint:1,schoolDecisions:{shadowlands:true}});bushi.school('Crab','Hida Bushi');
   let html=sectionHtml(bushi,'abilities');
   assert.deepEqual(groups(html,'kata'),['Air','Earth','Fire','Water','Void']);
-  assert.deepEqual(groups(html,'shadowlands'),['Mutations','Minor powers','Major powers','Akutenshi powers']);
+  assert.deepEqual(groups(html,'shadowlands'),['mutations','minor-shadowlands-powers','major-shadowlands-powers','akutenshi-powers']);
   assert.match(html,/· 3 XP</,'kata show their XP price');
   const c=await character();c.school('Crane','Asahina Shugenja');
   html=sectionHtml(c,'abilities');
-  assert.deepEqual(groups(html,'spell'),['Universal','Air','Earth','Fire','Water','Void']);
-  assert.match(html,/<input[^>]*data-option-search="spell"[^>]*data-search-target="ability-choice-spell"/);
+  assert.deepEqual(groups(html,'spell'),['All','Air','Earth','Fire','Water','Void']);
+  assert.match(html,/data-ability-group="All"><h4>Universal<\/h4>/);
+  assert.match(html,/<input[^>]*data-option-search="spell"[^>]*data-search-scope="spell"/);
   const earth=catalog.abilities.find(a=>a.kind==='spell'&&a.ring==='Earth'&&a.mastery===1&&a.slug==='earth-spells');
-  for(const id of ['spell:air-spells:Blessed Wind',earth.id]){c.inputs['#ability-choice-spell']={value:id};c.click({action:'add-ability',abilityKind:'spell'});}
+  for(const [id,group] of [['spell:air-spells:Blessed Wind','Air'],[earth.id,'Earth']]){c.inputs[`#ability-choice-spell-${group}`]={value:id};c.click({action:'add-ability',abilityKind:'spell',abilityGroup:group});}
   html=sectionHtml(c,'abilities');
-  assert.match(html,/creator-ability-group" data-ring="Air"><h4>Air<\/h4>[\s\S]*Blessed Wind · Mastery 1/);
-  assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth"><h4>Earth</h4>[\\s\\S]*${earth.name} · Mastery 1`));
+  assert.match(html,/creator-ability-group" data-ring="Air" data-ability-group="Air"><h4>Air<\/h4>[\s\S]*Blessed Wind · Mastery 1/);
+  assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth" data-ability-group="Earth"><h4>Earth</h4>[\\s\\S]*${earth.name} · Mastery 1`));
   assert.match(html,/<h3>Spells <small>5<\/small><\/h3>/,'two chosen plus the three universal spells');
 });
 

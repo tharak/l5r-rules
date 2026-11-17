@@ -441,3 +441,11 @@
 .creator-ability-group[data-ring] h4 { color: color-mix(in srgb, var(--ring-heading) 70%, #000); }
 .creator-ability-group details { margin: 6px 0; }
 @media (max-width: 650px) { .creator-ability-picker .creator-add-row { flex-wrap: wrap; } .creator-ability-picker .creator-add-row > input.ui-field[type="search"], .creator-ability-picker .creator-add-row > select.ui-field[id^="ability-choice"] { flex: 1 1 100%; } }
+
+/* Abilities: a search above the element blocks; each block has its own list and Add.
+   Closed types and blocks stay visible, disabled, with a one-line reason. */
+.creator-ability-kind > input.ui-field[type="search"] { width: 100%; max-width: 24em; margin-bottom: 8px; }
+:is(.creator-ability-group,.creator-ability-closed) > .creator-add-row { display: flex; gap: 8px; margin: 4px 0 6px; flex-wrap: nowrap; }
+:is(.creator-ability-group,.creator-ability-closed) > .creator-add-row > select.ui-field { flex: 1 1 auto; min-width: 0; width: auto; }
+:is(.creator-ability-group,.creator-ability-closed) > .creator-add-row > button { flex: none; }
+.creator-ability-locked { margin: 2px 0 6px; font-size: 12px; color: var(--muted); }
