@@ -327,7 +327,7 @@ test('chosen craft skill receives two free ranks; invalid categories and duplica
   assert.equal(d.skills.Kenjutsu.rank,1);
   c.change({choiceIndex:'2'},'Kenjutsu (Katana)');
   assert.match((await c.data()).derived.skillChoiceErrors[2],/extra emphases/);
-  assert.match(c.root.innerHTML,/data-choice-index="2"/);
+  assert.match(c.root.innerHTML,/id="school-choice-2"/);
 });
 
 test('multi-skill and emphasis choices keep their correct counts', async () => {
@@ -335,17 +335,17 @@ test('multi-skill and emphasis choices keep their correct counts', async () => {
   assert.equal((await c.data()).derived.school.skillChoices.length,3);
   c.change({choiceIndex:'0'},'Acting');
   c.change({choiceIndex:'1'},'Artisan: Painting');
-  assert.match(c.root.innerHTML,/data-choice-index="2"/);
+  assert.match(c.root.innerHTML,/id="school-choice-2"/);
   c.change({choiceIndex:'2'},'Perform: Song');
-  assert.doesNotMatch(c.root.innerHTML,/data-choice-index=/);
+  assert.doesNotMatch(c.root.innerHTML,/id="school-choice-\d/);
   assert.equal(Object.keys((await c.data()).derived.skills).length,7);
   const restored = await c.reload();
-  assert.doesNotMatch(restored.root.innerHTML,/data-choice-index=/);
+  assert.doesNotMatch(restored.root.innerHTML,/id="school-choice-\d/);
   assert.equal((await restored.data()).derived.skills['Perform: Song'].base,1);
   c.school('Crab','Kaiu Engineer');
-  assert.match(c.root.innerHTML,/data-choice-index="0"/);
+  assert.match(c.root.innerHTML,/id="school-choice-0"/);
   c.change({choiceIndex:'0'},'Siege');
-  assert.doesNotMatch(c.root.innerHTML,/data-choice-index=/);
+  assert.doesNotMatch(c.root.innerHTML,/id="school-choice-\d/);
   assert.deepEqual((await c.data()).derived.skills.Engineering.emphases,['Siege']);
   assert.equal((await c.data()).derived.xpRemaining,40);
 });
@@ -712,7 +712,7 @@ test('a school macro-skill grants a chosen subtype rather than a bare skill or e
 test('all listed macro specialties appear in skill suggestions and eligible school choices',async()=>{
   const c=await character();c.school('Crane','Kakita Artisan');
   const suggestions=c.root.innerHTML.match(/<select[^>]*id="skill-choice"[^>]*>([\s\S]*?)<\/select>/)[1];
-  const schoolSuggestions=c.root.innerHTML.match(/<datalist id="school-suggestions-0">([\s\S]*?)<\/datalist>/)[1];
+  const schoolSuggestions=c.root.innerHTML.match(/<select[^>]*id="school-choice-0"[^>]*>([\s\S]*?)<\/select>/)[1];
   for(const [name,count] of [['Artisan',8],['Craft',18],['Games',6],['Lore',19],['Perform',9]]) {
     const skill=catalog.skills.find(s=>s.name===name);
     assert.equal(skill.specialties.length,count,name);
@@ -1147,4 +1147,21 @@ test('skills use the shared picker: search, a list grouped by skill type, Add; t
   assert.equal((await c.data()).character.skills.Etiquette,1);
   c.inputs['#skill-choice']={value:''};c.inputs['#new-skill']={value:'Custom skill'};c.click({action:'add-skill'});
   assert.equal((await c.data()).character.skills['Custom skill'],1);
+});
+
+test('free school skill choices use the picker: Add fills the slot, × clears it, emphases list their options',async()=>{
+  const c=await character();c.school('Crane','Kakita Artisan');
+  let html=sectionHtml(c,'skills');
+  assert.match(html,/<input[^>]*id="school-choice-search-0"[^>]*data-search-target="school-choice-0"/);
+  assert.match(html,/data-action="set-school-choice" data-index="0"/);
+  c.inputs['#school-choice-0']={value:'Acting'};c.click({action:'set-school-choice',index:'0'});
+  assert.equal((await c.data()).character.schoolChoices[0],'Acting');
+  assert.match(sectionHtml(c,'skills'),/creator-choice-set"><span>[^<]*<\/span><strong>Acting<\/strong>/);
+  c.click({action:'clear-school-choice',index:'0'});
+  assert.equal((await c.data()).character.schoolChoices[0],'');
+  const kaiu=await character();kaiu.school('Crab','Kaiu Engineer');
+  const index=(await kaiu.data()).derived.school.skillChoices.findIndex(choice=>choice.kind==='emphasis');
+  html=sectionHtml(kaiu,'skills');
+  const list=html.match(new RegExp(`<select[^>]*id="school-choice-${index}"[^>]*>([\\s\\S]*?)</select>`))[1];
+  assert.match(list,/value="Construction"/);assert.match(list,/value="Siege"/);
 });

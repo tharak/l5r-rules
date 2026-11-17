@@ -251,6 +251,18 @@
     return {suggestions,untrainedSkills};
   }
 
+  // The shared picker: a search that narrows the list, the list (grouped), and one button.
+  // groups: [[title,[{value,label,disabled,title}]]]; a single untitled group renders flat.
+  function searchPicker({searchId,selectId,label,choose,placeholder,groups,button,searchAttrs={},buttonAttrs={}}) {
+    const optionsHtml = option('',choose,true)+groups.map(([title,items]) => {
+      const options = items.map(item => UI.option({value:item.value,label:item.label,attrs:{disabled:!!item.disabled,...(item.title?{title:item.title}:{})}})).join('');
+      return title ? `<optgroup label="${escapeHtml(title)}">${options}</optgroup>` : options;
+    }).join('');
+    return `<div class="creator-ability-picker">${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:
+      UI.field({attrs:{'id':searchId,'type':'search','data-option-search':selectId,'data-search-target':selectId,'placeholder':placeholder,'aria-label':`Search ${label.toLowerCase()}`,...searchAttrs}})+
+      UI.field({kind:'select',attrs:{'id':selectId,'aria-label':label},optionsHtml})+
+      UI.button({text:button,attrs:buttonAttrs})})}</div>`;
+  }
   // The same picker as Advantages and Abilities: search, a list grouped by skill type, Add.
   // Typing a name that is not in the list and pressing Add records a custom skill.
   const SKILL_GROUPS = ['High','Bugei','Merchant','Low'];
@@ -258,11 +270,22 @@
     const groupOf = name => catalog.skills.find(skill => skill.name === name.split(':')[0].trim())?.group || 'Other';
     const known = name => (data.skills[name]?.rank || 0) > 0;
     const groups = [...SKILL_GROUPS,'Other'].map(group => [group,suggestions.filter(name => groupOf(name) === group).sort((a,b)=>a.localeCompare(b))]).filter(([,names]) => names.length);
-    const optionsHtml = option('','Choose a skill',true)+groups.map(([group,names]) => `<optgroup label="${escapeHtml(group)}">${names.map(name => UI.option({value:name,label:name,attrs:{disabled:known(name),...(known(name)?{title:'Already known'}:{})}})).join('')}</optgroup>`).join('');
-    return `<div class="creator-ability-picker">${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:
-      UI.field({attrs:{'id':'new-skill','type':'search','data-option-search':'skill','data-search-target':'skill-choice','placeholder':'Search or type a new skill','aria-label':'Search skills'}})+
-      UI.field({kind:'select',attrs:{'id':'skill-choice','aria-label':'Skill'},optionsHtml})+
-      UI.button({text:'Add',attrs:{'data-action':'add-skill','aria-label':'Add skill'}})})}</div>`;
+    return searchPicker({searchId:'new-skill',selectId:'skill-choice',label:'Skill',choose:'Choose a skill',placeholder:'Search or type a new skill',button:'Add',buttonAttrs:{'data-action':'add-skill','aria-label':'Add skill'},
+      groups:groups.map(([group,names]) => [group,names.map(name => ({value:name,label:name,disabled:known(name),title:known(name)?'Already known':''}))])});
+  }
+  // A free school skill (or emphasis) slot: the shared picker until it is filled, then the
+  // choice with a button to clear it.
+  function renderSchoolChoice(choice,index,suggestions,data) {
+    const value = sheet.schoolChoices[index] || '', error = data.skillChoiceErrors[index];
+    const prompt = `${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}`;
+    if (value && !error) return `<div class="creator-choice creator-choice-set"><span>${prompt}</span><strong>${escapeHtml(value)}</strong>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'clear-school-choice','data-index':index,'aria-label':`Clear ${choice.prompt}`}})}</div>`;
+    const emphasis = choice.kind === 'emphasis';
+    const groupOf = name => catalog.skills.find(skill => skill.name === name.split(':')[0].trim())?.group || 'Other';
+    const groups = emphasis
+      ? [['',(catalog.skills.find(skill => skill.name === String(choice.skill || '').split(':')[0].trim())?.emphases || []).map(name => ({value:name,label:name}))]]
+      : [...SKILL_GROUPS,'Other'].map(group => [group,suggestions.filter(name => allowedSchoolSkill(choice,name) && groupOf(name) === group).sort((a,b)=>a.localeCompare(b)).map(name => ({value:name,label:name}))]).filter(([,items]) => items.length);
+    return `<div class="creator-choice"><span>${prompt}</span>${searchPicker({searchId:`school-choice-search-${index}`,selectId:`school-choice-${index}`,label:choice.prompt,choose:emphasis?'Choose an emphasis':'Choose a skill',placeholder:emphasis?'Search or type an emphasis':'Search skills',button:'Add',
+      searchAttrs:error?{'aria-invalid':'true',value}:{value},buttonAttrs:{'data-action':'set-school-choice','data-index':index,'aria-label':`Add ${choice.prompt}`},groups})}${error ? `<small class="creator-choice-error">${escapeHtml(error)}</small>` : ''}</div>`;
   }
   function renderSkills(data) {
     const {suggestions} = skillOptions();
@@ -270,7 +293,7 @@
     const names = [...new Set([...Object.keys(skills),...C.MACRO_SKILLS])].filter(name=>isSkillVisible(name,skills,skillFilters.skills)).sort((a,b)=>a.localeCompare(b));
     const choices = data.school?.skillChoices || [];
     const choicesComplete = choices.every((choice,index) => sheet.schoolChoices[index]?.trim() && !data.skillChoiceErrors[index]);
-    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',actionsHtml:sectionRules('skills','Skill rules')})}${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => `<label>${escapeHtml(choice.prompt)} · ${choice.kind === 'emphasis' ? 'Free emphasis' : `School rank ${choice.rank}`}<input type="text" data-choice-index="${index}" ${choice.kind === 'skill' ? `list="school-suggestions-${index}"` : ''} value="${escapeHtml(sheet.schoolChoices[index] || '')}" placeholder="${choice.kind === 'emphasis' ? 'Choose an emphasis' : 'Choose a school skill'}" ${data.skillChoiceErrors[index] ? 'aria-invalid="true"' : ''}>${choice.kind === 'skill' ? `<datalist id="school-suggestions-${index}">${suggestions.filter(name => allowedSchoolSkill(choice, name)).map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>` : ''}${data.skillChoiceErrors[index] ? `<small class="creator-choice-error">${escapeHtml(data.skillChoiceErrors[index])}</small>` : ''}</label>`).join('')}</div>` : ''}${renderSkillPicker(suggestions,data)}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin. Uncheck a filter to see untrained skills.</div>'}`});
+    return UI.panel({attrs:{'class':'creator-panel creator-skills','id':'creator-skills'},bodyHtml:`${UI.sectionHeading({step:'03',title:'Skills',actionsHtml:sectionRules('skills','Skill rules')})}${renderSchoolDecisions(data,'skills')}${choices.length && !choicesComplete ? `<div class="creator-choice-grid">${choices.map((choice,index) => renderSchoolChoice(choice,index,suggestions,data)).join('')}</div>` : ''}${renderSkillPicker(suggestions,data)}${renderSkillFilter('skills')}${names.length ? `<div class="creator-skill-list creator-skill-grid">${names.map(name=>C.requiresSkillSubtype(name)?renderMacroSkill(name):renderSkillRow(name,skills[name])).join('')}</div>` : '<div class="creator-empty">Choose a school or add a skill to begin. Uncheck a filter to see untrained skills.</div>'}`});
   }
 
   function renderMacroSkill(name) {
@@ -348,7 +371,10 @@
 
   function renderEquipment(data) {
     const rows = data.equipment.map(entry => UI.recordRow({attrs:{'class':'creator-equipment-row'},bodyHtml:`<div><strong>${escapeHtml(entry.name)}</strong>${entry.source==='personal' || entry.pending?`<small>${[entry.source==='personal'?'Personal equipment':'',entry.pending?'Choose an item':''].filter(Boolean).join(' · ')}</small>`:''}</div>${entry.source === 'school' && entry.choice ? renderEquipmentChoice(data,entry) : ''}${entry.source === 'personal' ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-equipment','data-index':entry.index,'aria-label':`Remove ${entry.name}`}}) : ''}`})).join('');
-    return UI.panel({attrs:{class:'creator-panel creator-equipment',id:'creator-equipment'},bodyHtml:`${UI.sectionHeading({step:'07',title:'Equipment',actionsHtml:sectionRules('equipment','Equipment rules')})}${UI.actionRow({attrs:{class:'creator-money-fields'},bodyHtml:['koku','bu','zeni'].map(k=>renderNumber(k,Number(data.money[k]) || 0,{label:k,step:1,min:0,action:'money-step',size:'compact'})).join('')})}${rows ? `<div class="creator-equipment-list">${rows}</div>` : ''}${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'new-equipment','list':'equipment-suggestions','type':'text','placeholder':'Equipment name','aria-label':'Equipment name'}})}<datalist id="equipment-suggestions">${[...catalog.weapons,...catalog.armors].map(e=>`<option value="${escapeHtml(e.name)}"></option>`).join('')}</datalist>${UI.button({text:'Add',attrs:{'data-action':'add-equipment'}})}`})}`});
+    return UI.panel({attrs:{class:'creator-panel creator-equipment',id:'creator-equipment'},bodyHtml:`${UI.sectionHeading({step:'07',title:'Equipment',actionsHtml:sectionRules('equipment','Equipment rules')})}${UI.actionRow({attrs:{class:'creator-money-fields'},bodyHtml:['koku','bu','zeni'].map(k=>renderNumber(k,Number(data.money[k]) || 0,{label:k,step:1,min:0,action:'money-step',size:'compact'})).join('')})}${rows ? `<div class="creator-equipment-list">${rows}</div>` : ''}${(()=>{const types=[...new Set(catalog.weapons.map(w=>w.type))].sort((a,b)=>a.localeCompare(b));
+      const item=e=>({value:e.name,label:e.name});
+      return searchPicker({searchId:'new-equipment',selectId:'equipment-choice',label:'Equipment',choose:'Choose equipment',placeholder:'Search or type an item',button:'Add',buttonAttrs:{'data-action':'add-equipment','aria-label':'Add equipment'},
+        groups:[['Armor',catalog.armors.map(item)],...types.map(type=>[type,catalog.weapons.filter(w=>w.type===type).map(item)])]});})()}`});
   }
 
   function renderTraining(data) {
@@ -525,7 +551,11 @@
     const sources=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training];
     const training=sheet.training.map((entry,index)=>({...entry,index}));
     if(d.school && !training.some(entry=>(entry.school || entry.id)===sheet.school))training.unshift({school:sheet.school,rank:d.schoolRank,index:-1});
-    return `<div class="creator-purchases"><h3>Later training</h3><div class="creator-option-list" role="list" aria-label="Current schools">${training.map(t=>{const i=t.index;const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row','role':'listitem','data-training-index':i},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${i>=0?UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}}):''}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}</div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'training-school','list':'training-suggestions','placeholder':'Search a school, path, or advanced school','aria-label':'Later school'}})}<datalist id="training-suggestions">${sources.map(s=>`<option value="${escapeHtml(s.name+' · '+(s.kind || 'basic'))}"></option>`).join('')}</datalist>${UI.button({text:'Add training',attrs:{'data-action':'add-training'}})}`})}</div>`;
+    return `<div class="creator-purchases"><h3>Later training</h3><div class="creator-option-list" role="list" aria-label="Current schools">${training.map(t=>{const i=t.index;const school=C.school(t.school || t.id,catalog);return UI.recordRow({attrs:{'class':'creator-option-row','role':'listitem','data-training-index':i},bodyHtml:`<span>${escapeHtml(school?.name || t.school)} · School Rank ${t.rank}${school?.kind?` · ${escapeHtml(school.kind)}`:''}</span>${school?.kind!=='path'?UI.stepper({value:t.rank,attrs:{'aria-label':`${school?.name || t.school} school rank`},outputAttrs:{'aria-label':'School rank'},decrease:{'data-action':'train-rank','data-index':i,'data-delta':'-1','disabled':t.rank<=1,'aria-label':`Decrease ${school?.name} school rank`},increase:{'data-action':'train-rank','data-index':i,'data-delta':'1','disabled':t.rank>=10,'aria-label':`Advance ${school?.name} school rank`}}):''}${i>=0?UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-training','data-index':i,'aria-label':'Remove training'}}):''}${school?`<a data-rule-reference href="${sourceLink(school.slug,school.anchor)}">Rules ↗</a>`:''}`});}).join('')}</div>${(()=>{const recorded=s=>sheet.training.some(t=>t.school===`${s.slug}#${s.anchor}`);
+      const item=s=>({value:s.name+' · '+(s.kind || 'basic'),label:s.name,disabled:recorded(s),title:recorded(s)?'Already recorded':''});
+      const byName=(a,b)=>a.name.localeCompare(b.name);
+      return searchPicker({searchId:'training-school',selectId:'training-choice',label:'Later school',choose:'Choose a school or path',placeholder:'Search schools and paths',button:'Add',buttonAttrs:{'data-action':'add-training','aria-label':'Add training'},
+        groups:[['Basic schools',sources.filter(s=>!s.kind).sort(byName).map(item)],['Advanced schools',sources.filter(s=>s.kind==='advanced').sort(byName).map(item)],['Paths',sources.filter(s=>s.kind==='path').sort(byName).map(item)]].filter(([,items])=>items.length)});})()}</div>`;
   }
   function renderSchoolDecisions(d,section) {
     const school=d.school;
@@ -567,7 +597,10 @@
   }
 
   function renderAncestors(d) {
-    return `<div class="creator-purchases"><div class="creator-option-heading"><h3>Ancestors</h3>${rulesLink('ancestors','','Ancestor rules')}</div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'ancestor-choice','list':'ancestor-suggestions','placeholder':'Search an ancestor','aria-label':'Ancestor'}})}<datalist id="ancestor-suggestions">${catalog.ancestors.map(a=>`<option value="${escapeHtml(a.name)}">${a.cost} XP · ${escapeHtml(a.clan)}</option>`).join('')}</datalist>${UI.button({text:'Add',attrs:{'data-action':'add-ancestor'}})}`})}${sheet.ancestors.map((a,i)=>{const rule=catalog.ancestors.find(e=>e.id===a.catalogId);return UI.disclosure({attrs:{},titleHtml:`${escapeHtml(a.name)} · ${a.cost} XP`,bodyHtml:`<p>${escapeHtml(rule?.description || a.description || '')}</p>${rule?`<a data-rule-reference href="${sourceLink(rule.slug,rule.anchor)}">Rules ↗</a>`:''}${UI.button({text:'Remove',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ancestor','data-index':i}})}`});}).join('')}</div>`;
+    return `<div class="creator-purchases"><div class="creator-option-heading"><h3>Ancestors</h3>${rulesLink('ancestors','','Ancestor rules')}</div>${(()=>{const taken=a=>sheet.ancestors.some(e=>e.catalogId===a.id);
+      const clans=[...new Set(catalog.ancestors.map(a=>a.clan))];
+      return searchPicker({searchId:'ancestor-choice',selectId:'ancestor-pick',label:'Ancestor',choose:'Choose an ancestor',placeholder:'Search ancestors',button:'Add',buttonAttrs:{'data-action':'add-ancestor','aria-label':'Add ancestor'},
+        groups:clans.map(clan=>[clan,catalog.ancestors.filter(a=>a.clan===clan).map(a=>({value:a.name,label:`${a.name} · ${a.cost} XP`,disabled:taken(a),title:taken(a)?'Already chosen':''}))])});})()}${sheet.ancestors.map((a,i)=>{const rule=catalog.ancestors.find(e=>e.id===a.catalogId);return UI.disclosure({attrs:{},titleHtml:`${escapeHtml(a.name)} · ${a.cost} XP`,bodyHtml:`<p>${escapeHtml(rule?.description || a.description || '')}</p>${rule?`<a data-rule-reference href="${sourceLink(rule.slug,rule.anchor)}">Rules ↗</a>`:''}${UI.button({text:'Remove',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ancestor','data-index':i}})}`});}).join('')}</div>`;
   }
   function renderAbility(a,d) {
     // The group already names the element or kind; the row shows rank, cost and how it was gained.
@@ -675,11 +708,11 @@
       const name=read('#custom-ability-name');
       if(name)sheet.abilities.push({id:newId(),kind:'custom',name,cost:Math.max(0,Number(read('#custom-ability-cost')) || 0),description:read('#custom-ability-description')});else uiError='Enter a custom ability name.';
     } else if(action==='add-ancestor') {
-      const a=catalog.ancestors.find(a=>a.name===read('#ancestor-choice'));
+      const a=catalog.ancestors.find(a=>a.name===(read('#ancestor-pick') || read('#ancestor-choice')));
       if(a && !sheet.ancestors.some(e=>e.catalogId===a.id))sheet.ancestors.push({id:newId(),catalogId:a.id,name:a.name,cost:a.cost});else uiError='Choose an ancestor not already selected.';
     } else if(action==='remove-ancestor')sheet.ancestors.splice(Number(button.dataset.index),1);
     else if(action==='add-training') {
-      const value=read('#training-school'),choice=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training].find(s=>s.name+' · '+(s.kind || 'basic')===value);
+      const value=read('#training-choice') || read('#training-school'),choice=[...C.schools(catalog).filter(s=>!s.nonhuman),...catalog.training].find(s=>s.name+' · '+(s.kind || 'basic')===value);
       if(choice && !sheet.training.some(t=>t.school===`${choice.slug}#${choice.anchor}`))sheet.training.push({school:`${choice.slug}#${choice.anchor}`,rank:1,enteredAtInsight:build().insightRank});else uiError='Choose training not already recorded.';
     } else if(action==='remove-training')sheet.training.splice(Number(button.dataset.index),1);
     else if(action==='train-rank') {
@@ -952,6 +985,10 @@
       commitEdit();
       root.querySelector('[data-portrait]')?.focus();
       return;
+    } else if (action === 'set-school-choice' || action === 'clear-school-choice') {
+      // The list choice wins; with none, the typed text (e.g. an emphasis) is used.
+      const index = Number(button.dataset.index);
+      sheet.schoolChoices[index] = action === 'clear-school-choice' ? '' : (read(`#school-choice-${index}`) || read(`#school-choice-search-${index}`));
     } else if (action === 'add-skill') {
       // The list choice wins; with none, the typed text becomes a (possibly custom) skill.
       const name = skillIdentity(root.querySelector('#skill-choice')?.value || root.querySelector('#new-skill').value).name;
@@ -962,7 +999,8 @@
       if (build().skills[name]) return;
       sheet.skills[name] = Math.max(1, Number(sheet.skills[name]) || 0);
     } else if (action === 'add-equipment') {
-      const name = root.querySelector('#new-equipment').value.trim();
+      // The list choice wins; with none, the typed text is a custom item.
+      const name = (root.querySelector('#equipment-choice')?.value || root.querySelector('#new-equipment').value).trim();
       if (!name) return;
       const item=C.item(name,catalog);sheet.equipment.push({id:newId(),name,catalogId:item?.id || ''});
     } else if (action === 'remove-equipment') {
@@ -1025,7 +1063,7 @@
   }
 
   function onChange(event) {
-    if (['new-skill','skill-choice'].includes(event.target.id)) return;
+    if (['new-skill','skill-choice','training-choice','ancestor-pick','equipment-choice'].includes(event.target.id) || /^school-choice-/.test(event.target.id || '')) return;
     const {dataset} = event.target;
     if (dataset.hideZeroSkills !== undefined || dataset.hideZeroMacroSkills !== undefined) {
       const view = dataset.skillFilterView === 'skills' ? 'skills' : 'rolls';

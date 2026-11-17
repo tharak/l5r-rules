@@ -449,3 +449,16 @@
 :is(.creator-ability-group,.creator-ability-closed) > .creator-add-row > select.ui-field { flex: 1 1 auto; min-width: 0; width: auto; }
 :is(.creator-ability-group,.creator-ability-closed) > .creator-add-row > button { flex: none; }
 .creator-ability-locked { margin: 2px 0 6px; font-size: 12px; color: var(--muted); }
+
+/* Free school skill slots: the shared picker until filled, then the choice with a clear button. */
+.creator-choice { display: grid; gap: 6px; min-width: 0; }
+.creator-choice > span { font-size: 12px; color: var(--muted); }
+.creator-choice .creator-add-row { flex-wrap: nowrap; }
+.creator-choice .creator-add-row > input.ui-field[type="search"] { flex: 1 1 8em; min-width: 6em; width: auto; }
+.creator-choice .creator-add-row > select.ui-field { flex: 2 1 10em; min-width: 8em; width: auto; }
+.creator-choice-set { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.creator-choice-set > span { flex-basis: 100%; }
+/* Pickers outside Abilities (skills, training, ancestors, equipment): search, list, button. */
+.creator-ability-picker > .creator-add-row > input.ui-field[type="search"] { flex: 1 1 10em; min-width: 8em; width: auto; }
+.creator-ability-picker > .creator-add-row > select.ui-field { flex: 2 1 16em; min-width: 10em; width: auto; }
+@media (max-width: 650px) { .creator-ability-picker > .creator-add-row, .creator-choice .creator-add-row { flex-wrap: wrap; } .creator-ability-picker > .creator-add-row > :is(input,select).ui-field { flex: 1 1 100%; } }
