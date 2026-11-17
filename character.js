@@ -651,47 +651,48 @@
   // Each element (or Shadowlands list) is its own block: its list, Add, and the entries known.
   // Nothing is hidden: a closed type shows one disabled list and why; a block that cannot take
   // anything yet is disabled with its reason, and a reason every block shares is said once above.
+  // Each unit (a spell ring x Mastery level, a kata/kiho ring, the tattoos, a Shadowlands list)
+  // is a row of buttons: bought (pressed; click sells), then available (click buys), then
+  // unavailable (disabled, reason on hover). Closed types show every button disabled.
   function renderAbilityKind([kind,title,label,rulesPage],d) {
     const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
     const closed = !d.school ? 'Choose a school first.' : !R.abilityAccess(kind,sheet,d) ? ACCESS_REASONS[kind] : '';
-    // The reason a type is closed (or one every block shares) sits on the heading line.
-    const heading = note => `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${note?`<span class="creator-ability-locked">${escapeHtml(note)}</span>`:''}${rulesLink(rulesPage,'',`${title} rules`)}</div>${abilityPermission(kind,d)}`;
-    if (closed) {
-      const picker = UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:UI.field({kind:'select',attrs:{'aria-label':title,disabled:true},optionsHtml:option('',`Choose a ${label}`,true)})+UI.button({text:'Add',attrs:{'aria-label':`Add ${label}`,disabled:true}})});
-      return `<div class="creator-purchases creator-ability-kind creator-ability-closed" data-ability-kind="${kind}">${heading(closed)}${picker}${owned.length?`<div class="creator-ability-list">${owned.map(a=>renderAbility(a,d)).join('')}</div>`:''}</div>`;
-    }
     const free = R.freeAbilityLeft(kind,d);
     const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
-    const ownedGroups = abilityGroups(kind,owned);
-    // A unit is one list with its Add button. Spells split each ring into a unit per Mastery level;
-    // the other types use one unit per ring (or list).
     const levels = items => [...new Set(items.map(a => a.mastery || 0))].sort((x,y) => x-y);
     const unitsOf = group => kind === 'spell'
       ? levels(group.items).map(level => ({key:`${group.key}-${level}`,title:`Mastery ${level}`,items:group.items.filter(a => (a.mastery || 0) === level),level}))
       : [{key:group.key,title:'',items:group.items}];
+    const rank = entry => entry.bought ? 0 : entry.offer.blocked ? 2 : 1;
     const units = catalogGroups.flatMap(group => unitsOf(group).map(unit => {
-      const offers = unit.items.map(a => [a,abilityOffer(a,d,free)]);
-      const addable = offers.some(([,offer]) => !offer.blocked);
-      // The first entry not already known explains a closed list (lowest mastery first).
-      const reasons = addable ? [] : (offers.find(([,offer]) => offer.reason !== 'Already known.')?.[1].reasons || ['All known.']);
-      return {...unit,group,offers,addable,reasons};
+      const entries = unit.items.map(a => {
+        const selection = sheet.abilities.find(e => e.catalogId === a.id);
+        const granted = !selection && d.abilities.some(e => e.id === a.id);
+        const offer = closed ? {blocked:true,reasons:[closed],reason:closed,cost:0} : abilityOffer(a,d,free);
+        return {a,selection,granted,bought:!!selection || granted,offer};
+      }).sort((x,y) => rank(x)-rank(y));
+      const addable = entries.some(entry => !entry.bought && !entry.offer.blocked);
+      // The first entry not already known explains a list with nothing to buy (lowest mastery first).
+      const reasons = closed || addable ? [] : (entries.find(entry => !entry.bought)?.offer.reasons || []);
+      return {...unit,group,entries,addable,reasons};
     }));
-    const closedUnits = units.filter(unit => !unit.addable);
-    const shared = closedUnits.length === units.length && units.length > 1 ? closedUnits[0].reasons.filter(reason => closedUnits.every(unit => unit.reasons.includes(reason))) : [];
+    const closedUnits = units.filter(unit => !unit.addable && unit.reasons.length);
+    const shared = closed ? [closed] : closedUnits.length === units.length && units.length > 1 ? closedUnits[0].reasons.filter(reason => closedUnits.every(unit => unit.reasons.includes(reason))) : [];
+    const snippet = text => { const plain = String(text || '').replace(/\s+/g,' ').trim(); return plain.length > 200 ? plain.slice(0,199)+'…' : plain; };
+    const buttonFor = ({a,selection,granted,bought,offer}) => UI.button({
+      text:bought ? `✓ ${a.name}${a.slug==='maho'?' · Maho':''}` : abilityOption(a,offer,free),variant:'quiet',size:'compact',
+      attrs:{class:'creator-ability-option','data-action':bought?'sell-ability':'buy-ability','data-id':a.id,'data-ability-kind':kind,'aria-pressed':bought,
+        disabled:granted || (!bought && offer.blocked),
+        title:granted ? 'School grant' : bought ? 'Bought · click to remove' : offer.blocked ? offer.reason : snippet(a.description)}});
     const renderUnit = unit => {
-      const id = `ability-choice-${kind}-${unit.key}`, name = [unit.group.title || title,unit.title].filter(Boolean).join(' ');
-      const optionsHtml = option('',`Choose a ${label}`,true)+unit.offers.map(([a,offer]) => UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}})).join('');
-      const known = (ownedGroups.find(entry => entry.key === unit.group.key)?.items || []).filter(a => unit.level == null || (a.mastery || 0) === unit.level);
-      const picker = UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:
-        UI.field({kind:'select',attrs:{id,'aria-label':name,disabled:!unit.addable},optionsHtml})+
-        UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'data-ability-group':unit.key,'aria-label':`Add ${label}${name!==title?` (${name})`:''}`,disabled:!unit.addable}})});
-      const body = `${picker}${locked(unit.reasons.filter(reason => !shared.includes(reason)).join(' '))}${known.map(a=>renderAbility(a,d)).join('')}`;
+      const body = `${locked(unit.reasons.filter(reason => !shared.includes(reason)).join(' '))}<div class="creator-ability-options">${unit.entries.map(buttonFor).join('')}</div>`;
       return unit.level == null ? body : `<div class="creator-ability-level" data-ability-level="${unit.level}"><h5>${unit.title}</h5>${body}</div>`;
     };
     const blocks = catalogGroups.map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${units.filter(unit => unit.group === group).map(renderUnit).join('')}</div>`).join('');
-    // Owned entries outside every catalog group (e.g. a renamed catalog entry) still show.
-    const stray = owned.filter(a => !catalogGroups.some(group => group.key === abilityGroups(kind,[a])[0]?.key));
-    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}">${heading(shared.join(' '))}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}${stray.map(a=>renderAbility(a,d)).join('')}</div></div>`;
+    // Rules, School grant and Memorize for what was bought live in one collapsed Details list.
+    const details = owned.length ? UI.disclosure({attrs:{class:'creator-ability-details','id':`ability-details-${kind}`},titleHtml:'Details',bodyHtml:`<div class="creator-ability-list">${owned.map(a=>renderAbility(a,d)).join('')}</div>`}) : '';
+    const heading = `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${shared.length?`<span class="creator-ability-locked">${escapeHtml(shared.join(' '))}</span>`:''}${rulesLink(rulesPage,'',`${title} rules`)}</div>${abilityPermission(kind,d)}`;
+    return `<div class="creator-purchases creator-ability-kind${closed?' creator-ability-closed':''}" data-ability-kind="${kind}">${heading}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}</div>${details}</div>`;
   }
   function renderAbilities(d) {
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
@@ -702,7 +703,7 @@
   }
   function handleExtendedAction(action,button) {
     if(action==='section'){root.querySelector('#creator-'+button.dataset.section)?.scrollIntoView({behavior:'smooth',block:'start'});return true;}
-    const actions=['reset-section','award-xp','add-emphasis','remove-emphasis','add-ability','remove-ability','memorize','add-custom-ability','add-ancestor','remove-ancestor','add-training','remove-training','train-rank'];
+    const actions=['reset-section','award-xp','add-emphasis','remove-emphasis','add-ability','buy-ability','sell-ability','remove-ability','memorize','add-custom-ability','add-ancestor','remove-ancestor','add-training','remove-training','train-rank'];
     if(!actions.includes(action))return false;
     if(action==='reset-section') {
       const key=button.dataset.section;
@@ -715,14 +716,16 @@
       if(!value)uiError='Choose an emphasis.';
       else if(!build().skills[name].emphases.includes(value))(sheet.emphases[name] ||= []).push(value);
     } else if(action==='remove-emphasis')sheet.emphases[button.dataset.skill]?.splice(Number(button.dataset.index),1);
-    else if(action==='add-ability') {
-      const kind=button.dataset.abilityKind, value=read(`#ability-choice-${kind}-${button.dataset.abilityGroup}`),a=catalog.abilities.find(a=>a.kind===kind && a.id===value);
+    else if(action==='buy-ability' || action==='add-ability') {
+      // A button carries its catalog id; the older list + Add form reads its list.
+      const kind=button.dataset.abilityKind, value=button.dataset.id || read(`#ability-choice-${kind}-${button.dataset.abilityGroup}`),a=catalog.abilities.find(a=>a.kind===kind && a.id===value);
       // Free while the school still has picks of this kind (tattoos always); otherwise XP.
       const d=a?build():null,free=a?R.freeAbilityLeft(kind,d):false,offer=a?abilityOffer(a,d,free):null;
       if(!a)uiError='Choose an ability from the catalog, or add a custom ability below.';
       else if(offer.blocked)uiError=`${a.name}: ${offer.reason}`;
       else sheet.abilities.push({id:newId(),catalogId:a.id,kind:a.kind,name:a.name,grant:free,memorized:false});
-    } else if(action==='remove-ability')sheet.abilities=sheet.abilities.filter(e=>e.id!==button.dataset.id);
+    } else if(action==='sell-ability')sheet.abilities=sheet.abilities.filter(e=>e.catalogId!==button.dataset.id);
+    else if(action==='remove-ability')sheet.abilities=sheet.abilities.filter(e=>e.id!==button.dataset.id);
     else if(action==='memorize') {const a=sheet.abilities.find(e=>e.id===button.dataset.id);if(a)a.memorized=!a.memorized;else{const granted=build().abilities.find(e=>e.selectionId===button.dataset.id);if(granted?.kind==='spell')sheet.abilities.push({id:newId(),catalogId:granted.id,kind:'spell',name:granted.name,grant:true,memorized:true});}}
     else if(action==='add-custom-ability') {
       const name=read('#custom-ability-name');
@@ -1137,6 +1140,15 @@
     if(kind){
       // Search narrows the list beside it; element groups with no match disappear.
       const scope=event.target.dataset.searchScope;
+      // Ability button lists: hide buttons that do not match, then empty levels and rings.
+      if(scope && root.querySelector(`[data-ability-kind="${scope}"] .creator-ability-option`)){
+        const query=event.target.value.toLowerCase(),section=root.querySelector(`.creator-ability-kind[data-ability-kind="${scope}"]`);
+        for(const option of section.querySelectorAll('.creator-ability-option'))option.hidden=!!query && !option.textContent.toLowerCase().includes(query);
+        const visible=node=>[...node.querySelectorAll('.creator-ability-option')].some(option=>!option.hidden);
+        for(const level of section.querySelectorAll('.creator-ability-level'))level.hidden=!visible(level);
+        for(const group of section.querySelectorAll('.creator-ability-group'))group.hidden=!visible(group);
+        return;
+      }
       const selects=scope?[...root.querySelectorAll(`[data-ability-kind="${scope}"] select[id^="ability-choice-"]`)]:[root.querySelector('#'+(event.target.dataset.searchTarget || kind+'-select'))].filter(Boolean);
       const query=event.target.value.toLowerCase();
       for(const select of selects){
