@@ -288,7 +288,7 @@
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
   const day = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : ''; };
   // Each entry is a tile; opened, its body is a panel over the page with its own title and close.
-  const entry = (key,summaryHtml,bodyHtml) => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}><summary>${summaryHtml}</summary><div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">${summaryHtml}${button('entry-close','✕',key)}</div>${bodyHtml}</div></details>`;
+  const entry = (key,summaryHtml,bodyHtml,tileAttrs = '') => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}${tileAttrs}><summary>${summaryHtml}</summary><div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">${summaryHtml}${button('entry-close','✕',key)}</div>${bodyHtml}</div></details>`;
   const entryTitle = (title,meta) => `<span class="campaign-entry-title">${e(title)}</span>${meta?`<small class="campaign-entry-meta">${meta}</small>`:''}`;
   const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
   // Timeline: dated events, each with a map of Rokugan and pins for PCs, NPCs or plots.
@@ -383,7 +383,7 @@
   }
   function renderNPCs(npcs,isGM) {
     const fresh = '';
-    const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:'NPC'}),
+    const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC'}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
@@ -392,8 +392,10 @@
     const list = pcs.map(pc => {
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
       const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${pickerToggle('pcs',pc.id)}`;
-      return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait,clan:profile?.clan,name:label(pc),meta:`PC · ${playerName(pc)}`}),
-        `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
+      // Your own PC falls back to its local sheet until its public profile arrives.
+      const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
+      return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,name:label(pc),meta:profile?.family || mine?.family || ''}),
+        `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`,UI.clanTileStyle(profile?.clan || mine?.clan));
     }).join('');
     const picker = '';
     return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(button('pc-picker','+ PC'))}${list}</div>${picker}`;

@@ -252,6 +252,12 @@
     if (mon) return `<img class="character-avatar character-avatar-mon" src="${escape(mon)}" alt="">`;
     return `<span class="character-avatar" aria-hidden="true">${escape(String(name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
   }
-  const characterTileBody = ({portrait,clan,name,meta}) => `${characterAvatar({portrait,clan,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
-  window.UI = {characterAvatar,characterTileBody,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  // The tile shows the name with the family under it; the clan mon sits behind as a faint,
+  // centred, cropped background (see clanTileStyle); the avatar is the picture or the initial.
+  const characterTileBody = ({portrait,name,meta}) => `${characterAvatar({portrait,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
+  function clanTileStyle(clan) {
+    const mon = window.CharacterCatalog?.clanMon(clan || '');
+    return mon ? ` style="--tile-mon:url('${escape(mon)}')" data-tile-mon` : '';
+  }
+  window.UI = {characterAvatar,characterTileBody,clanTileStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

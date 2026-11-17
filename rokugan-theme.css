@@ -347,3 +347,8 @@
   :is(.home-tile, [data-campaign-row="npcs"] .campaign-entry, [data-campaign-row="pcs"] .campaign-entry) .character-avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; object-fit: cover; font-size: 20px; }
   .campaign-entry-panel-head .character-tile-text strong { font: 22px var(--serif); }
 }
+/* A PC tile shows its clan mon behind it: faint, centred, cropped to the tile. */
+@media screen {
+  .home-tile[data-tile-mon], .campaign-entry[data-tile-mon] > summary { position: relative; overflow: hidden; isolation: isolate; }
+  .home-tile[data-tile-mon]::before, .campaign-entry[data-tile-mon] > summary::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--tile-mon) center / cover no-repeat; opacity: .22; pointer-events: none; }
+}
