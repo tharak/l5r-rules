@@ -69,3 +69,7 @@
 .timeline-popup header img{width:56px;height:56px;object-fit:cover;border-radius:3px}
 .timeline-popup h3{margin:0;font:20px var(--serif)}
 @media(max-width:700px){.timeline-event.ui-button{width:150px}.timeline-pin img,.timeline-pin-dot{width:30px;height:30px}}
+/* PCs and NPCs share one row on the timeline: PCs in blue, NPCs in violet, plots in gold. */
+.timeline-target-pcs{border-left:4px solid #3d6f9b!important}
+.timeline-target-npcs{border-left:4px solid #7a5296!important}
+.timeline-target-plots{border-left:4px solid #b48a2c!important}

@@ -157,7 +157,7 @@
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
         : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
-    return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p>${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
+    return `${sectionBar('Plots',button('plot-new','+ Plot'))}${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
   }
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
   // across re-renders (toggle events do not bubble, so listen in the capture phase).
@@ -211,16 +211,18 @@
     if (isGM && selected) {
       // An entry already pinned in any session cannot be added again.
       const used = new Set(store().list(path('timeline','')).map(item => `${item.kind}:${item.targetId}:${item.noteId}`));
-      const groups = [['plots','Plots',plots.map(p => [p.id,p.title || 'Untitled plot'])],['pcs','PCs',pcs.map(pc => [pc.id,label(pc)])],['npcs','NPCs',npcs.map(n => [n.id,n.name || 'Unnamed NPC'])]]
-        .map(([kind,group,items]) => items.length ? `<div class="timeline-target-group"><span>${group}</span>${items.map(([id,name]) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:'timeline-target','data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`}})).join('')}</div>` : '').join('');
+      // Plots on one row; PCs and NPCs share the next, told apart by colour.
+      const chip = (kind,id,name) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:`timeline-target timeline-target-${kind}`,'data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`,'aria-label':`${{plots:'Plot',pcs:'PC',npcs:'NPC'}[kind]}: ${name}, ${entriesOf(kind,id).length} entries`}});
+      const characters = [...pcs.map(pc => ['pcs',pc.id,label(pc)]),...npcs.map(n => ['npcs',n.id,n.name || 'Unnamed NPC'])].sort((a,b) => a[2].localeCompare(b[2]));
+      const groups = [plots.length ? `<div class="timeline-target-group" role="group" aria-label="Plots">${plots.map(p => chip('plots',p.id,p.title || 'Untitled plot')).join('')}</div>` : '',
+        characters.length ? `<div class="timeline-target-group" role="group" aria-label="PCs and NPCs">${characters.map(([kind,id,name]) => chip(kind,id,name)).join('')}</div>` : ''].join('');
       const [kind,id] = pickTarget.split(':'), entries = pickTarget ? entriesOf(kind,id) : [];
       const entryButtons = entries.map(entry => UI.button({text:entry.title,variant:'quiet',size:'compact',attrs:{class:'timeline-entry','data-campaign':'timeline-entry','data-id':entry.id,'aria-pressed':pickNote === entry.id,disabled:used.has(`${kind}:${id}:${entry.id}`),title:used.has(`${kind}:${id}:${entry.id}`) ? 'Already on the timeline' : ''}})).join('');
-      const help = !pickTarget ? 'Choose a plot, PC or NPC, then one of its entries, then click the map.' : !entries.length ? 'This has no notes or public journal entries yet.' : !pickNote ? 'Now choose one of its entries.' : 'Click the map to place this entry.';
-      controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}<p class="entry-help">${help}</p></div>`;
+      controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}</div>`;
     }
     const placing = isGM && selected && pickTarget && pickNote;
-    const head = selected ? `<p class="timeline-date">${e(day(selected.createdAt || selected.updatedAt))}</p><h3>${e(selected.title || 'Untitled session')}</h3>` : '<p class="entry-help">Sessions appear here once the GM adds them.</p>';
-    const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : selected ? '<p class="entry-help">No events on the map for this session yet.</p>' : '';
+    const head = selected ? `<p class="timeline-date">${e(day(selected.createdAt || selected.updatedAt))}</p><h3>${e(selected.title || 'Untitled session')}</h3>` : '';
+    const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
     const map = `<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div>`;
     return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${head}${controls}${map}${eventList}</article></div>${renderNotePopup()}`;
   }
@@ -232,18 +234,20 @@
     const sectionName = {plots:'Plots',npcs:'NPC',pcs:'PC'}[item.kind];
     return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
   }
+  // Section titles are visually hidden; the tabs already name the section. Actions sit on top.
+  const sectionBar = (title,actionsHtml) => `<h2 class="visually-hidden">${e(title)}</h2>${actionsHtml ? `<div class="campaign-toolbar">${actionsHtml}</div>` : ''}`;
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
         : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
-    return `${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:isGM?button('session-new','+ Session'):''})}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
+    return `${sectionBar('Sessions',isGM?button('session-new','+ Session'):'')}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
   }
   function renderNPCs(npcs,isGM) {
     const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}<p class="entry-text">${npc.notes ? e(npc.notes) : '<em>No description yet.</em>'}</p></div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit NPC',npc.id)+button('npc-delete','Delete NPC',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
-    return `${UI.sectionHeading({title:'NPCs',level:2,actionsHtml:isGM?button('npc-new','+NPC'):''})}${fresh}<div class="campaign-entries">${list || '<p>No NPCs yet.</p>'}</div>`;
+    return `${sectionBar('NPCs',isGM?button('npc-new','+NPC'):'')}${fresh}<div class="campaign-entries">${list || '<p>No NPCs yet.</p>'}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
@@ -254,7 +258,7 @@
     }).join('');
     const picker = picking ? `<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>` : '';
     const invite = invitation ? UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}) : '';
-    return `${UI.sectionHeading({title:'PCs',level:2,actionsHtml:UI.actionRow({attrs:{'class':'campaign-actions'},bodyHtml:`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`})})}<div class="campaign-entries">${list || '<p>No PCs linked yet.</p>'}</div>${picker}${invite}`;
+    return `${sectionBar('PCs',`${button('pc-picker','+PC')}${isGM?button('share-invite','Invite link'):''}`)}<div class="campaign-entries">${list || '<p>No PCs linked yet.</p>'}</div>${picker}${invite}`;
   }
   function render(slug) {
     renderAgain ||= () => {};

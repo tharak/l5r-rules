@@ -243,7 +243,7 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  render();await d.click('section','timeline');
  let html=render();
- assert.match(html,/timeline-map/);assert.match(html,/Sessions appear here once the GM adds them/);
+ assert.match(html,/timeline-map/);assert.doesNotMatch(html,/entry-help/,'no helper text');
  assert.doesNotMatch(html,/<h2>Timeline<\/h2>/,'no Timeline heading');
  d.data.set('campaigns/c/sessions/s1',{title:'First session',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-20'});
  d.data.set('campaigns/c/sessions/s2',{title:'Second session',text:'',createdAt:'2026-11-08',updatedAt:'2026-11-08'});
@@ -252,7 +252,7 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  html=render();
  assert.ok(html.indexOf('Second session')<html.indexOf('First session'),'newest first');
  assert.match(html,/data-timeline-map="s2"/,'newest session selected');
- assert.match(html,/data-campaign="timeline-target" data-id="npcs:n"/);
+ assert.match(html,/timeline-target timeline-target-npcs"[^>]*data-campaign="timeline-target" data-id="npcs:n"|data-campaign="timeline-target" data-id="npcs:n"[^>]*class="[^"]*timeline-target-npcs/);
  await d.click('timeline-target','npcs:n');
  assert.match(render(),/data-campaign="timeline-entry" data-id="note1"/);
  await d.click('timeline-entry','note1');
@@ -284,4 +284,16 @@ test('timeline entries for a PC include the public entries of the character jour
  watch.receive({profile:{name:'Doji Ren',journal:[{id:'j1',text:'Reached the capital',createdAt:'2026-11-02'}]}},null,{fromCache:false});
  d.click('timeline-target','pcs:p');
  assert.match(render(),/data-campaign="timeline-entry" data-id="journal:j1"[^>]*>Reached the capital/);
+});
+
+test('campaign sections show actions without visible titles or helper text',()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ for(const section of ['sessions','plots','npcs','pcs']) {
+  render();d.click('section',section);
+  const html=render();
+  assert.match(html,/<h2 class="visually-hidden">/,section);
+  assert.doesNotMatch(html,/entry-help|Add clues and plans/,section);
+ }
 });
