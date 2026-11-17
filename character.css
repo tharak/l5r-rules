@@ -418,3 +418,6 @@
 .creator-skill-filter:has(input:checked) { text-decoration: line-through; opacity: .7; }
 .creator-skill-filter:has(input:not(:checked)) { color: var(--ink, inherit); border-color: currentColor; }
 .creator-skill-filter:has(input:focus-visible) { outline: 2px solid var(--red); outline-offset: 2px; }
+
+/* Required choices still empty: marked on the control itself. */
+.creator-panel [aria-invalid="true"] { border-color: var(--red); box-shadow: inset 3px 0 0 var(--red); }

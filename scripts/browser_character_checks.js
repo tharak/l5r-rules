@@ -107,7 +107,7 @@ async page => {
     await p.locator('[data-action="reset-section"][data-section="story"]').click();
     check(await p.locator('[data-field="notes"]').inputValue()==='','Story reset did not clear inputs');
     check(await p.locator('[data-field="name"]').inputValue()==='Character browser test','Story reset affected Identity');
-    check((await p.locator('#creator-identity .creator-validation').innerText()).includes('Choose a starting school'),'Missing school guidance is not in Identity');
+    check(await p.locator('#creator-identity [data-field="school"][aria-invalid="true"]').count()===1,'Missing school guidance is not in Identity');
     check(await p.locator('.creator-exceptions,.creator-creation-options').count()===0,'Generic exceptions menu remains');
     await p.getByRole('button',{name:'Save PC',exact:true}).click();
     await p.waitForURL(/#\/characters$/);await p.getByRole('heading',{name:'Character browser test',exact:true}).waitFor();

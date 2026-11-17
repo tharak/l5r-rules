@@ -469,7 +469,10 @@
     return 'identity';
   }
   function renderSection(content,key,d) {
-    const issues=d.blockers.filter(v=>violationSection(v.code)===key);
+    // An empty required choice is shown on its own control instead of as a sentence.
+    const missing={name:'name',clan:'clan',family:'family','family-trait':'familyTrait',school:'school'};
+    for(const v of d.blockers)if(missing[v.code])content=content.replace(`data-field="${missing[v.code]}"`,`data-field="${missing[v.code]}" aria-invalid="true"`);
+    const issues=d.blockers.filter(v=>!missing[v.code] && violationSection(v.code)===key);
     const messages=issues.length?`<ul class="creator-validation" aria-label="${escapeHtml(sectionTitle(key) || 'Progression')} choices">${issues.map(v=>`<li>${escapeHtml(v.message)}</li>`).join('')}</ul>`:'';
     // Keep feedback visible in the section that contains the corresponding control.
     return content.replace(key==='summary'?'</aside>':'</section>',messages+(key==='summary'?'</aside>':'</section>'));
