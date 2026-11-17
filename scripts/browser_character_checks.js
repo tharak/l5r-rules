@@ -16,7 +16,7 @@ async page => {
     await p.getByRole('button',{name:'Increase Total bonus',exact:true}).click();
     check(await p.locator('.creator-roll-result').innerHTML()===originalRoll,'Bonus change cleared the result');
     await p.getByRole('button',{name:'Reset bonuses',exact:true}).click();
-    check(await p.locator('.creator-roll-dice li').count()===0,'Reset did not clear the result');
+    check(await p.locator('.creator-roll-result').innerHTML()===originalRoll,'Reset bonuses cleared the last roll');
     await p.getByRole('button',{name:'Close roll',exact:true}).click();
     await p.getByRole('button',{name:'Roll Agility trait',exact:true}).click();
     check(await p.locator('.creator-roll-dice li').count()===2,'Default Trait roll did not run');

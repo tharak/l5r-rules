@@ -732,8 +732,8 @@
       if (!Object.hasOwn(rollState.bonuses,part)) return true;
       rollState.bonuses[part] += Number(button.dataset.delta);
     } else if (action === 'reset-roll-bonuses') {
+      // Only the pool resets; the last roll stays on screen.
       rollState.bonuses = {rolled:0,kept:0,bonus:0};
-      rollState.result = null;
     } else rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(rollState.base,rollState.bonuses),rollState);
     refreshRollDialog(button);
     return true;
