@@ -1214,3 +1214,15 @@ test('rings are ordered by value in Rolls and ability blocks; section 02 keeps i
   assert.equal(spellBlocks[0],'All','Universal first');
   assert.deepEqual(spellBlocks.slice(1,3),['Fire','Water']);
 });
+
+test('character toolbar: Save, Public view and Delete only; Delete asks, removes the PC and goes to Start',async()=>{
+  const c=await character({name:'Ren'});
+  const nav=c.root.innerHTML.match(/<nav class="creator-nav"[^]*?<\/nav>/)[0];
+  assert.doesNotMatch(nav,/← Characters|← Campaign|Copy link|JSON|Print/);
+  assert.match(nav,/data-action="save-close"[^>]*>Save</);assert.match(nav,/data-action="preview-public"/);
+  assert.match(nav,/data-action="delete-character" aria-label="Delete character"/);
+  c.window.confirm=()=>false;c.click({action:'delete-character'});
+  assert.equal(c.records().length,1,'cancel keeps the character');
+  c.window.confirm=()=>true;c.click({action:'delete-character'});
+  assert.equal(c.records().length,0);assert.equal(c.route(),'#/start');
+});

@@ -540,7 +540,7 @@
   const publicHref = () => `#/pc/${encodeURIComponent(window.CharacterStorage?.accountId || '')}/${encodeURIComponent(activeId || '')}`;
   function renderNavigation() {
     const sections=[['rolls','Rolls'],['identity','Identity'],['traits','Traits'],['skills','Skills'],['options','Advantages'],['abilities','Abilities'],['story','Story'],['equipment','Equipment']];
-    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a href="${external?.returnHref || window.CampaignUI?.creatorReturn() || '#/characters'}">← ${external || window.CampaignUI?.creatorReturn() ? 'Campaign' : 'Characters'}</a>${UI.button({text:external?.readOnly?'Close':'Save',attrs:{'data-action':'save-close'}})}${!external ? UI.button({text:'Public view',variant:'secondary',attrs:{'data-action':'preview-public','aria-haspopup':'dialog'}}) : ''}${!external && window.CharacterStorage?.accountId && activeId ? UI.button({text:'Copy link',variant:'secondary',attrs:{'data-action':'copy-public-link'}}) : ''}${UI.button({text:'JSON ↗',variant:'secondary',attrs:{'data-action':'export','aria-label':'Export JSON'}})}${UI.button({text:'Print ↗',variant:'secondary',attrs:{'data-action':'print','aria-label':'Print sheet'}})}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
+    return `<nav class="creator-nav" aria-label="Character sections"><div class="creator-nav-sections">${sections.map(([key,label])=>UI.button({text:label,attrs:{'data-action':'section','data-section':key}})).join('')}</div>${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`${UI.button({text:external?.readOnly?'Close':'Save',attrs:{'data-action':'save-close'}})}${!external ? UI.button({text:'Public view',variant:'secondary',attrs:{'data-action':'preview-public','aria-haspopup':'dialog'}}) : ''}${!external && activeId ? UI.button({text:'Delete',variant:'secondary',attrs:{'data-action':'delete-character','aria-label':'Delete character'}}) : ''}`})}</nav>${uiError?`<p class="creator-feedback" role="alert">${escapeHtml(uiError)}</p>`:''}`;
   }
   function violationSection(code) {
     if (/^(rank:trait:)/.test(code)) return 'traits';
@@ -1085,6 +1085,13 @@
       const url = URL.createObjectURL(blob), link = document.createElement('a');
       link.href = url; link.download = `${(sheet.name || 'rokugan-character').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-')}.json`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url),1000);
+      return;
+    } else if (action === 'delete-character') {
+      // Deleting the open character returns to the start page, where the PCs are listed.
+      if (external || !activeId) return;
+      if (!window.confirm(`Delete ${sheet.name || 'this character'}${window.CharacterStorage?.accountId ? ' from your account and synced devices' : ' from this browser'}?`)) return;
+      remove(activeId);
+      location.hash = '#/start';
       return;
     } else if (action === 'print') { window.print(); return;
     } else if (action === 'reset') {
