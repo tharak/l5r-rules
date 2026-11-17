@@ -90,6 +90,9 @@ function campaignCards() {
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
  vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('sheet-sharing.js','utf8'),{window,structuredClone,crypto:require('node:crypto')});
  vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null},location,Event,console,setTimeout,crypto:require('node:crypto')});
+ // Like the app, render the address a click moved to (a section or item inside this campaign).
+ const renderSlug=window.CampaignUI.render;
+ window.CampaignUI.render=slug=>{const here=location.hash.slice(2).split('/').map(decodeURIComponent).join('/');return renderSlug(slug.startsWith('campaigns/')&&here.startsWith(slug+'/')?here:slug);};
  const render=()=>window.CampaignUI.render('campaigns');
  return {data,store,watches,window,location,listeners,documentListeners,render,setCharacters:value=>characters=value,
   click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
@@ -180,7 +183,7 @@ test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',asy
  let request;d.window.PortraitCreator={open:next=>{request=next;}};
  await d.click('npc-portrait-remove');
  await d.click('npc-portrait-create');
- assert.equal(request.title,'Court envoy');assert.equal(request.returnHref,'#/campaigns/c');
+ assert.equal(request.title,'Court envoy');assert.equal(request.returnHref,'#/campaigns/c/npcs');
  request.onUse(picture);
  assert.equal(d.data.get(id).portrait,picture);
 });
@@ -357,6 +360,30 @@ test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on 
  assert.equal(JSON.stringify(d.data.get('campaigns/c').timelineHidden),'[]');
  d.store.uid='alice';await d.click('section','pcs');
  assert.doesNotMatch(render(),/timeline-visibility/,'only the GM sees the checkbox');
+});
+test('campaign links open a section and item by name + short ID, and clicks move the address',async()=>{
+ const d=campaignCards();
+ const routes={window:{}};vm.runInNewContext(fs.readFileSync('routes.js','utf8'),routes);d.window.Routes=routes.window.Routes;
+ d.data.set('campaigns/camp1234',{title:'Emerald Dawn',gmUid:'gm'});
+ d.data.set('campaigns/camp1234/sessions/ses45678',{title:'Session 1',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/camp1234/sessions/ses00000',{title:'Session 2',text:'',createdAt:'2026-11-02'});
+ d.data.set('campaigns/camp1234/npcs/npc98765',{name:'Mario',notes:''});
+ // Cards link to the readable address.
+ assert.match(d.render(),/href="#\/campaigns\/emerald-dawn-camp"/);
+ // The name part is decoration: an old name still opens the NPC.
+ let html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp/npcs/old-name-npc9');
+ assert.match(html,/data-entry="npcs:npc98765" open/);
+ assert.match(html,/data-campaign="section" data-id="npcs"[^>]*aria-pressed="true"/);
+ html=d.window.CampaignUI.render('campaigns/camp1234/timeline/session-1-ses4');
+ assert.match(html,/data-campaign="timeline-session" data-id="ses45678"[^>]*aria-current="true"/);
+ // Clicks change the address so it can be shared and Back works.
+ await d.click('timeline-session','ses00000');
+ assert.equal(d.location.hash,'#/campaigns/emerald-dawn-camp/timeline/session-2-ses0');
+ await d.click('section','npcs');
+ assert.equal(d.location.hash,'#/campaigns/emerald-dawn-camp/npcs');
+ // An unknown item opens the section without failing.
+ html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp/plots/nobody-zzzz');
+ assert.match(html,/data-campaign="section" data-id="plots"[^>]*aria-pressed="true"/);
 });
 test('session, plot and NPC descriptions become their first journal entry; entries carry titles',async()=>{
  const d=campaignCards();

@@ -12,6 +12,38 @@
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
+  // Links: #/campaigns/<title>-<id>[/<section>[/<item name>-<id>]]. Only the ID parts find
+  // things, so renames keep links working; a bare full ID (older links) still resolves.
+  const SECTIONS = ['timeline','sessions','plots','npcs','pcs'];
+  const hasHistory = () => typeof history !== 'undefined' && typeof history.replaceState === 'function';
+  const decodedRoute = () => { try { return location.hash.slice(2).split('#')[0].split('/').map(decodeURIComponent).join('/'); } catch { return ''; } };
+  function campaignSegment(id) {
+    const campaigns = store().list('campaigns/'), campaign = campaigns.find(item => item.id === id);
+    return window.Routes && campaign ? window.Routes.segment(campaign.title || 'campaign',id,campaigns.map(item => item.id)) : id;
+  }
+  function itemName(kind,item) {
+    if (kind === 'pcs') return sheets.get(item.id+':public')?.data?.profile?.name || window.CharacterBuilder?.list().find(c => c.id === item.characterId)?.name || 'pc';
+    return (kind === 'npcs' ? item.name : item.title) || kind.slice(0,-1);
+  }
+  function itemSegment(kind,id) {
+    const items = store().list(path(kind,'')), item = items.find(entry => entry.id === id);
+    return window.Routes && item ? window.Routes.segment(itemName(kind,item),id,items.map(entry => entry.id)) : id;
+  }
+  function campaignHref(id = active, sectionName = '', kind = '', itemId = '') {
+    let href = '#/campaigns/'+encodeURIComponent(campaignSegment(id));
+    if (sectionName) href += '/'+sectionName;
+    if (sectionName && itemId) href += '/'+encodeURIComponent(itemSegment(kind,itemId));
+    return href;
+  }
+  const resolveCampaign = segment => window.Routes?.resolve(segment,store().list('campaigns/'))?.id || segment;
+  // The route last applied to the page state, and an item still waiting for its data.
+  let appliedRoute = '', pendingItem = null, scrollEntry = '';
+  // Move to a campaign address. Push adds a Back step; otherwise the address is replaced quietly.
+  function go(href,push = true) {
+    if (push) { location.hash = href; appliedRoute = decodedRoute(); return; }
+    if (!hasHistory()) return;
+    history.replaceState(history.state,'',href); appliedRoute = decodedRoute();
+  }
   const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
@@ -82,7 +114,7 @@
       const player = store().get(`campaigns/${campaign.id}/members/${pc.ownerUid}`)?.displayName || 'Player';
       return `<li>${e(name || 'Private PC')} - ${e(player)}</li>`;
     }).join('');
-    return UI.card({attrs:{'class':'panel campaign-card'},href:`#/campaigns/${campaign.id}`,bodyHtml:`<h2>${e(campaign.title)}${READ_KINDS.some(kind => unreadIn(campaign.id,kind)) ? ` ${unreadMark}` : ''}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:''}`});
+    return UI.card({attrs:{'class':'panel campaign-card'},href:campaignHref(campaign.id),bodyHtml:`<h2>${e(campaign.title)}${READ_KINDS.some(kind => unreadIn(campaign.id,kind)) ? ` ${unreadMark}` : ''}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:''}`});
   }
   function reset(next) {
     if (next === active) return;
@@ -91,6 +123,7 @@
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
     timelineSession='';pickTarget='';pickNote='';notePopup='';
+    appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
     const key = pc.id+(full?':full':':public');
@@ -230,7 +263,13 @@
   document.addEventListener('toggle',event => {
     const details = event.target;
     if (!details?.dataset?.entry) return;
+    // A re-render that restores an already open entry also fires "toggle"; only real changes move the address.
+    if (details.open === openEntries.has(details.dataset.entry)) return;
     if (details.open) openEntries.add(details.dataset.entry); else openEntries.delete(details.dataset.entry);
+    // The address names the open entry, so it can be copied and shared.
+    const [kind,id] = details.dataset.entry.split(':');
+    if (!active || kind !== section || !decodedRoute().startsWith('campaigns/')) return;
+    go(details.open ? campaignHref(active,section,kind,id) : campaignHref(active,section),false);
   },true);
   const day = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : ''; };
   const entry = (key,summaryHtml,bodyHtml) => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}><summary>${summaryHtml}</summary><div class="campaign-entry-body">${bodyHtml}</div></details>`;
@@ -345,8 +384,30 @@
       watchCardSheets(campaigns);
       return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1><div class="campaign-toolbar">${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? UI.disclosure({attrs:{},titleHtml:`Retained drafts`,bodyHtml:`${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}`}) : ''}</div>`;
     }
-    reset(slug.slice('campaigns/'.length));
+    const [campaignPart = '',routeSection = '',itemPart = ''] = slug.slice('campaigns/'.length).split('/');
+    reset(resolveCampaign(campaignPart));
+    // A new address picks the section and the item it names; later renders keep the state.
+    if (slug !== appliedRoute) {
+      appliedRoute = slug;
+      section = SECTIONS.includes(routeSection) ? routeSection : 'timeline';
+      notePopup = '';
+      pendingItem = SECTIONS.includes(routeSection) && itemPart ? {kind:routeSection === 'timeline' ? 'sessions' : routeSection,segment:itemPart} : null;
+    }
+    if (pendingItem && window.Routes) {
+      const found = window.Routes.resolve(pendingItem.segment,store().list(path(pendingItem.kind,'')));
+      if (found) {
+        if (section === 'timeline') { timelineSession = found.id; pickTarget = pickNote = ''; }
+        else { openEntries.add(`${pendingItem.kind}:${found.id}`); scrollEntry = `${pendingItem.kind}:${found.id}`; }
+        pendingItem = null;
+      }
+    }
     const c = store().get(`campaigns/${active}`);
+    // Older or raw-ID links settle on the readable address once the campaign is known.
+    if (c && hasHistory() && campaignPart !== campaignSegment(active)) {
+      const rest = slug.split('/').slice(2).map(encodeURIComponent).join('/');
+      go(campaignHref(active)+(rest ? '/'+rest : ''),false);
+    }
+    if (scrollEntry) { const key = scrollEntry; scrollEntry = ''; setTimeout(() => document.querySelector(`.campaign-entry[data-entry="${key}"]`)?.scrollIntoView({block:'start'}),0); }
     if (!c) { reset(''); return '<div class="workspace"><h1>Campaign unavailable</h1><p>Loading, or membership is no longer active.</p><a href="#/campaigns">Campaigns</a></div>'; }
     const isGM = gm(), sessions = store().list(path('sessions','')), npcs = store().list(path('npcs','')), pcs = store().list(path('pcs',''));
     migratePCNotes();
@@ -405,7 +466,7 @@
     const item = sheets.get(sheetId+':full');
     if (!item?.data) { target.textContent = 'Loading full sheet…'; return; }
     // Only a sheet's creator edits it; the GM gets a read-only copy of the full sheet.
-    window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,journal:{owner:item.pc.ownerUid,characterId:item.pc.characterId},returnHref:`#/campaigns/${active}`,save(){},close(){sheetId='';editor=null;changed();}});
+    window.CharacterBuilder.mount(target,{sheet:JSON.parse(item.data.sheetJson),readOnly:true,journal:{owner:item.pc.ownerUid,characterId:item.pc.characterId},returnHref:campaignHref(active,'pcs'),save(){},close(){sheetId='';editor=null;changed();}});
     editor = item.data.revision;
   }
   function refresh(renderPage) {
@@ -429,7 +490,7 @@
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
-      else if (action==='section') {if(['sessions','plots','npcs','pcs','timeline'].includes(id)){section=id;notePopup='';}}
+      else if (action==='section') {if(SECTIONS.includes(id)){section=id;notePopup='';go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
       else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};}
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
@@ -441,7 +502,7 @@
         store().queue(`campaigns/${active}`,{...c,timelineHidden:[...hidden]});
         if(!onPicker(...id.split(':'))&&pickTarget===id){pickTarget='';pickNote='';}
       }
-      else if (action==='timeline-session') {timelineSession=id;pickTarget='';pickNote='';}
+      else if (action==='timeline-session') {timelineSession=id;pickTarget='';pickNote='';go(campaignHref(active,'timeline','sessions',id));}
       else if (action==='timeline-target' && gm()) {pickTarget=pickTarget===id?'':id;pickNote='';}
       else if (action==='timeline-entry' && gm()) pickNote=pickNote===id?'':id;
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
@@ -497,7 +558,7 @@
       else if (action==='npc-portrait-remove') setNPCPortrait('');
       else if (action==='npc-portrait-create' && gm() && window.PortraitCreator?.open) {
         const npc=npcDraft || store().get(path('npcs',npcId));
-        window.PortraitCreator.open({title:npc?.name || 'this NPC',returnHref:`#/campaigns/${active}`,onUse:picture=>setNPCPortrait(picture)});
+        window.PortraitCreator.open({title:npc?.name || 'this NPC',returnHref:campaignHref(active,'npcs'),onUse:picture=>setNPCPortrait(picture)});
       }
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
@@ -632,6 +693,6 @@
     if (event.relatedTarget?.closest('[data-campaign]') || (event.target.dataset.campaignField?.startsWith('npc-') && npcDraft)) return;
     if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
   });
-  window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!location.hash.startsWith('#/campaigns/'+creatorCampaign))creatorCampaign=null;});
-  window.CampaignUI={render,refresh,mountEditor,creatorReturn:()=>creatorCampaign?'#/campaigns/'+creatorCampaign:null};
+  window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
+  window.CampaignUI={render,refresh,mountEditor,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
 })();

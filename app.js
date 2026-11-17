@@ -366,8 +366,10 @@ function render() {
   if (campaignRoute) window.CampaignUI.mountEditor();
   // Scroll only when navigating to a different page; live updates (a new pin, a synced edit)
   // re-render in place and must keep the reader's position.
-  if (location.hash === lastRenderedHash) return;
-  lastRenderedHash = location.hash;
+  // Within one campaign, changing section or item keeps the position (the item scrolls itself).
+  const scrollKey = campaignRoute ? routePath().split('/').slice(0,2).join('/') : location.hash;
+  if (scrollKey === lastRenderedHash) return;
+  lastRenderedHash = scrollKey;
   const fragment = location.hash.split('#').slice(2).join('#');
   if (fragment) requestAnimationFrame(() => document.getElementById(decodeURIComponent(fragment))?.scrollIntoView());
   else window.scrollTo(0, 0);
