@@ -262,8 +262,9 @@
     }
     const placing = isGM && selected && pickTarget && pickNote;
     const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
-    const map = `<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div>`;
-    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${controls}${map}${eventList}</article></div>${renderNotePopup()}`;
+    // The selectors float over the map's top-left corner (above it on narrow screens).
+    const map = `<div class="timeline-stage">${controls}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div></div>`;
+    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}${eventList}</article></div>${renderNotePopup()}`;
   }
   // The full entry behind a timeline event, in an overlay dialog.
   function renderNotePopup() {
@@ -512,7 +513,7 @@
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&notePopup){event.preventDefault();act('note-popup-close');}});
   function placePin(event) {
     const map=event.target.closest?.('[data-timeline-map]');
-    if(!map||!pickTarget||!pickNote||!gm()||event.target.closest('.timeline-pin'))return;
+    if(!map||!pickTarget||!pickNote||!gm()||event.target.closest('.timeline-pin')||event.target.closest('.timeline-pin-controls'))return;
     const sessionId=map.dataset.timelineMap,[kind,targetId]=pickTarget.split(':');
     const rect=map.getBoundingClientRect(),x=Math.round((event.clientX-rect.left)/rect.width*1000)/10,y=Math.round((event.clientY-rect.top)/rect.height*1000)/10;
     const now=new Date().toISOString(),existing=store().list(path('timeline','')).find(item=>item.kind===kind&&item.targetId===targetId&&item.noteId===pickNote);
