@@ -599,3 +599,19 @@ test('the pin picker only offers plots, PCs and NPCs that have notes',()=>{
  assert.match(html,/data-campaign="timeline-target" data-id="npcs:withNotes"/);
  assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="npcs:empty"/);assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="plots:p"/);
 });
+test('a pin\'s note popup offers Remove pin to whoever placed it and to the GM; removing deletes the pin',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
+ d.data.set('campaigns/c/notes/a',{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'n',title:'Met',text:'x',createdAt:'1',updatedAt:'1',revision:'r'});
+ d.data.set('campaigns/c/timeline/mine',{sessionId:'s',kind:'npcs',targetId:'n',noteId:'a',x:10,y:10,createdAt:'1',creatorUid:'alice'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ d.store.uid='bob';render();await d.click('note-popup','mine');
+ assert.doesNotMatch(render(),/data-campaign="pin-remove"/,'not someone else\'s pin');
+ await d.click('note-popup-close');
+ d.store.uid='alice';render();await d.click('note-popup','mine');
+ assert.match(render(),/data-campaign="pin-open-entry" data-id="npcs:n"[^]*data-campaign="pin-remove" data-id="mine"/);
+ await d.click('pin-remove','mine');
+ assert.equal(d.data.has('campaigns/c/timeline/mine'),false);
+});

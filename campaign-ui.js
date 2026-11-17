@@ -336,7 +336,7 @@
     // Every session's pins are on the map; the selected session's are in colour and on top, the
     // others greyed out behind them.
     const allPins = timelineEvents('').sort((a,b) => (a.sessionId === selected?.id) - (b.sessionId === selected?.id));
-    const pinHtml = allPins.map(item => `<span class="timeline-pin timeline-pin-${item.kind}${item.sessionId === selected?.id ? '' : ' timeline-pin-other'}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${isGM ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
+    const pinHtml = allPins.map(item => `<span class="timeline-pin timeline-pin-${item.kind}${item.sessionId === selected?.id ? '' : ' timeline-pin-other'}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${canMovePin(item) ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
     let controls = '';
     // Every member places pins (the GM can also move anyone's).
     if (selected) {
@@ -357,7 +357,7 @@
     const placing = selected && pickTarget && pickNote;
     const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
     // The selectors float over the map's top-left corner (above it on narrow screens).
-    const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}${store().get(`campaigns/${active}`)?.mapId ? button('map-reset','Default map') : ''}</div>` : '';
+    const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
     const map = `<div class="timeline-stage">${controls}${mapActions}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="${e(mapSrc())}" alt="Campaign map">${pinHtml}</div></div>`;
     return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
   }
@@ -451,12 +451,14 @@
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
   const renderInvitePopup = () => '';
+  // A pin is moved or removed by whoever placed it, or by the GM (older pins count as the GM's).
+  const canMovePin = item => !!item && (gm() || (!!item.creatorUid && item.creatorUid === store().uid));
   function renderNotePopup() {
     if (!notePopup) return '';
     const item = store().get(path('timeline',notePopup)), target = item && pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
     if (!note) return '';
     const sectionName = {plots:'Plots',npcs:'NPC',pcs:'PC'}[item.kind];
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('pin-open-entry',`Open ${sectionName}`,`${item.kind}:${item.targetId}`)+(canMovePin(item)?button('pin-remove','Remove pin',notePopup):'')+button('note-popup-close','Close')})}</div>`;
   }
   // Section titles are visually hidden; the tabs already name the section. Actions sit on top.
   // Each kind is a grid of tiles with no visible title: its add button is the first tile.
@@ -653,7 +655,7 @@
       else if (action==='timeline-entry') pickNote=pickNote===id?'':id;
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
       else if (action==='note-popup-close') {const back=notePopup;notePopup='';setTimeout(()=>document.querySelector(`[data-campaign="note-popup"][data-id="${back}"]`)?.focus(),0);}
-      else if (action==='timeline-unpin' && gm()) {if(window.confirm('Remove this event from the map?'))store().queue(path('timeline',id),null);}
+      else if (action==='timeline-unpin' && canMovePin(store().get(path('timeline',id)))) {if(window.confirm('Remove this pin from the map?'))store().queue(path('timeline',id),null);}
       else if (action==='mark-read') {const [kind,entryId]=id.split(':');if(READ_KINDS.includes(kind))markRead(kind,entryId);}
       else if (action==='image-remove') {
         const [kind,index]=id.split(':');
@@ -764,6 +766,16 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
+      else if (action==='pin-remove') {
+        const item=store().get(path('timeline',id));
+        if (!canMovePin(item)) return;
+        store().queue(path('timeline',id),null);notePopup='';
+      }
+      else if (action==='pin-open-entry') {
+        // Open the PC, NPC or plot behind the pin as its panel.
+        const [kind,targetId]=id.split(':');notePopup='';
+        openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);
+      }
       else if (action==='npc-portrait-library') {
         const editing=npcDraft || npcId, file=await window.MediaLibrary?.pickFile('Choose a picture');
         const url=file && await UI.readPortrait(file);
@@ -793,6 +805,34 @@
     } catch(err) {error=err.code==='permission-denied'?'Access denied. Check membership or invitation expiry.':err.message;}
     finally {busy=false;changed();}
   }
+  // Drag a pin to move it (yours, or any as GM). A drag that moved suppresses the click that
+  // would open the pin's note.
+  let drag=null, swallowClick=false;
+  document.addEventListener('pointerdown',event=>{
+    const pin=event.target.closest?.('.timeline-pin[data-pin-id]'), map=pin?.closest('.timeline-map');
+    if(!pin||!map||event.button!==0)return;
+    const item=store().get(path('timeline',pin.dataset.pinId));
+    if(!canMovePin(item))return;
+    drag={pin,map,id:pin.dataset.pinId,item,x0:event.clientX,y0:event.clientY,moved:false,x:item.x,y:item.y};
+  });
+  document.addEventListener('pointermove',event=>{
+    if(!drag)return;
+    if(!drag.moved&&Math.hypot(event.clientX-drag.x0,event.clientY-drag.y0)<5)return;
+    drag.moved=true;event.preventDefault();
+    const rect=drag.map.getBoundingClientRect();
+    drag.x=Math.min(100,Math.max(0,Math.round((event.clientX-rect.left)/rect.width*1000)/10));
+    drag.y=Math.min(100,Math.max(0,Math.round((event.clientY-rect.top)/rect.height*1000)/10));
+    drag.pin.style.left=`${drag.x}%`;drag.pin.style.top=`${drag.y}%`;drag.pin.classList.add('timeline-pin-dragging');
+  });
+  document.addEventListener('pointerup',()=>{
+    if(!drag)return;
+    const done=drag;drag=null;
+    if(!done.moved)return;
+    swallowClick=true;setTimeout(()=>{swallowClick=false;},0);
+    const {id:_,...rest}=done.item;
+    store().queue(path('timeline',done.id),{...rest,x:done.x,y:done.y,creatorUid:done.item.creatorUid||store().uid,updatedAt:new Date().toISOString()});
+  });
+  document.addEventListener('click',event=>{if(swallowClick){event.preventDefault();event.stopPropagation();swallowClick=false;}},true);
   document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');
     if(b?.dataset.campaign==='timeline-arrow'){const pin=document.querySelector(`.timeline-pin[data-pin-id="${CSS.escape(b.dataset.id)}"]`);if(pin){const r=pin.getBoundingClientRect();window.scrollTo({top:window.scrollY+r.top+r.height/2-window.innerHeight/2,left:window.scrollX+r.left+r.width/2-document.documentElement.clientWidth/2,behavior:'smooth'});}return;}
     if(b)act(b.dataset.campaign,b.dataset.id);else placePin(event);});

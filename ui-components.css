@@ -83,3 +83,5 @@
 .ui-cropper-body .ui-field-label { display: grid; gap: 4px; width: min(256px, 100%); font-size: 12px; }
 .ui-cropper-zoom.ui-field { padding: 0; border: 0; background: transparent; accent-color: var(--red); }
 .ui-cropper footer { display: flex; justify-content: flex-end; gap: 8px; padding: 0 16px 16px; }
+/* A hidden file input fills only its own label (Upload, Add picture, Add image). */
+label:has(> .ui-portrait-input) { position: relative; overflow: hidden; }

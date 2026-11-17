@@ -173,3 +173,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .timeline-pin-other{filter:grayscale(1);opacity:.45;z-index:0}
 .timeline-pin-other:hover,.timeline-pin-other:focus-within{opacity:.85}
 .timeline-pin:not(.timeline-pin-other){z-index:1}
+/* Pins you can move: drag them; while dragging they lift above the others. */
+.timeline-pin-dragging{z-index:5;cursor:grabbing;filter:drop-shadow(0 4px 6px #0006)}
+.timeline-pin .timeline-pin-open{touch-action:none}
