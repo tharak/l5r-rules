@@ -169,9 +169,8 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .campaign-not-invited{max-width:640px;padding-top:40px}
 .campaign-not-invited h1{font:30px var(--serif);margin:0 0 14px}
 .campaign-not-invited em{font-style:normal;color:var(--red)}
-/* Pins from other sessions stay on the map, greyed out behind the selected session's. */
-.timeline-pin-other{filter:grayscale(1);opacity:.45;z-index:0}
-.timeline-pin-other:hover,.timeline-pin-other:focus-within{opacity:.85}
+/* Pins from other sessions stay on the map, greyed out (not faded) behind the selected session's. */
+.timeline-pin-other{filter:grayscale(1);z-index:0}
 .timeline-pin:not(.timeline-pin-other){z-index:1}
 /* Pins you can move: drag them; while dragging they lift above the others. */
 .timeline-pin-dragging{z-index:5;cursor:grabbing;filter:drop-shadow(0 4px 6px #0006)}
