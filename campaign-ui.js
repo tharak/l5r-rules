@@ -421,7 +421,7 @@
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace${section==='timeline'?' campaign-workspace-wide':''}"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
+    return `<div class="workspace campaign-workspace${section==='timeline'?' campaign-workspace-wide':''}"><div class="workspace-head">${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['timeline','Timeline'],['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label:READ_KINDS.includes(value)&&unreadIn(active,value)?`${label} !`:label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
       ${section==='sessions'?renderSessions(sessions,isGM):''}
       ${section==='plots'?renderPlots(plots):''}
@@ -694,20 +694,12 @@
     if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
   });
   window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
-  // Start page rows: the campaign cards (or Sign in), and every campaign's NPCs with links.
+  // Start page row: the campaign cards (or Sign in).
   function homeCampaigns() {
     if (!store().uid) return {signedIn:false,html:button('sign-in','Sign in with Google')};
     const campaigns = store().list('campaigns/');
     watchCardSheets(campaigns);
     return {signedIn:true,html:campaigns.map(campaignCard).join(''),create:button('create','+ Campaign')};
   }
-  function homeNPCs() {
-    if (!store().uid) return [];
-    return store().list('campaigns/').flatMap(campaign => {
-      const npcs = store().list(`campaigns/${campaign.id}/npcs/`), ids = npcs.map(npc => npc.id);
-      return npcs.map(npc => ({id:npc.id,name:npc.name || 'Unnamed NPC',portrait:UI.isPortrait(npc.portrait)?npc.portrait:'',updatedAt:npc.updatedAt || '',campaign:campaign.title || 'Campaign',
-        href:`#/campaigns/${encodeURIComponent(campaignSegment(campaign.id))}/npcs/${encodeURIComponent(window.Routes ? window.Routes.segment(npc.name || 'npc',npc.id,ids) : npc.id)}`}));
-    });
-  }
-  window.CampaignUI={render,refresh,mountEditor,homeCampaigns,homeNPCs,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
+  window.CampaignUI={render,refresh,mountEditor,homeCampaigns,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
 })();
