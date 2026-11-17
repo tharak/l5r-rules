@@ -29,7 +29,24 @@
   const skillFilters = {rolls:{zero:true,macro:true},skills:{zero:false,macro:false}};
   const LEGACY_SKILL_CATEGORY_FILTER_KEY = 'l5r-rules-character-rolls-hidden-zero-categories-v2';
   const sectionTitle = key => sectionNames[key];
-  const editorRoute = () => location.hash.split('#').slice(0,2).join('#') === '#/create-character';
+  const routeHash = () => location.hash.split('#').slice(0,2).join('#');
+  const editorRoute = () => routeHash() === '#/create-character' || routeHash().startsWith('#/characters/');
+  // A character's own link: #/characters/<name>-<short id>. Renaming keeps old links working.
+  function href(id = currentId()) {
+    const characters = list(), character = characters.find(item => item.id === id);
+    if (!character || !window.Routes) return '#/characters';
+    return '#/characters/'+encodeURIComponent(window.Routes.segment(character.name || 'pc',id,characters.map(item => item.id)));
+  }
+  function currentId() {
+    if (activeId) return activeId;
+    try { return localStorage.getItem(activeKey()) || roster()[0]?.id; } catch { return roster()[0]?.id; }
+  }
+  // Keep the address in step with the open character's name without a page reload.
+  function syncRoute() {
+    if (external || !routeHash().startsWith('#/characters/') || typeof history === 'undefined') return;
+    const target = href(activeId);
+    if (target !== '#/characters' && target !== routeHash()) history.replaceState(history.state,'',target);
+  }
   const activeKey = () => window.CharacterStorage?.activeKey() || ACTIVE_KEY;
 
   function makeId() { return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`; }
@@ -121,7 +138,7 @@
   function save() {
     if (external) { if (!external.readOnly) external.save(sheet); return true; }
     const records = roster(), record = records.find(item => item.id === activeId);
-    if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); return storeRoster(records); }
+    if (record) { record.sheet = sheet; record.updatedAt = new Date().toISOString(); const saved = storeRoster(records); syncRoute(); return saved; }
     return false;
   }
   function selectedClan() { return catalog.clans.find(clan => clan.name === sheet.clan); }
@@ -627,6 +644,7 @@
     if (!root?.isConnected || !catalog || (!external && !editorRoute())) return;
     const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.id || d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
+    syncRoute();
     root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${macroSkill?renderSubskills():''}${rollState?renderRollDialog():''}${publicPreview?renderPublicPreview(data):''}</div>`;
     const subskillDialog = root.querySelector('.creator-subskill-dialog');
     if (subskillDialog) {
@@ -855,7 +873,7 @@
     } else if (action === 'create-portrait') {
       if (external || !window.PortraitCreator?.open) return;
       const id = activeId;
-      window.PortraitCreator.open({title:sheet.name || 'your character',clan:sheet.clan,recipe:sheet.portraitRecipe,returnHref:'#/create-character',
+      window.PortraitCreator.open({title:sheet.name || 'your character',clan:sheet.clan,recipe:sheet.portraitRecipe,returnHref:href(id),
         onUse:(picture,recipe) => { setPortrait(id,picture,recipe); }});
       return;
     } else if (action === 'remove-portrait') {
@@ -1056,13 +1074,13 @@
     finally { sheet = previous; }
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
-  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, addJournalEntries, read:readRecord, profile, normalize:R.normalize };
+  window.CharacterBuilder = { mount, list, create, open, href, currentId, remove, setPortrait, addJournalEntries, read:readRecord, profile, normalize:R.normalize };
   const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
   function refreshRemoteSheet() {
     if (!root?.isConnected || !editorRoute() || external) return;
     const record = roster().find(record => record.id === activeId);
-    if (!record) { remoteRefreshPending = false; location.hash = '#/start'; return; }
+    if (!record) { remoteRefreshPending = false; location.hash = '#/characters'; return; }
     const next = R.normalize(record.sheet);
     // Cloud echoes can reorder object keys or update another character. Neither
     // should replace the editor, its unsaved picker values, or the focused field.

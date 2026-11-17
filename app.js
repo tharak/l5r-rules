@@ -317,12 +317,20 @@ function renderDirectory() {
   return `<div class="directory"><div class="eyebrow muted"><span class="eyebrow-line"></span> THE COMPLETE ARCHIVE</div><h1>All pages</h1><p>Browse rules and reference pages.</p><div class="directory-count">${pages.length} PAGES</div><div class="directory-groups">${Object.entries(groups).map(([letter, entries]) => `<section class="directory-group"><h2>${esc(letter)}</h2><div>${entries.map(page => `<a href="${pageHref(page.slug)}"><span>${esc(page.title)}</span><small>${esc(pageSection(page.slug))}</small><b>↗</b></a>`).join('')}</div></section>`).join('')}</div></div>`;
 }
 
-let lastRenderedHash = null;
+let lastRenderedHash = null, characterMissing = false;
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
-  if (slug.startsWith('characters/')) { location.replace('#/characters'); return; }
-  if (slug === 'create-character-lab') { location.replace('#/create-character'); return; }
+  // The old editor address opens the current character at its own link.
+  if (slug === 'create-character' || slug === 'create-character-lab') {
+    if (!window.CharacterBuilder.list().length) window.CharacterBuilder.create();
+    location.replace(window.CharacterBuilder.href()); return;
+  }
+  // #/characters/<name>-<id>: open that character (the roster may still be syncing).
+  const characterRoute = slug.startsWith('characters/');
+  const character = characterRoute ? window.Routes.resolve(slug.slice('characters/'.length),window.CharacterBuilder.list()) : null;
+  if (character) window.CharacterBuilder.open(character.id);
+  characterMissing = characterRoute && !character;
   if (slug === 'start') { location.replace('#/campaigns'); return; }
   // Old flat links to a page that lives in a book move to its book path, keeping the anchor.
   if (bookPaths.has(slug) && routePath() !== bookPaths.get(slug)) {
@@ -331,7 +339,7 @@ function render() {
   }
   const page = state.data.pages[slug];
   const campaignRoute = slug === 'campaigns' || slug.startsWith('campaigns/') || slug.startsWith('invite/');
-  const characterEditor = slug === 'create-character';
+  const characterEditor = !!character;
   const designGuide = slug === 'design-guideline';
   const portraitCreator = slug === 'portrait-creator';
   const clanMons = slug === 'clan-mons';
@@ -339,7 +347,7 @@ function render() {
   const publicPC = /^pc\/[^/]+\/[^/]+$/.test(slug);
   // Campaign pages show the map of Rokugan behind their content.
   document.body.classList.toggle('route-campaigns', campaignRoute);
-  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
+  const title = designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // The page label only appears on rule pages; elsewhere the heading and nav already say it.
   $('#breadcrumb').hidden = !page;
@@ -347,7 +355,7 @@ function render() {
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
-  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
+  $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : characterMissing ? '<div class="workspace"><h1>Character not found</h1><a href="#/characters">Characters</a></div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
   if (characterEditor) window.CharacterBuilder.mount($('#app'));
   if (portraitCreator) window.PortraitCreator.mount($('#app'));
@@ -401,8 +409,8 @@ $('#app').addEventListener('click', async event => {
   const button = event.target.closest('[data-dashboard]');
   if (!button) return;
   const action = button.dataset.dashboard;
-  if (action === 'new') { window.CharacterBuilder.create(); location.hash = pageHref('create-character'); }
-  if (action === 'open' && window.CharacterBuilder.open(button.dataset.id)) location.hash = pageHref('create-character');
+  if (action === 'new') location.hash = window.CharacterBuilder.href(window.CharacterBuilder.create());
+  if (action === 'open' && window.CharacterBuilder.open(button.dataset.id)) location.hash = window.CharacterBuilder.href(button.dataset.id);
   if (action === 'remove') {
     const character = window.CharacterBuilder.list().find(item => item.id === button.dataset.id);
     if (character && window.confirm(`Delete ${character.name || 'this character'}${window.CharacterStorage?.accountId ? ' from your account and synced devices' : ' from this browser'}?`)) {
@@ -410,7 +418,7 @@ $('#app').addEventListener('click', async event => {
     }
   }
 });
-window.addEventListener('characters-changed', () => { if (state.data && currentSlug() === 'characters') render();
+window.addEventListener('characters-changed', () => { if (state.data && (currentSlug() === 'characters' || characterMissing)) render();
   else if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });
 window.addEventListener('campaigns-changed', () => { if (state.data && /^(campaigns|invite\/)/.test(currentSlug())) window.CampaignUI.refresh(render); });
 window.addEventListener('campaign-sheet-changed', () => { if (state.data && (currentSlug()==='campaigns' || currentSlug().startsWith('campaigns/') || currentSlug().startsWith('invite/'))) window.CampaignUI.refresh(render); });

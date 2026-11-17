@@ -29,7 +29,7 @@ async function character(saved,preferences = {}) {
     fetch:async () => ({ok:true, json:async () => catalog}),
     URL:{createObjectURL(blob){exported = blob; return 'blob:test';}, revokeObjectURL(){}},
     document, setTimeout:fn=>timers.push(fn)});
-  for (const file of ['ui-components.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
+  for (const file of ['ui-components.js','routes.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
   const change = (dataset,value) => root.onchange({target:{dataset,value}});
@@ -101,7 +101,7 @@ test('a local edit supersedes a deferred remote refresh and remote deletion stil
   assert.equal(c.renders(),count);
   assert.equal(c.records()[0].sheet.name,'Local name');
   c.document.activeElement=input;c.remote([]);
-  assert.equal(c.route(),'#/start');
+  assert.equal(c.route(),'#/characters');
 });
 
 test('Save PC preserves personal edits and closes the sheet to Characters',async()=>{
@@ -615,7 +615,7 @@ test('Create picture hands the sheet to the portrait creator and saves its pictu
   let request;
   c.window.PortraitCreator={open:next=>{request=next;}};
   c.click({action:'create-portrait'});
-  assert.equal(request.title,'Hida Kenta');assert.equal(request.clan,'Crab');assert.equal(request.returnHref,'#/create-character');
+  assert.equal(request.title,'Hida Kenta');assert.equal(request.clan,'Crab');assert.match(request.returnHref,/^#\/characters\/hida-kenta-[\w-]{4,}$/);
   assert.equal(request.recipe.layers.hair,'topknot');
   request.onUse(picture,{gender:'female',age:'young',body:'slim',layers:{hair:'bun'},mon:true});
   const saved=(await c.data()).character;
