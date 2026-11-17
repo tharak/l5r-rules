@@ -2,11 +2,37 @@ const UI = window.UI;
 const state = { data: null, searchMatches: [], activeMatch: 0, navExpanded: new Set() };
 const $ = (selector) => document.querySelector(selector);
 const esc = UI.escape;
-const pageHref = slug => `#/${encodeURIComponent(slug)}`;
+// Rule pages that sit in a book live at their place in it: #/books/water/maho.
+// Built from the book tree once the wiki loads; other slugs stay flat (#/equipment).
+const bookPaths = new Map(), BOOK_RINGS = {'book-of-air':'air','book-of-earth':'earth','book-of-fire':'fire','book-of-water':'water','book-of-the-void':'void'};
+const pageHref = slug => `#/${(bookPaths.get(slug) || slug).split('/').map(encodeURIComponent).join('/')}`;
 
-function currentSlug() {
+// A route path (books/water/maho) or a flat slug, to the page slug it shows.
+function slugFromPath(path) {
+  if (!path.startsWith('books/')) return path;
+  const parts = path.split('/');
+  if (parts.length === 2) return Object.keys(BOOK_RINGS).find(slug => BOOK_RINGS[slug] === parts[1]) || path;
+  return parts[parts.length - 1];
+}
+function routePath() {
   const hash = location.hash.slice(2).split('#')[0];
-  try { return decodeURIComponent(hash || 'start'); } catch { return 'start'; }
+  try { return hash.split('/').map(decodeURIComponent).join('/') || 'start'; } catch { return 'start'; }
+}
+function currentSlug() { return slugFromPath(routePath()); }
+
+function buildBookPaths() {
+  bookPaths.clear();
+  // Breadth-first, so a page listed in several places keeps its shallowest one.
+  let level = bookSections().filter(book => BOOK_RINGS[book.slug]).map(book => ({entry:book,path:`books/${BOOK_RINGS[book.slug]}`}));
+  while (level.length) {
+    const next = [];
+    for (const {entry,path} of level) {
+      if (entry.anchor || bookPaths.has(entry.slug) || !state.data.pages[entry.slug]) continue;
+      bookPaths.set(entry.slug,path);
+      for (const child of entry.children || []) if (!child.anchor) next.push({entry:child,path:`${path}/${child.slug}`});
+    }
+    level = next;
+  }
 }
 
 function allNav() {
@@ -248,7 +274,7 @@ function openRules(href) {
   const match=/^#\/([^#]+)(?:#(.*))?$/.exec(href);
   if(!match || !state.data)return;
   let slug,anchor;
-  try {slug=decodeURIComponent(match[1]);anchor=decodeURIComponent(match[2] || '');}catch{return;}
+  try {slug=slugFromPath(match[1].split('/').map(decodeURIComponent).join('/'));anchor=decodeURIComponent(match[2] || '');}catch{return;}
   if(!rulesDialog) {
     const template=document.createElement('template');
     template.innerHTML=UI.dialog({title:'',titleId:'rules-popup-title',attrs:{class:'rules-popup'},headerClass:'rules-popup-header',bodyClass:'rules-popup-body',headerHtml:`<h2 id="rules-popup-title"></h2>${UI.button({text:'Close',variant:'secondary',attrs:{'aria-label':'Close rules',autofocus:true}})}`});
@@ -298,6 +324,11 @@ function render() {
   if (slug.startsWith('characters/')) { location.replace('#/characters'); return; }
   if (slug === 'create-character-lab') { location.replace('#/create-character'); return; }
   if (slug === 'start') { location.replace('#/campaigns'); return; }
+  // Old flat links to a page that lives in a book move to its book path, keeping the anchor.
+  if (bookPaths.has(slug) && routePath() !== bookPaths.get(slug)) {
+    const fragment = location.hash.split('#').slice(2).join('#');
+    location.replace(pageHref(slug) + (fragment ? `#${fragment}` : '')); return;
+  }
   const page = state.data.pages[slug];
   const campaignRoute = slug === 'campaigns' || slug.startsWith('campaigns/') || slug.startsWith('invite/');
   const characterEditor = slug === 'create-character';
@@ -399,4 +430,4 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Enter') { location.hash = pageHref(state.searchMatches[state.activeMatch].slug); closeSearch(); }
 });
 
-fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; addDeepNavigation(); render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });
+fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; addDeepNavigation(); buildBookPaths(); render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });
