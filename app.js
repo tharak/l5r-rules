@@ -334,6 +334,13 @@ function renderDirectory() {
 }
 
 let lastRenderedHash = null, characterMissing = false;
+// One background image per page (over the default map), or none.
+function setPageArt(src,wash = '') {
+  if (src) { document.body.style.setProperty('--page-art',`url('${src}')`); document.body.dataset.pageArt = ''; }
+  else { document.body.style.removeProperty('--page-art'); delete document.body.dataset.pageArt; }
+  if (wash) document.body.style.setProperty('--page-wash',wash); else document.body.style.removeProperty('--page-wash');
+}
+window.setPageArt = setPageArt;
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
@@ -362,6 +369,12 @@ function render() {
   const publicPC = /^pc\/[^/]+\/[^/]+$/.test(slug);
   // Campaign pages show the map of Rokugan behind their content.
   document.body.classList.toggle('route-campaigns', campaignRoute);
+  // Official art behind some pages: the start landscape and the Shadowlands map on its rule
+  // pages. The character page sets its own clan art (CharacterBuilder.render).
+  const SHADOWLANDS_PAGES = ['shadowlands-taint','maho','mutations','minor-shadowlands-powers','major-shadowlands-powers','akutenshi-powers','the-nothing'];
+  // The start landscape is already pale, so it takes a lighter wash.
+  if (slug === 'start') setPageArt('public/assets/lore/clan-landscape.webp','#f2e9d659');
+  else setPageArt(SHADOWLANDS_PAGES.includes(slug) ? 'public/assets/lore/shadowlands-map.webp' : '');
   const title = slug === 'start' ? 'Start' : designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // The page label only appears on rule pages; elsewhere the heading and nav already say it.

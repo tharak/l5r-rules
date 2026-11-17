@@ -802,6 +802,8 @@
     const openDetails = root.querySelectorAll ? Array.from(root.querySelectorAll('details[open]')).map(d=>d.id || d.querySelector('summary')?.textContent?.split(' ·')[0]) : [];
     const data = build();
     syncRoute();
+    // The character's clan art behind the page (great clans with official covers only).
+    if (!external && document.body?.style) window.setPageArt?.(C.clanCover(sheet.clan));
     root.innerHTML = `<div class="creator-page">${renderNavigation()}${renderLayout(data)}${renderPrintSheet(data)}${emphasisSkill && data.skills[emphasisSkill]?.rank ? renderEmphases(emphasisSkill,data.skills[emphasisSkill]) : ''}${macroSkill?renderSubskills():''}${rollState?renderRollDialog():''}${publicPreview?renderPublicPreview(data):''}</div>`;
     const subskillDialog = root.querySelector('.creator-subskill-dialog');
     if (subskillDialog) {

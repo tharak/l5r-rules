@@ -19,15 +19,18 @@
 
   body {
     background-color: var(--paper);
-    background-image: url('public/assets/parchment.jpg');
+    /* The map of Rokugan behind every page, under a parchment wash; a page can set --page-art. */
+    background-image: linear-gradient(#f2e9d6b8, #f2e9d6b8), var(--page-art, url('public/assets/rokugan-map.webp'));
     background-position: center top;
     background-size: cover;
     background-repeat: no-repeat;
     background-attachment: fixed;
     color: var(--ink);
   }
-  /* Campaign pages: the map of Rokugan behind the content, under a parchment wash for legibility. */
+  /* Campaign pages keep the map a little stronger. */
   body.route-campaigns { background-image: linear-gradient(#f2e9d6a6, #f2e9d6a6), url('public/assets/rokugan-map.webp'); }
+  /* Official art pages (clan art, Shadowlands, the start landscape) use a softer wash. */
+  body[data-page-art] { background-image: linear-gradient(var(--page-wash, #f2e9d6c4), var(--page-wash, #f2e9d6c4)), var(--page-art); background-position: center; }
   .main-column { min-height: 100vh; }
   ::selection { background: #943d322b; color: #302f28; }
   a:focus-visible, button:focus-visible, input:focus-visible,
