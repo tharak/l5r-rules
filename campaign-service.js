@@ -96,14 +96,20 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
           // The campaign record says who the GM is (it can be handed over). Only the GM watches the
           // private invitation; a member's own index copy of the GM is brought in line here.
-          let invitationStop = null;
-          stops.push(()=>invitationStop?.());
+          let invitationStop = null, requestsStop = null;
+          stops.push(()=>{invitationStop?.();requestsStop?.();});
           stops.push(sdk.onSnapshot(ref(`campaigns/${id}`),s=>{
             const data = s.exists() ? s.data() : null;
             events.receive(`campaigns/${id}`,data);
             if (!data) return;
-            if (data.gmUid === uid && !invitationStop) invitationStop = sdk.onSnapshot(ref(`campaigns/${id}/private/invitation`),i=>events.receive(`campaigns/${id}/private/invitation`,i.exists()?i.data():null),()=>{});
-            if (data.gmUid !== uid && invitationStop) { invitationStop(); invitationStop = null; events.receive(`campaigns/${id}/private/invitation`,null); }
+            if (data.gmUid === uid && !invitationStop) {
+              invitationStop = sdk.onSnapshot(ref(`campaigns/${id}/private/invitation`),i=>events.receive(`campaigns/${id}/private/invitation`,i.exists()?i.data():null),()=>{});
+              // Join requests from people who are not members yet.
+              requestsStop = sdk.onSnapshot(sdk.collection(db,`campaigns/${id}/requests`),r=>{
+                for (const change of r.docChanges()) events.receive(`campaigns/${id}/requests/${change.doc.id}`,change.type==='removed'?null:change.doc.data());
+              },()=>{});
+            }
+            if (data.gmUid !== uid && invitationStop) { invitationStop(); requestsStop?.(); invitationStop = requestsStop = null; events.receive(`campaigns/${id}/private/invitation`,null); }
             if (indexed.gmUid !== data.gmUid) { indexed.gmUid = data.gmUid; sdk.updateDoc(ref(indexPath(id)),{gmUid:data.gmUid}).catch(()=>{}); }
           },fail));
           // NPCs are public to every member.
@@ -209,10 +215,31 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
         for (let offset=0;offset<items.length;offset+=400) await commit(items.slice(offset,offset+400).map(d=>[`campaigns/${c}/${collection}/${d.id}`,null]));
       }
       await this.revoke(c);
+      await sdk.deleteDoc(ref(`campaignDirectory/${c.slice(0,8)}`)).catch(()=>{});
+      for (const request of await records(`campaigns/${c}/requests`)) await sdk.deleteDoc(ref(`campaigns/${c}/requests/${request.id}`));
       const members = await records(`campaigns/${c}/members`);
       // Delete players before the GM; GM rights stay active until the final batch.
       for (const member of members.filter(m=>m.id!==uid)) await this.removeMember(c,member.id);
       await commit([[memberPath(c),null],[indexPath(c),null],[`campaigns/${c}`,null]]);
+    },
+    // Campaign links carry 8 characters of the id; the GM keeps a public lookup (id and title only)
+    // so someone who is not a member can see which campaign a link names and ask to join.
+    async publishDirectory(c,title) { await sdk.setDoc(ref(`campaignDirectory/${c.slice(0,8)}`),{campaignId:c,title:String(title || 'Campaign').slice(0,200)}); },
+    async lookupCampaign(segment) {
+      const text = String(segment || ''), key = /^[0-9a-f]{8}-/.test(text) ? text.slice(0,8) : text.slice(text.lastIndexOf('-')+1).slice(0,8);
+      if (key.length !== 8) return null;
+      return get(`campaignDirectory/${key}`).catch(() => null);
+    },
+    async requestInvite(c) { await sdk.setDoc(ref(`campaigns/${c}/requests/${uid}`),{displayName:playerName(),createdAt:new Date().toISOString()}); },
+    async withdrawRequest(c) { await sdk.deleteDoc(ref(`campaigns/${c}/requests/${uid}`)); },
+    watchRequest(c,receive) { return sdk.onSnapshot(ref(`campaigns/${c}/requests/${uid}`),s=>receive(s.exists()?s.data():null),()=>receive(null)); },
+    // The GM approves a request by attaching the current invite token (making one if needed).
+    async answerRequest(c,who,approve) {
+      if (!approve) return sdk.deleteDoc(ref(`campaigns/${c}/requests/${who}`));
+      let token = (await get(`campaigns/${c}/private/invitation`))?.token;
+      if (token) { try { await this.invitation(token); } catch { token = null; } }
+      token ||= await this.invite(c);
+      await sdk.updateDoc(ref(`campaigns/${c}/requests/${who}`),{inviteToken:token});
     },
     // GM handover: another current member becomes GM at once; this account stays a member.
     async handOver(c,to) {

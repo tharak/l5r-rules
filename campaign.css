@@ -165,3 +165,7 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .campaign-offer>span{flex:1;min-width:200px}
 .campaign-transfer-list{display:flex;flex-wrap:wrap;gap:8px}
 .campaign-transfer-pending{align-self:center;font-size:13px;color:var(--muted)}
+/* Opened a campaign link without an invitation: name the campaign and offer to ask the GM. */
+.campaign-not-invited{max-width:640px;padding-top:40px}
+.campaign-not-invited h1{font:30px var(--serif);margin:0 0 14px}
+.campaign-not-invited em{font-style:normal;color:var(--red)}

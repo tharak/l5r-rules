@@ -14,7 +14,7 @@
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -25,7 +25,8 @@
   const decodedRoute = () => { try { return location.hash.slice(2).split('#')[0].split('/').map(decodeURIComponent).join('/'); } catch { return ''; } };
   function campaignSegment(id) {
     const campaigns = store().list('campaigns/'), campaign = campaigns.find(item => item.id === id);
-    return window.Routes && campaign ? window.Routes.segment(campaign.title || 'campaign',id,campaigns.map(item => item.id)) : id;
+    // Eight id characters, so the public campaign lookup can find a shared link (see notInvited).
+    return window.Routes && campaign ? window.Routes.segment(campaign.title || 'campaign',id,campaigns.map(item => item.id),8) : id;
   }
   function itemName(kind,item) {
     if (kind === 'pcs') return sheets.get(item.id+':public')?.data?.profile?.name || window.CharacterBuilder?.list().find(c => c.id === item.characterId)?.name || 'pc';
@@ -362,10 +363,38 @@
     if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${gm() ? inviteSection() : ''}`,'new-close');
     return '';
   }
-  // Offers made to you in this campaign: accept saves the PC to your account and links it.
+  // Offers made to you in this campaign (accept saves the PC to your account and links it), and,
+  // for the GM, requests to join from people who opened a link without an invitation.
   function renderOffers() {
     const mine = transfers.filter(t => t.toUid === store().uid && t.status === 'offered' && t.campaignId === active);
-    return mine.length ? `<div class="campaign-offers">${mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`).join('')}</div>` : '';
+    const requests = gm() ? store().list(path('requests','')) : [];
+    const rows = [
+      ...mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`),
+      ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
+    ];
+    return rows.length ? `<div class="campaign-offers">${rows.join('')}</div>` : '';
+  }
+  // Opened a campaign link without being a member: name the campaign (from the public lookup) and
+  // offer to ask the GM for an invitation; once approved, a Join button appears.
+  let lookup = {segment:'',state:'',campaign:null}, myRequest = {campaignId:'',data:null,stop:null};
+  const published = new Map();
+  function notInvited(segment) {
+    const backend = store().backend;
+    if (lookup.segment !== segment) {
+      lookup = {segment,state:'loading',campaign:null};
+      (backend?.lookupCampaign?.(segment) || Promise.resolve(null)).then(found => { if (lookup.segment === segment) { lookup = {segment,state:found?'found':'missing',campaign:found}; changed(); } });
+    }
+    const found = lookup.campaign, title = found?.title;
+    if (found && myRequest.campaignId !== found.campaignId) {
+      myRequest.stop?.();
+      myRequest = {campaignId:found.campaignId,data:null,stop:backend?.watchRequest?.(found.campaignId,data => { if (myRequest.campaignId === found.campaignId) { myRequest.data = data; changed(); } })};
+    }
+    const request = found && myRequest.campaignId === found.campaignId ? myRequest.data : null;
+    const action = !found ? '' : request?.inviteToken ? `<p>Your request was approved.</p>${button('join','Join campaign',request.inviteToken)}`
+      : request ? `<p class="campaign-invite-note">Request sent · waiting for the GM.</p>${button('request-withdraw','Withdraw request',found.campaignId)}`
+      : button('request-invite','Ask to be invited',found.campaignId);
+    if (lookup.state === 'loading') return '<div class="workspace"><p class="campaign-invite-note">Looking up the campaign…</p></div>';
+    return `<div class="workspace campaign-not-invited"><h1>You were not invited to ${title ? `the campaign <em>${e(title)}</em>` : 'this campaign'}</h1>${found ? '' : '<p class="campaign-invite-note">Ask its GM for an invite link.</p>'}${action}</div>`;
   }
   // Pick a member: the new GM, or who receives a PC.
   function renderTransferPopup(pcs) {
@@ -488,7 +517,9 @@
       go(campaignHref(active)+(rest ? '/'+rest : ''),false);
     }
     if (scrollEntry) { const key = scrollEntry; scrollEntry = ''; setTimeout(() => document.querySelector(`.campaign-entry[data-entry="${key}"]`)?.scrollIntoView({block:'start'}),0); }
-    if (!c) { reset(''); return '<div class="workspace"><h1>Campaign unavailable</h1><p>Loading, or membership is no longer active.</p><a href="#/campaigns">Campaigns</a></div>'; }
+    if (!c) { reset(''); return store().ready ? notInvited(campaignPart) : '<div class="workspace"><p class="campaign-invite-note">Loading campaign…</p></div>'; }
+    // The GM keeps the public lookup current so shared links can name this campaign.
+    if (gm() && published.get(active) !== c.title) { published.set(active,c.title); store().backend?.publishDirectory?.(active,c.title).catch(()=>{}); }
     const isGM = gm(), sessions = store().list(path('sessions','')), npcs = store().list(path('npcs','')), pcs = store().list(path('pcs',''));
     migratePCNotes();
     migrateDescriptions();
@@ -712,6 +743,9 @@
         const pcId=await backend.link(t.campaignId,characterId);
         await backend.acceptPC(t.id,pcId);
       }
+      else if (action==='request-invite') await backend.requestInvite(id);
+      else if (action==='request-withdraw') await backend.withdrawRequest(id);
+      else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
       else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {

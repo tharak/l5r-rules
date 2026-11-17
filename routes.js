@@ -8,17 +8,17 @@
     return slug || 'item';
   }
   // The shortest ID prefix (at least MIN characters) that no sibling ID shares.
-  function shortId(id, siblingIds = []) {
+  function shortId(id, siblingIds = [], min = MIN) {
     id = String(id);
     const others = siblingIds.map(String).filter(other => other !== id);
-    for (let length = MIN; length < id.length; length++) {
+    for (let length = min; length < id.length; length++) {
       const prefix = id.slice(0,length);
       if (!others.some(other => other.startsWith(prefix))) return prefix;
     }
     return id;
   }
-  function segment(name, id, siblingIds = []) {
-    return `${slugify(name)}-${shortId(id,siblingIds)}`;
+  function segment(name, id, siblingIds = [], min = MIN) {
+    return `${slugify(name)}-${shortId(id,siblingIds,min)}`;
   }
   // Finds the item a segment names: a bare full ID, or the part after the last "-" as an
   // ID prefix. Ambiguous or unknown segments find nothing.

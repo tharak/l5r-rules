@@ -242,3 +242,20 @@ test('PC handover offers: the owner offers to a member; only the recipient reads
  await assertFails(updateDoc(r(db('bob'),'transfers/x'),{status:'accepted',acceptedAt:'later',newPcId:'n2'}),'accepted once');
  await assertSucceeds(deleteDoc(r(db('alice'),'transfers/x')));
 });
+test('campaign lookup and join requests: anyone signed in reads one lookup; only the GM writes it; requests stay between asker and GM',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/abcdef12-x',{title:'Lookup',gmUid:'gm'}],['campaigns/abcdef12-x/members/gm',{gmUid:'gm',membershipId:'gm-m',inviteToken:''}]]);});
+ await assertFails(setDoc(r(db('stranger'),'campaignDirectory/abcdef12'),{campaignId:'abcdef12-x',title:'Lookup'}));
+ await assertFails(setDoc(r(db('gm'),'campaignDirectory/zzzzzzzz'),{campaignId:'abcdef12-x',title:'Lookup'}),'key must be the id prefix');
+ await assertSucceeds(setDoc(r(db('gm'),'campaignDirectory/abcdef12'),{campaignId:'abcdef12-x',title:'Lookup'}));
+ await assertSucceeds(getDoc(r(db('stranger'),'campaignDirectory/abcdef12')));
+ await assertFails(getDoc(r(db(),'campaignDirectory/abcdef12')),'signed in only');
+ await assertFails(getDocs(collection(db('stranger'),'campaignDirectory')),'cannot be listed');
+ await assertFails(getDoc(r(db('stranger'),'campaigns/abcdef12-x')),'the campaign itself stays private');
+ await assertSucceeds(setDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger'),{displayName:'Stranger',createdAt:'now'}));
+ await assertFails(setDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/other'),{displayName:'Forged',createdAt:'now'}));
+ await assertFails(setDoc(r(db('gm'),'campaigns/abcdef12-x/requests/gm'),{displayName:'GM',createdAt:'now'}),'members do not ask');
+ await assertSucceeds(getDocs(collection(db('gm'),'campaigns/abcdef12-x/requests')));
+ await assertFails(getDocs(collection(db('stranger'),'campaigns/abcdef12-x/requests')));
+ await assertFails(updateDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger'),{inviteToken:'x'}),'only the GM approves');
+ await assertSucceeds(deleteDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger')));
+});

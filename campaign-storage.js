@@ -79,7 +79,7 @@
     announce();
   }
   const api = {connect,queue,flush,get:path=>cache[path],list:prefix=>Object.entries(cache).filter(([path])=>path.startsWith(prefix) && !path.slice(prefix.length).includes('/')).map(([path,data])=>({id:path.slice(prefix.length),...data})),
-    get uid(){return uid;},get status(){return status;},get backend(){return adapter;},
+    get uid(){return uid;},get status(){return status;},get backend(){return adapter;},get ready(){return ready;},
     drafts:()=>uid ? read(key('drafts'),{}) : {}};
   window.CampaignStorage = api;
   window.addEventListener('online',flush);

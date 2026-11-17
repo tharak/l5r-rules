@@ -369,23 +369,23 @@ test('campaign links open a section and item by name + short ID, and clicks move
  d.data.set('campaigns/camp1234/sessions/ses00000',{title:'Session 2',text:'',createdAt:'2026-11-02'});
  d.data.set('campaigns/camp1234/npcs/npc98765',{name:'Mario',notes:''});
  // Cards link to the readable address.
- assert.match(d.render(),/href="#\/campaigns\/emerald-dawn-camp"/);
+ assert.match(d.render(),/href="#\/campaigns\/emerald-dawn-camp1234"/);
  // The name part is decoration: an old name still opens the NPC.
- let html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp/npcs/old-name-npc9');
+ let html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp1234/npcs/old-name-npc9');
  assert.match(html,/data-entry="npcs:npc98765" open/,'the NPC opens as a panel');
  assert.match(html,/data-entry="npcs:npc98765" open[^>]*><summary>[^]*?<div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">[^]*?data-campaign="entry-close" data-id="npcs:npc98765"/);
  // Closing the panel returns the address to the campaign.
- d.location.hash='#/campaigns/emerald-dawn-camp/npcs/mario-npc9';
+ d.location.hash='#/campaigns/emerald-dawn-camp1234/npcs/mario-npc9';
  await d.click('entry-close','npcs:npc98765');
- d.location.hash='#/campaigns/emerald-dawn-camp'; // what history.replaceState does in a browser
- assert.doesNotMatch(d.window.CampaignUI.render('campaigns/emerald-dawn-camp'),/data-entry="npcs:npc98765" open/);
+ d.location.hash='#/campaigns/emerald-dawn-camp1234'; // what history.replaceState does in a browser
+ assert.doesNotMatch(d.window.CampaignUI.render('campaigns/emerald-dawn-camp1234'),/data-entry="npcs:npc98765" open/);
  html=d.window.CampaignUI.render('campaigns/camp1234/timeline/session-1-ses4');
  assert.match(html,/data-campaign="timeline-session" data-id="ses45678"[^>]*aria-current="true"/);
  // Clicks change the address so it can be shared and Back works.
  await d.click('timeline-session','ses00000');
- assert.equal(d.location.hash,'#/campaigns/emerald-dawn-camp/timeline/session-2-ses0');
+ assert.equal(d.location.hash,'#/campaigns/emerald-dawn-camp1234/timeline/session-2-ses0');
  // An unknown item opens nothing and does not fail.
- html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp/plots/nobody-zzzz');
+ html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp1234/plots/nobody-zzzz');
  assert.doesNotMatch(html,/class="campaign-entry" data-entry="[^"]+" open/);
 });
 test('session, plot and NPC descriptions become their first journal entry; entries carry titles',async()=>{
@@ -421,7 +421,7 @@ test('start page row: campaign cards, + Campaign, or Sign in',()=>{
  const routes={window:{}};vm.runInNewContext(fs.readFileSync('routes.js','utf8'),routes);d.window.Routes=routes.window.Routes;
  d.data.set('campaigns/camp1234',{title:'Emerald Dawn',gmUid:'gm'});
  const home=d.window.CampaignUI.homeCampaigns();
- assert.equal(home.signedIn,true);assert.match(home.html,/href="#\/campaigns\/emerald-dawn-camp"/);assert.match(home.create,/data-campaign="create"/);
+ assert.equal(home.signedIn,true);assert.match(home.html,/href="#\/campaigns\/emerald-dawn-camp1234"/);assert.match(home.create,/data-campaign="create"/);
  d.store.uid='';
  assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
 });
@@ -535,4 +535,40 @@ test('PC handover: the owner offers to a member; the member accepts into their a
  push([{id:'t1',fromUid:'gm',toUid:'alice',campaignId:'c',pcId:'p1',characterId:'isamu',name:'Hoshi Isamu',status:'accepted',newPcId:'newpc'}]);
  for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls,[['write','campaigns/c/pcs/p1',null],['remove','isamu'],['drop','t1']]);
+});
+test('a link to a campaign you are not in: "You were not invited to the campaign X", ask to be invited, then join once approved',async()=>{
+ const d=campaignCards();
+ let watchCb=null;const calls=[];
+ Object.assign(d.store,{ready:true});
+ Object.assign(d.store.backend,{
+  lookupCampaign:async seg=>seg.endsWith('-b8cd98e4')?{campaignId:'b8cd98e4-5ba6',title:'O Silêncio do Crisântemo'}:null,
+  watchRequest:(c,cb)=>{watchCb=cb;return()=>{};},
+  requestInvite:async c=>calls.push(['request',c]),
+  watchTransfers:()=>()=>{},
+ });
+ const render=slug=>d.window.CampaignUI.render(slug);
+ render('campaigns/o-silencio-do-crisantemo-b8cd98e4');
+ for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ let html=render('campaigns/o-silencio-do-crisantemo-b8cd98e4');
+ assert.match(html,/You were not invited to the campaign <em>O Silêncio do Crisântemo<\/em>/);
+ assert.match(html,/data-campaign="request-invite" data-id="b8cd98e4-5ba6"[^>]*>Ask to be invited</);
+ await d.click('request-invite','b8cd98e4-5ba6');assert.deepEqual(calls,[['request','b8cd98e4-5ba6']]);
+ watchCb({displayName:'Alice',createdAt:'now'});
+ assert.match(render('campaigns/o-silencio-do-crisantemo-b8cd98e4'),/Request sent · waiting for the GM/);
+ watchCb({displayName:'Alice',createdAt:'now',inviteToken:'tok9'});
+ assert.match(render('campaigns/o-silencio-do-crisantemo-b8cd98e4'),/Your request was approved[^]*data-campaign="join" data-id="tok9"/);
+ // An unknown link still says so, without a request button.
+ render('campaigns/unknown-zzzzzzzz');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ html=render('campaigns/unknown-zzzzzzzz');
+ assert.match(html,/You were not invited to this campaign/);assert.doesNotMatch(html,/request-invite/);
+});
+test('the GM sees join requests and approves or declines them',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/requests/alice',{displayName:'Alice',createdAt:'now'});
+ const calls=[];Object.assign(d.store.backend,{answerRequest:async(c,who,ok)=>calls.push([c,who,ok]),publishDirectory:async(c,t)=>calls.push(['publish',c,t]),watchTransfers:()=>()=>{}});
+ const html=d.window.CampaignUI.render('campaigns/c');
+ assert.match(html,/<strong>Alice<\/strong> asks to join[^]*data-campaign="request-approve" data-id="alice"[^]*data-campaign="request-decline" data-id="alice"/);
+ await d.click('request-approve','alice');for(let i=0;i<3;i++)await new Promise(r=>setImmediate(r));
+ assert.deepEqual(calls,[['publish','c','Campaign'],['c','alice',true]]);
 });
