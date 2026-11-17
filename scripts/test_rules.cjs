@@ -198,11 +198,11 @@ test('read marks: members read everyone\'s marks and write only their own',async
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/reads/alice')));
 });
 test('timeline events: members read them, only the GM writes them',async()=>{
- const event={date:'Spring 1123',title:'Arrival',text:'',order:1,pins:[{kind:'npcs',id:'n',x:50,y:25}],createdAt:'now',updatedAt:'now'};
+ const event={sessionId:'s',kind:'npcs',targetId:'n',noteId:'note',x:50,y:25,createdAt:'now',updatedAt:'now'};
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/timeline/t'),event));
  for(const u of ['alice','bob'])await assertSucceeds(getDoc(r(db(u),'campaigns/c/timeline/t')));
  for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c/timeline/t')));
- await assertFails(setDoc(r(db('alice'),'campaigns/c/timeline/t'),{...event,title:'Forged'}));
- await assertFails(setDoc(r(db('gm'),'campaigns/c/timeline/t'),{...event,extra:1}));
+ await assertFails(setDoc(r(db('alice'),'campaigns/c/timeline/t'),{...event,x:10}));
+ for(const bad of [{...event,kind:'sessions'},{...event,x:120},{...event,extra:1}])await assertFails(setDoc(r(db('gm'),'campaigns/c/timeline/t'),bad));
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/timeline/t')));
 });

@@ -35,22 +35,29 @@
 .campaign-image-add{position:relative;cursor:pointer}
 .campaign-unread{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--red);color:#fff;font:700 12px var(--sans)}
 .campaign-read-status{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0;color:var(--muted)}
-/* Timeline: events beside a map of Rokugan with pins. */
+/* Timeline: sessions beside an always-visible map of Rokugan; events pin notes on the map. */
 .timeline{display:grid;grid-template-columns:minmax(180px,240px) minmax(0,1fr);gap:16px;align-items:start}
 .timeline-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.timeline-list li{display:flex;align-items:center;gap:4px}
-.timeline-event.ui-button{display:grid;flex:1;justify-items:start;text-align:left;gap:2px;min-width:0}
+.timeline-event.ui-button{display:grid;width:100%;justify-items:start;text-align:left;gap:2px;min-width:0}
 .timeline-event[aria-current="true"]{border-color:var(--red)!important;background:var(--wash)!important}
 .timeline-event small{color:var(--muted)}
-.timeline-order{display:flex;gap:2px}
 .timeline-date{margin:0;color:var(--muted);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .timeline-detail h3{margin:2px 0 6px;font:22px var(--serif)}
-.timeline-pin-controls{display:grid;gap:4px;margin:8px 0}
+.timeline-pin-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0}
+.timeline-pin-controls .entry-help{grid-column:1/-1;margin:0}
 .timeline-map{position:relative;margin-top:10px;border:1px solid var(--line);border-radius:3px;overflow:hidden}
 .timeline-map>img{display:block;width:100%;height:auto}
 .timeline-map-placing{cursor:crosshair;outline:2px solid var(--red)}
-.timeline-pin{position:absolute;transform:translate(-50%,-100%);display:grid;justify-items:center;gap:2px;pointer-events:auto}
+.timeline-pin{position:absolute;transform:translate(-50%,-100%);display:grid;justify-items:center}
+.timeline-pin-open.ui-button{display:grid;justify-items:center;gap:2px;padding:0!important;min-height:0!important;border:0!important;background:none!important}
 .timeline-pin img,.timeline-pin-dot{width:40px;height:40px;object-fit:cover;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 6px #0006;background:var(--red)}
-.timeline-pin-name{padding:1px 6px;border-radius:3px;background:#fffbf2e6;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px #0004}
+.timeline-pin-name{max-width:160px;overflow:hidden;text-overflow:ellipsis;padding:1px 6px;border-radius:3px;background:#fffbf2e6;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 1px 3px #0004;color:var(--ink)}
 .timeline-pin-remove.ui-button{min-height:20px!important;padding:0 6px!important;font-size:12px}
+.timeline-notes{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.timeline-popup-backdrop{position:fixed;inset:0;background:#252622b8;z-index:50}
+.timeline-popup{position:fixed;z-index:51;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:16px;border:1px solid var(--line);border-radius:3px;background:var(--surface);box-shadow:0 12px 40px #0006}
+.timeline-popup:focus{outline:2px solid var(--red)}
+.timeline-popup header{display:flex;gap:12px;align-items:center}
+.timeline-popup header img{width:56px;height:56px;object-fit:cover;border-radius:3px}
+.timeline-popup h3{margin:0;font:20px var(--serif)}
 @media(max-width:700px){.timeline{grid-template-columns:minmax(0,1fr)}.timeline-pin img,.timeline-pin-dot{width:30px;height:30px}}

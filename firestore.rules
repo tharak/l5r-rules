@@ -129,14 +129,17 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
-      // Timeline events: every member reads them; the GM writes them, with map pins.
+      // Timeline events: a note about a PC, NPC or plot, pinned on the map within a session.
+      // Every member reads them; only the GM writes them.
       match /timeline/{id} {
         allow read: if joined(c);
-        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['date','title','text','order','pins','createdAt','updatedAt'])
-          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
-          && request.resource.data.date is string && request.resource.data.date.size() <= 100
-          && request.resource.data.text is string && request.resource.data.text.size() <= 20000
-          && request.resource.data.order is number && request.resource.data.pins is list && request.resource.data.pins.size() <= 100
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt'])
+          && request.resource.data.kind in ['pcs','npcs','plots']
+          && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80
+          && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80
+          && request.resource.data.noteId is string && request.resource.data.noteId.size() <= 80
+          && request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 100
+          && request.resource.data.y is number && request.resource.data.y >= 0 && request.resource.data.y <= 100
           && request.resource.data.createdAt is string && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
