@@ -53,6 +53,11 @@ test('campaign, session, NPC and membership permissions',async()=>{
  await assertSucceeds(getDoc(r(db('gm'),'campaigns/c/npcs/n')));
  const npc={name:'NPC',notes:'',updatedAt:'now'},picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
+ // Role and description are optional strings within limits; other fields are refused.
+ await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/npcs/described'),{...npc,role:'Magistrate',description:'Keeps the old shrine.'}));
+ await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/described'),{...npc,role:'x'.repeat(201)}));
+ await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/described'),{...npc,description:'x'.repeat(20001)}));
+ await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/described'),{...npc,clan:'Crab'}));
  for(const portrait of ['https://example.test/a.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,AA" onerror="x','data:image/png;base64,'+'A'.repeat(120000),42])
   await assertFails(setDoc(r(db('gm'),'campaigns/c/npcs/pictured'),{...npc,portrait}));
  await assertFails(setDoc(r(db('alice'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));

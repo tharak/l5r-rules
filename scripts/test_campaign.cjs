@@ -461,3 +461,25 @@ test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close b
   assert.doesNotMatch(render(),/campaign-popup/,`${title} closes`);
  }
 });
+test('NPCs have a name, role, description and a notes list (journal entries)',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();await d.click('npc-new');
+ let html=render();
+ for(const field of ['npc-name','npc-role','npc-description'])assert.match(html,new RegExp(`data-campaign-field="${field}"`),field);
+ for(const [campaignField,value] of [['npc-name','Doji Hayaku'],['npc-role','Magistrate'],['npc-description','Keeps the old shrine.']])d.documentListeners.input({target:{dataset:{campaignField},value}});
+ await d.click('npc-save');
+ const [id]=[...d.data.keys()].filter(path=>path.startsWith('campaigns/c/npcs/'));
+ const npc=d.data.get(id);
+ assert.equal(npc.name,'Doji Hayaku');assert.equal(npc.role,'Magistrate');assert.equal(npc.description,'Keeps the old shrine.');
+ html=render();
+ assert.match(html,/<strong>Doji Hayaku<\/strong><small>Magistrate<\/small>/,'the tile shows the role under the name');
+ assert.match(html,/class="campaign-npc-role">Magistrate<[^]*class="campaign-npc-description entry-text">Keeps the old shrine\.</);
+ assert.match(html,new RegExp(`data-campaign="note-new" data-id="npcs:${id.split('/').pop()}"`),'notes are its journal entries');
+ // Editing an existing NPC updates the role live.
+ await d.click('npc-open',id.split('/').pop());
+ d.documentListeners.input({target:{dataset:{campaignField:'npc-role'},value:'Former magistrate'}});
+ await d.click('npc-save');
+ assert.equal(d.data.get(id).role,'Former magistrate');
+});

@@ -156,3 +156,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .campaign-row .campaign-entry>summary .campaign-entry-title{flex:0 1 auto}
 /* The date line wraps under the title and never widens the tile. */
 .campaign-row .campaign-entry>summary .campaign-entry-meta{contain:inline-size;min-width:0}
+/* NPC panel: role and description above its notes (journal entries). */
+.campaign-npc-role{margin:0 0 6px;font:600 14px var(--sans);color:var(--muted)}
+.campaign-npc-description{margin:0 0 12px;white-space:pre-wrap}

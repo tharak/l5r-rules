@@ -176,6 +176,8 @@
     const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')});
     return picture+UI.recordEditor({fields:[
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
+      {label:'Role',value:npc.role || '',attrs:{'data-campaign-field':'npc-role',maxlength:200,placeholder:'e.g. Magistrate of the Lion'}},
+      {label:'Description',kind:'textarea',value:npc.description || '',attrs:{'data-campaign-field':'npc-description',maxlength:20000,rows:4}},
     ],actionsHtml:button('npc-save','Save','',!npc.name.trim())+(npcId?button('npc-delete','Delete',npcId):'')});
   }
   // Sessions, NPCs and plots each have a journal of entries (stored as campaign notes).
@@ -383,9 +385,9 @@
   }
   function renderNPCs(npcs,isGM) {
     const fresh = '';
-    const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC'}),
+    const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
@@ -606,7 +608,7 @@
       }
       else if (action==='session-close') sessionId='';
       else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
-      else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};focusPopup=true;}
+      else if (action==='npc-new') {npcId='';npcDraft={name:'',role:'',description:'',notes:''};focusPopup=true;}
       else if (action==='npc-open') {npcId=id;npcDraft=null;openEntries.add(`npcs:${id}`);}
       else if (action==='npc-portrait-remove') setNPCPortrait('');
       else if (action==='npc-portrait-create' && gm() && window.PortraitCreator?.open) {
@@ -616,7 +618,7 @@
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
         if (!gm() || !draft || !draft.name.trim()) return;
-        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:'',...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
+        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),role:String(draft.role || '').trim().slice(0,200),description:String(draft.description || '').slice(0,20000),notes:'',...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
         npcId='';npcDraft=null;
         store().flush();
       }
@@ -732,7 +734,8 @@
     }
     if(field==='title') {const c=store().get(`campaigns/${active}`);if(event.target.value.trim())store().queue(`campaigns/${active}`,{...c,title:event.target.value});return;}
     const kind=field.startsWith('session-')?'sessions':'npcs',id=kind==='sessions'?sessionId:npcId;
-    const data=store().get(path(kind,id));if(data)store().queue(path(kind,id),{...data,[field.split('-')[1]==='title'?'title':field.split('-')[1]==='text'?'text':field.split('-')[1]==='name'?'name':'notes']:event.target.value,updatedAt:new Date().toISOString()});
+    const key={title:'title',text:'text',name:'name',role:'role',description:'description'}[field.split('-')[1]] || 'notes';
+    const data=store().get(path(kind,id));if(data)store().queue(path(kind,id),{...data,[key]:event.target.value,updatedAt:new Date().toISOString()});
   });
   document.addEventListener('focusout',event=>{
     if (event.relatedTarget?.closest('[data-campaign]') || (event.target.dataset.campaignField?.startsWith('npc-') && npcDraft)) return;
