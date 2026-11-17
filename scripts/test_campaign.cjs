@@ -440,3 +440,17 @@ test('Invite opens a popup with the link, Copy link, Replace link and Revoke',as
  await d.click('invite-close');
  assert.doesNotMatch(render(),/campaign-invite-popup/);
 });
+test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close button discards the draft',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ const popupOf=html=>html.match(/<div class="timeline-popup campaign-popup"[^]*$/)?.[0] || '';
+ for(const [action,title,field] of [['plot-new','New plot','data-entry-field="title"'],['npc-new','New NPC','data-campaign-field="npc-name"'],['pc-picker','Add a PC','data-campaign="pc-create"']]){
+  render();await d.click(action);
+  const html=render();
+  assert.match(popupOf(html),new RegExp(`<h3 id="new-popup-title">${title}</h3>[^]*${field}`),title);
+  assert.doesNotMatch(html.split('<div class="timeline-popup campaign-popup"')[0],new RegExp(field),`${title}: nothing inline`);
+  await d.click('new-close');
+  assert.doesNotMatch(render(),/campaign-popup/,`${title} closes`);
+ }
+});

@@ -249,7 +249,7 @@
   }
   function renderPlots(plots) {
     // A new plot is drafted above the list; an existing one is edited inside its entry.
-    const fresh = plotDraft && !plotId ? `<div class="campaign-entry-new">${entryEditor('plot',plotDraft)}</div>` : '';
+    const fresh = '';
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
         : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
@@ -283,6 +283,7 @@
   document.addEventListener('keydown',event => {
     if (event.key !== 'Escape') return;
     if (inviteLink) { inviteLink = ''; inviteCopied = false; changed(); return; }
+    if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
@@ -347,6 +348,15 @@
     return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
   }
   // The full entry behind a timeline event, in an overlay dialog.
+  // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).
+  const popup = (id,title,bodyHtml,closeAction) => `<div class="timeline-popup-backdrop" data-campaign="${closeAction}"></div><div class="timeline-popup campaign-popup" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${e(title)}</h3></div>${button(closeAction,'✕')}</header>${bodyHtml}</div>`;
+  const newOpen = () => (plotDraft && !plotId) || (npcDraft && !npcId) || picking;
+  function renderNewPopup(pcs) {
+    if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
+    if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft),'new-close');
+    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`,'new-close');
+    return '';
+  }
   // Invite settings in a popup: the link, Copy link, Replace link and Revoke.
   function renderInvitePopup() {
     if (!inviteLink || !gm()) return '';
@@ -373,7 +383,7 @@
     return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','+ Session'):'')}${list}</div>`;
   }
   function renderNPCs(npcs,isGM) {
-    const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
+    const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
@@ -386,7 +396,7 @@
       return entry(`pcs:${pc.id}`,`${avatar(profile?.portrait,profile?.clan)}${entryTitle(label(pc),e(playerName(pc)))}`,
         `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
     }).join('');
-    const picker = picking ? `<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>` : '';
+    const picker = '';
     return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(`${button('pc-picker','+ PC')}${isGM?button('share-invite','Invite'):''}`)}${list}</div>${picker}`;
   }
   function render(slug) {
@@ -453,7 +463,7 @@
       <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
       <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -519,7 +529,7 @@
       else if (action==='entry-close') {openEntries.delete(id);go(campaignHref(active),false);}
       else if (action==='section') {if(SECTIONS.includes(id)){section=id;notePopup='';go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
-      else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};}
+      else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};focusPopup=true;}
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
@@ -580,7 +590,7 @@
       }
       else if (action==='session-close') sessionId='';
       else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
-      else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};}
+      else if (action==='npc-new') {npcId='';npcDraft={name:'',notes:''};focusPopup=true;}
       else if (action==='npc-open') {npcId=id;npcDraft=null;openEntries.add(`npcs:${id}`);}
       else if (action==='npc-portrait-remove') setNPCPortrait('');
       else if (action==='npc-portrait-create' && gm() && window.PortraitCreator?.open) {
@@ -595,7 +605,7 @@
         store().flush();
       }
       else if (action==='npc-delete') {if(window.confirm('Delete this NPC?'))store().queue(path('npcs',id),null);}
-      else if (action==='pc-picker') picking=!picking;
+      else if (action==='pc-picker') {picking=!picking;focusPopup=picking;}
       else if (action==='pc-link') {await backend.link(active,id);picking=false;}
       else if (action==='pc-create') {const campaign=active;const id=window.CharacterBuilder.create();await backend.link(campaign,id);picking=false;creatorCampaign=campaign;location.hash=window.CharacterBuilder.href(id);}
       else if (action==='pc-open') {
@@ -628,6 +638,7 @@
         catch { window.prompt('Copy this invite link:',inviteLink); }
       }
       else if (action==='invite-close') {inviteLink='';inviteCopied=false;}
+      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;
