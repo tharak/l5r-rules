@@ -1089,3 +1089,21 @@ test('every ability is its own catalog entry: no merged spells, no paragraphs re
   assert.equal(byId('spell:water-spells:Hands of the Tides').fields.duration,'Instantaneous');
   assert.match(byId('kata:katas:Art of Ninjutsu').description,/Stealth Skill Rank/);
 });
+
+test('abilities: one subsection per type, lists grouped by element or Shadowlands list, owned entries in ring colours',async()=>{
+  const c=await character();
+  let html=sectionHtml(c,'abilities');
+  for(const kind of ['spell','kata','kiho','tattoo','shadowlands'])assert.match(html,new RegExp(`class="creator-purchases creator-ability-kind" data-ability-kind="${kind}"`));
+  const picker=kind=>html.match(new RegExp(`<select[^>]*id="ability-choice-${kind}"[^>]*>([\\s\\S]*?)</select>`))[1];
+  const groups=kind=>[...picker(kind).matchAll(/<optgroup label="([^"]+)"/g)].map(m=>m[1]);
+  assert.deepEqual(groups('spell'),['Universal','Air','Earth','Fire','Water','Void']);
+  assert.deepEqual(groups('kata'),['Air','Earth','Fire','Water','Void']);
+  assert.deepEqual(groups('shadowlands'),['Mutations','Minor powers','Major powers','Akutenshi powers']);
+  assert.deepEqual(groups('tattoo'),[]);
+  assert.match(html,/<input[^>]*data-option-search="spell"[^>]*data-search-target="ability-choice-spell"/);
+  for(const id of ['spell:air-spells:Blessed Wind','spell:fire-spells:Everburning Rage']){c.inputs['#ability-choice-spell']={value:id};c.inputs['#ability-payment-spell']={value:'purchase'};c.click({action:'add-ability',abilityKind:'spell'});}
+  html=sectionHtml(c,'abilities');
+  assert.match(html,/creator-ability-group" data-ring="Air"><h4>Air<\/h4>[\s\S]*Blessed Wind · Mastery 1/);
+  assert.match(html,/creator-ability-group" data-ring="Fire"><h4>Fire<\/h4>[\s\S]*Everburning Rage · Mastery 5/);
+  assert.match(html,/<h3>Spells <small>2<\/small><\/h3>/);
+});

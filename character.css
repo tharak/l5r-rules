@@ -427,3 +427,17 @@
 .creator-fields .ui-field-label > .creator-source { position: absolute; top: 0; right: 0; margin: 0; line-height: inherit; }
 .creator-ability-picker .creator-add-row > .creator-source, .creator-section-rules { flex: none; align-self: center; white-space: nowrap; }
 #creator-equipment > .creator-panel-head { justify-content: flex-start; }
+
+/* Abilities: one subsection per type; owned entries grouped by element (ring colours) or list. */
+.creator-ability-pickers { display: grid; gap: 22px; margin: 16px 0; }
+.creator-ability-kind { margin: 0; }
+.creator-ability-kind .creator-option-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.creator-ability-kind h3 small { font: 13px var(--sans); color: var(--muted); }
+.creator-ability-picker .creator-add-row > input.ui-field[type="search"] { flex: 1 1 10em; min-width: 8em; width: auto; }
+.creator-ability-picker .creator-add-row > select.ui-field[id^="ability-choice"] { flex: 2 1 16em; min-width: 10em; width: auto; }
+.creator-ability-kind .creator-ability-list { display: grid; gap: 8px; margin-top: 10px; }
+.creator-ability-group { padding: 8px 12px; border: 1px solid var(--line); border-radius: 3px; }
+.creator-ability-group h4 { margin: 0 0 4px; font: 600 12px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--ring-heading, var(--muted)); }
+.creator-ability-group[data-ring] h4 { color: color-mix(in srgb, var(--ring-heading) 70%, #000); }
+.creator-ability-group details { margin: 6px 0; }
+@media (max-width: 650px) { .creator-ability-picker .creator-add-row { flex-wrap: wrap; } .creator-ability-picker .creator-add-row > input.ui-field[type="search"], .creator-ability-picker .creator-add-row > select.ui-field[id^="ability-choice"] { flex: 1 1 100%; } }

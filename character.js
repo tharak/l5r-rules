@@ -153,7 +153,6 @@
   const build = () => R.calculate(sheet,catalog);
   const read = selector => root.querySelector(selector)?.value?.trim() || '';
   const newId = () => makeId();
-  const abilityLabel = a => `${a.name} · ${a.kind}${a.ring ? ` · ${a.ring} ${a.mastery || ''}` : ''}`;
   function commitEdit() {
     save(); render();
   }
@@ -558,22 +557,46 @@
     return `<div class="creator-purchases"><div class="creator-option-heading"><h3>Ancestors</h3>${rulesLink('ancestors','','Ancestor rules')}</div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'id':'ancestor-choice','list':'ancestor-suggestions','placeholder':'Search an ancestor','aria-label':'Ancestor'}})}<datalist id="ancestor-suggestions">${catalog.ancestors.map(a=>`<option value="${escapeHtml(a.name)}">${a.cost} XP · ${escapeHtml(a.clan)}</option>`).join('')}</datalist>${UI.button({text:'Add',attrs:{'data-action':'add-ancestor'}})}`})}${sheet.ancestors.map((a,i)=>{const rule=catalog.ancestors.find(e=>e.id===a.catalogId);return UI.disclosure({attrs:{},titleHtml:`${escapeHtml(a.name)} · ${a.cost} XP`,bodyHtml:`<p>${escapeHtml(rule?.description || a.description || '')}</p>${rule?`<a data-rule-reference href="${sourceLink(rule.slug,rule.anchor)}">Rules ↗</a>`:''}${UI.button({text:'Remove',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ancestor','data-index':i}})}`});}).join('')}</div>`;
   }
   function renderAbility(a,d) {
-    const summary = `${escapeHtml(a.name)} · ${escapeHtml(a.kind)}${a.ring?` · ${escapeHtml(a.ring)} ${a.mastery || ''}`:''} · ${a.cost} XP${a.grant?' · School grant':''}${a.memorized?' · Memorized':''}`;
+    // The group already names the element or kind; the row shows rank, cost and how it was gained.
+    const summary = `${escapeHtml(a.name)}${a.mastery?` · ${a.kind==='spell'?'Mastery':'Rank'} ${a.mastery}`:''} · ${a.cost} XP${a.grant?' · School grant':''}${a.memorized?' · Memorized':''}`;
     const rules = `${Object.keys(a.fields || {}).length?`<dl>${Object.entries(a.fields).map(([key,value])=>`<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('')}</dl>`:''}<p>${escapeHtml(a.description || '')}</p>${a.spellRoll?`<p>Spell Casting Roll: ${escapeHtml(a.spellRoll.notation)} · TN ${a.mastery*5+5}</p>`:''}${a.reasons?.length?`<p class="creator-error">${a.reasons.map(escapeHtml).join(' ')}</p>`:''}${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}">Local rules ↗</a>${a.kind==='spell'?UI.button({text:a.memorized?'Remove memorization':'Memorize · '+a.mastery+' XP',attrs:{'data-action':'memorize','data-id':a.selectionId}}):''}${sheet.abilities.some(e=>e.id===a.selectionId)?UI.button({text:'Remove ability',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ability','data-id':a.selectionId}}):''}`})}`;
     return UI.disclosure({attrs:{},titleHtml:`${summary}`,bodyHtml:`${rules}`});
   }
 
   const abilityKinds = [['spell','Spells','spell','magic'],['kata','Kata','kata','katas'],['kiho','Kiho','kiho','kiho'],['tattoo','Tattoos','tattoo','tattoos'],['shadowlands','Shadowlands powers','Shadowlands power','shadowlands-taint']];
-  function renderAbilityPickers() {
-    return `<div class="creator-ability-pickers">${abilityKinds.map(([kind,title,label,rulesPage])=>`<div class="creator-ability-picker" data-ability-kind="${kind}">${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:
-      UI.field({kind:'select',attrs:{id:`ability-choice-${kind}`,'aria-label':title},options:[{value:'',label:`Choose a ${label}`},...catalog.abilities.filter(a=>a.kind===kind).map(a=>({value:a.id,label:abilityLabel(a)}))]})+
+  // Spells, kata and kiho group by element (coloured like the skills); Shadowlands powers by
+  // their source list; tattoos are one list.
+  const ELEMENT_GROUPS = [['All','Universal'],['Air','Air'],['Earth','Earth'],['Fire','Fire'],['Water','Water'],['Void','Void']];
+  const SHADOWLANDS_GROUPS = [['mutations','Mutations'],['minor-shadowlands-powers','Minor powers'],['major-shadowlands-powers','Major powers'],['akutenshi-powers','Akutenshi powers']];
+  function abilityGroups(kind,items) {
+    if (kind === 'tattoo') return [{key:'',title:'',items}];
+    const groups = kind === 'shadowlands' ? SHADOWLANDS_GROUPS.map(([key,title]) => ({key,title,items:items.filter(a=>a.slug===key)}))
+      : ELEMENT_GROUPS.map(([key,title]) => ({key,title,ring:key==='All'?'':key,items:items.filter(a=>a.ring===key)}));
+    // Anything that fits no group still shows, after the known ones.
+    const rest = items.filter(a => !groups.some(group => group.items.includes(a)));
+    return [...groups,...(rest.length?[{key:'other',title:'Other',items:rest}]:[])].filter(group => group.items.length);
+  }
+  const byMastery = (a,b) => (a.mastery || 0)-(b.mastery || 0) || a.name.localeCompare(b.name);
+  function abilityOption(a) {
+    return `${a.name}${a.mastery?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}`;
+  }
+  function renderAbilityKind([kind,title,label,rulesPage],d) {
+    const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
+    const optionsHtml = option('',`Choose a ${label}`,true)+catalogGroups.map(group => {
+      const options = group.items.map(a => option(a.id,abilityOption(a),false)).join('');
+      return group.title ? `<optgroup label="${escapeHtml(group.title)}">${options}</optgroup>` : options;
+    }).join('');
+    const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
+    const ownedHtml = abilityGroups(kind,owned).map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''}>${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${group.items.map(a=>renderAbility(a,d)).join('')}</div>`).join('');
+    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}"><div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${rulesLink(rulesPage,'',`${title} rules`)}</div><div class="creator-ability-picker">${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:
+      UI.field({attrs:{'data-option-search':kind,'data-search-target':`ability-choice-${kind}`,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})+
+      UI.field({kind:'select',attrs:{id:`ability-choice-${kind}`,'aria-label':title},optionsHtml})+
       UI.field({kind:'select',attrs:{id:`ability-payment-${kind}`,'aria-label':`${title}: paid with XP or a free school choice`},options:[{value:'purchase',label:'XP'},{value:'grant',label:'Free (school)'}]})+
-      UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'aria-label':`Add ${label}`}})+
-      rulesLink(rulesPage,'',`${title} rules`)
-    })}</div>`).join('')}</div>`;
+      UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'aria-label':`Add ${label}`}})
+    })}</div>${owned.length?`<div class="creator-ability-list">${ownedHtml}</div>`:''}</div>`;
   }
   function renderAbilities(d) {
-    return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}${renderAbilityPickers()}<div class="creator-ability-list">${d.abilities.map(a=>renderAbility(a,d)).join('') }</div>${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
+    return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
   }
   function renderModifiers(d) {
     const controls=[['armorTN','Armor TN'],['reduction','Reduction'],['initiativeRoll','Initiative rolled dice'],['initiativeKeep','Initiative kept dice'],['initiativeFlat','Initiative flat bonus'],['unarmedRoll','Unarmed rolled dice'],['unarmedKeep','Unarmed kept dice'],['healing','Healing per day'],['wounds','Wounds per level'],['insight','Insight bonus']];
@@ -1003,7 +1026,14 @@
 
   function onInput(event) {
     const kind=event.target.dataset.optionSearch;
-    if(kind){const select=root.querySelector('#'+kind+'-select');for(const option of select.options)option.hidden=!!option.value && !option.textContent.toLowerCase().includes(event.target.value.toLowerCase());return;}
+    if(kind){
+      // Search narrows the list beside it; element groups with no match disappear.
+      const select=root.querySelector('#'+(event.target.dataset.searchTarget || kind+'-select'));if(!select)return;
+      const query=event.target.value.toLowerCase();
+      for(const option of select.options)option.hidden=!!option.value && !option.textContent.toLowerCase().includes(query);
+      for(const group of select.querySelectorAll?.('optgroup') || [])group.hidden=![...group.children].some(option=>!option.hidden);
+      return;
+    }
     if(event.target.dataset.optionDetail){if(event.target.tagName==='SELECT')return;const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;save();}return;}
     const field = event.target.dataset.field;
     if (event.target.dataset.journalTitle !== undefined) { if (journalDraft) journalDraft.title = event.target.value; return; }
