@@ -336,12 +336,12 @@
     // Every session's pins are on the map; the selected session's are in colour and on top, the
     // others greyed out behind them.
     const allPins = timelineEvents('').sort((a,b) => (a.sessionId === selected?.id) - (b.sessionId === selected?.id));
-    const pinHtml = allPins.map(item => `<span class="timeline-pin timeline-pin-${item.kind}${item.sessionId === selected?.id ? '' : ' timeline-pin-other'}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${canMovePin(item) ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
+    const pinHtml = allPins.map(item => `<span class="timeline-pin timeline-pin-${item.kind}${item.sessionId === selected?.id ? '' : ' timeline-pin-other'}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${''}</span>`).join('');
     let controls = '';
     // Every member places pins (the GM can also move anyone's).
     if (selected) {
       // An entry already pinned in any session cannot be added again.
-      const used = new Set(store().list(path('timeline','')).map(item => `${item.kind}:${item.targetId}:${item.noteId}`));
+      const used = new Map(store().list(path('timeline','')).map(item => [`${item.kind}:${item.targetId}:${item.noteId}`,item.id]));
       // Plots on one row; PCs and NPCs share the next, told apart by colour.
       const chip = (kind,id,name) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:`timeline-target timeline-target-${kind}`,'data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`,'aria-label':`${{plots:'Plot',pcs:'PC',npcs:'NPC'}[kind]}: ${name}, ${entriesOf(kind,id).length} entries`}});
       // Only plots, PCs and NPCs with notes to pin are offered, so the map stays uncluttered.
@@ -351,7 +351,11 @@
       const groups = [notedPlots.length ? `<div class="timeline-target-group" role="group" aria-label="Plots">${notedPlots.map(p => chip('plots',p.id,p.title || 'Untitled plot')).join('')}</div>` : '',
         characters.length ? `<div class="timeline-target-group" role="group" aria-label="PCs and NPCs">${characters.map(([kind,id,name]) => chip(kind,id,name)).join('')}</div>` : ''].join('');
       const [kind,id] = pickTarget.split(':'), entries = pickTarget ? entriesOf(kind,id) : [];
-      const entryButtons = entries.map(entry => UI.button({text:entry.title,variant:'quiet',size:'compact',attrs:{class:'timeline-entry','data-campaign':'timeline-entry','data-id':entry.id,'aria-pressed':pickNote === entry.id,disabled:used.has(`${kind}:${id}:${entry.id}`),title:used.has(`${kind}:${id}:${entry.id}`) ? 'Already on the timeline' : ''}})).join('');
+      // An entry already pinned is crossed out; clicking it opens its pin's note, like the pin.
+      const entryButtons = entries.map(entry => { const pinId = used.get(`${kind}:${id}:${entry.id}`);
+        return UI.button({text:entry.title,variant:'quiet',size:'compact',attrs:pinId
+          ? {class:'timeline-entry timeline-entry-used','data-campaign':'note-popup','data-id':pinId,title:'On the map: open its note'}
+          : {class:'timeline-entry','data-campaign':'timeline-entry','data-id':entry.id,'aria-pressed':pickNote === entry.id}}); }).join('');
       controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}</div>`;
     }
     const placing = selected && pickTarget && pickNote;
@@ -813,22 +817,25 @@
     if(!pin||!map||event.button!==0)return;
     const item=store().get(path('timeline',pin.dataset.pinId));
     if(!canMovePin(item))return;
-    drag={pin,map,id:pin.dataset.pinId,item,x0:event.clientX,y0:event.clientY,moved:false,x:item.x,y:item.y};
+    // Keep where the pin was grabbed relative to its anchor (its point), so it does not jump.
+    const rect=map.getBoundingClientRect();
+    const ax=rect.left+Number(item.x)/100*rect.width, ay=rect.top+Number(item.y)/100*rect.height;
+    drag={pin,map,id:pin.dataset.pinId,item,x0:event.clientX,y0:event.clientY,dx:event.clientX-ax,dy:event.clientY-ay,moved:false,x:item.x,y:item.y};
   });
   document.addEventListener('pointermove',event=>{
     if(!drag)return;
     if(!drag.moved&&Math.hypot(event.clientX-drag.x0,event.clientY-drag.y0)<5)return;
     drag.moved=true;event.preventDefault();
     const rect=drag.map.getBoundingClientRect();
-    drag.x=Math.min(100,Math.max(0,Math.round((event.clientX-rect.left)/rect.width*1000)/10));
-    drag.y=Math.min(100,Math.max(0,Math.round((event.clientY-rect.top)/rect.height*1000)/10));
+    drag.x=Math.min(100,Math.max(0,Math.round((event.clientX-drag.dx-rect.left)/rect.width*1000)/10));
+    drag.y=Math.min(100,Math.max(0,Math.round((event.clientY-drag.dy-rect.top)/rect.height*1000)/10));
     drag.pin.style.left=`${drag.x}%`;drag.pin.style.top=`${drag.y}%`;drag.pin.classList.add('timeline-pin-dragging');
   });
   document.addEventListener('pointerup',()=>{
     if(!drag)return;
     const done=drag;drag=null;
     if(!done.moved)return;
-    swallowClick=true;setTimeout(()=>{swallowClick=false;},0);
+    swallowClick=true;setTimeout(()=>{swallowClick=false;},400);
     const {id:_,...rest}=done.item;
     store().queue(path('timeline',done.id),{...rest,x:done.x,y:done.y,creatorUid:done.item.creatorUid||store().uid,updatedAt:new Date().toISOString()});
   });

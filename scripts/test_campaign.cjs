@@ -269,7 +269,8 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  assert.match(html,/timeline-pin timeline-pin-npcs" data-pin-id="[^"]+" style="left:50%;top:25%"[\s\S]*Carries a sealed letter/);
  // The pinned entry is now disabled for every session.
  await d.click('timeline-session','s1');await d.click('timeline-target','npcs:n');
- assert.match(render(),/data-campaign="timeline-entry" data-id="note1"[^>]*disabled/);
+ assert.match(render(),/class="[^"]*timeline-entry-used"[^>]*data-campaign="note-popup" data-id="[^"]+"[^>]*>[^<]*</,'a pinned entry is crossed out and opens its pin\'s note');
+ assert.doesNotMatch(render(),/data-campaign="timeline-entry" data-id="note1"/);
  await d.click('timeline-session','s2');
  await d.click('note-popup',key.split('/').pop());
  assert.match(render(),/role="dialog"[\s\S]*From the Emerald Champion/);
