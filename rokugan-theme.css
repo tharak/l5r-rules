@@ -331,3 +331,9 @@
   .topbar.topbar-slim { flex-wrap: wrap; }
   .topbar.topbar-slim .topbar-page { order: 3; flex-basis: 100%; }
 }
+/* Start page: character and book tiles size to their content and wrap. */
+@media screen {
+  .home-row[aria-labelledby="home-characters"] .home-row-items, .home-row[aria-labelledby="home-books"] .home-row-items { display: flex; flex-wrap: wrap; gap: 12px; }
+  .home-row[aria-labelledby="home-characters"] .home-tile, .home-row[aria-labelledby="home-books"] .home-tile { width: auto; max-width: 100%; padding-right: 18px; }
+  .home-row[aria-labelledby="home-characters"] .home-tile strong, .home-row[aria-labelledby="home-characters"] .home-tile small { white-space: nowrap; }
+}
