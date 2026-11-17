@@ -291,6 +291,7 @@ function renderDirectory() {
   return `<div class="directory"><div class="eyebrow muted"><span class="eyebrow-line"></span> THE COMPLETE ARCHIVE</div><h1>All pages</h1><p>Browse rules and reference pages.</p><div class="directory-count">${pages.length} PAGES</div><div class="directory-groups">${Object.entries(groups).map(([letter, entries]) => `<section class="directory-group"><h2>${esc(letter)}</h2><div>${entries.map(page => `<a href="${pageHref(page.slug)}"><span>${esc(page.title)}</span><small>${esc(pageSection(page.slug))}</small><b>↗</b></a>`).join('')}</div></section>`).join('')}</div></div>`;
 }
 
+let lastRenderedHash = null;
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
@@ -324,6 +325,10 @@ function render() {
   if (publicPC) { const [,owner,id] = slug.split('/'); window.PublicCharacter.mount($('#app'),decodeURIComponent(owner),decodeURIComponent(id)); } else window.PublicCharacter?.unmount();
   renderNavigation();
   if (campaignRoute) window.CampaignUI.mountEditor();
+  // Scroll only when navigating to a different page; live updates (a new pin, a synced edit)
+  // re-render in place and must keep the reader's position.
+  if (location.hash === lastRenderedHash) return;
+  lastRenderedHash = location.hash;
   const fragment = location.hash.split('#').slice(2).join('#');
   if (fragment) requestAnimationFrame(() => document.getElementById(decodeURIComponent(fragment))?.scrollIntoView());
   else window.scrollTo(0, 0);
