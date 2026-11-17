@@ -425,20 +425,27 @@ test('start page row: campaign cards, + Campaign, or Sign in',()=>{
  d.store.uid='';
  assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
 });
-test('Invite opens a popup with the link, Copy link, Replace link and Revoke',async()=>{
+test('the + PC popup holds the invite link (GM): Copy link, Replace link, Revoke; no separate Invite button',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- let copied='';d.window.navigator=undefined;
  Object.assign(d.store.backend,{get:async()=>null,invitation:async()=>({}),invite:async()=>'tok123',revoke:async()=>{}});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();await d.click('share-invite');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ const settle=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
+ assert.doesNotMatch(render(),/data-campaign="share-invite"/);
+ await d.click('pc-picker');await settle();
  let html=render();
- assert.match(html,/class="timeline-popup campaign-invite-popup" role="dialog"/);
- assert.match(html,/value="http:\/\/localhost\/#\/invite\/tok123"[^>]*readonly|readonly[^>]*value="http:\/\/localhost\/#\/invite\/tok123"/);
- assert.match(html,/data-campaign="invite-copy"[^>]*>Copy link</);
- assert.match(html,/data-campaign="invite"[^>]*>Replace link</);assert.match(html,/data-campaign="revoke"[^>]*>Revoke</);
- await d.click('invite-close');
- assert.doesNotMatch(render(),/campaign-invite-popup/);
+ const popup=html.split('<div class="timeline-popup campaign-popup"')[1] || '';
+ assert.match(popup,/<h3 id="new-popup-title">Add a PC<\/h3>[^]*data-campaign="pc-create"[^]*<h4>Invite players<\/h4>/);
+ assert.match(popup,/value="http:\/\/localhost\/#\/invite\/tok123"/);
+ assert.match(popup,/data-campaign="invite-copy"[^>]*>Copy link</);
+ assert.match(popup,/data-campaign="invite"[^>]*>Replace link</);assert.match(popup,/data-campaign="revoke"[^>]*>Revoke</);
+ await d.click('revoke');await settle();
+ assert.match(render(),/No active invite link\.[^]*data-campaign="invite"[^>]*>New link</);
+ await d.click('new-close');
+ assert.doesNotMatch(render(),/campaign-popup/);
+ // A player's + PC popup has no invite section.
+ d.store.uid='alice';render();await d.click('pc-picker');await settle();
+ assert.doesNotMatch(render(),/Invite players/);
 });
 test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close button discards the draft',async()=>{
  const d=campaignCards();

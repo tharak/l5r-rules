@@ -282,8 +282,7 @@
   const closeEntry = details => { if (details?.open) details.open = false; };
   document.addEventListener('keydown',event => {
     if (event.key !== 'Escape') return;
-    if (inviteLink) { inviteLink = ''; inviteCopied = false; changed(); return; }
-    if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; changed(); return; }
+    if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
@@ -354,16 +353,17 @@
   function renderNewPopup(pcs) {
     if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
     if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft),'new-close');
-    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>`,'new-close');
+    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${gm() ? inviteSection() : ''}`,'new-close');
     return '';
   }
-  // Invite settings in a popup: the link, Copy link, Replace link and Revoke.
-  function renderInvitePopup() {
-    if (!inviteLink || !gm()) return '';
-    return `<div class="timeline-popup-backdrop" data-campaign="invite-close"></div><div class="timeline-popup campaign-invite-popup" role="dialog" aria-modal="true" aria-labelledby="invite-popup-title" tabindex="-1"><header><div><h3 id="invite-popup-title">Invite</h3></div>${button('invite-close','✕')}</header>
+  // Invite settings (in the + PC popup): the link, Copy link, Replace link and Revoke.
+  function inviteSection() {
+    if (!inviteLink) return `<div class="campaign-invite"><h4>Invite players</h4><p class="campaign-invite-note">${busy ? 'Preparing the invite link…' : 'No active invite link.'}</p>${busy ? '' : button('invite','New link')}</div>`;
+    return `<div class="campaign-invite"><h4>Invite players</h4>
       <div class="campaign-invite-link">${UI.field({attrs:{type:'text',readonly:true,value:inviteLink,'aria-label':'Invite link','data-invite-link':true}})}${UI.button({text:inviteCopied?'Copied':'Copy link',attrs:{'data-campaign':'invite-copy','data-id':'',disabled:busy}})}</div>
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
+  const renderInvitePopup = () => '';
   function renderNotePopup() {
     if (!notePopup) return '';
     const item = store().get(path('timeline',notePopup)), target = item && pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
@@ -397,7 +397,7 @@
         `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
     }).join('');
     const picker = '';
-    return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(`${button('pc-picker','+ PC')}${isGM?button('share-invite','Invite'):''}`)}${list}</div>${picker}`;
+    return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(button('pc-picker','+ PC'))}${list}</div>${picker}`;
   }
   function render(slug) {
     renderAgain ||= () => {};
@@ -514,6 +514,21 @@
     }
     renderPage();
   }
+  // The campaign's current invite link (reusing a still-valid one unless a fresh one is asked for).
+  async function loadInvite(backend,fresh) {
+    const campaign=active;
+    let token=fresh?null:(await backend.get(path('private','invitation')))?.token;
+    if (token) {
+      try {await backend.invitation(token);}
+      catch (err) {
+        if(err.code!=='permission-denied' && err.message!=='This invitation has expired or was revoked.')throw err;
+        token=null;
+      }
+    }
+    token ||= await backend.invite(campaign);
+    if(active!==campaign || store().backend!==backend || !gm())return;
+    inviteLink=inviteURL(token);inviteCopied=false;
+  }
   async function act(action,id) {
     if (busy) return;
     // Signed out: use the account menu's own sign-in (open the menu if it isn't ready yet).
@@ -605,7 +620,11 @@
         store().flush();
       }
       else if (action==='npc-delete') {if(window.confirm('Delete this NPC?'))store().queue(path('npcs',id),null);}
-      else if (action==='pc-picker') {picking=!picking;focusPopup=picking;}
+      else if (action==='pc-picker') {
+        picking=!picking;focusPopup=picking;
+        // The GM's + PC popup also holds the invite link, so players can be invited from it.
+        if (picking && gm()) { changed(); await loadInvite(backend,false); }
+      }
       else if (action==='pc-link') {await backend.link(active,id);picking=false;}
       else if (action==='pc-create') {const campaign=active;const id=window.CharacterBuilder.create();await backend.link(campaign,id);picking=false;creatorCampaign=campaign;location.hash=window.CharacterBuilder.href(id);}
       else if (action==='pc-open') {
@@ -619,26 +638,14 @@
       else if (action==='close-sheet') {sheetId='';editor=null;}
       else if (action==='share-invite'||action==='invite') {
         if (!gm()) return;
-        const campaign=active;
-        changed();
-        let token=action==='share-invite'?(await backend.get(path('private','invitation')))?.token:null;
-        if (token) {
-          try {await backend.invitation(token);}
-          catch (err) {
-            if(err.code!=='permission-denied' && err.message!=='This invitation has expired or was revoked.')throw err;
-            token=null;
-          }
-        }
-        token ||= await backend.invite(campaign);
-        if(active!==campaign || store().backend!==backend || !gm())return;
-        inviteLink=inviteURL(token);inviteCopied=false;focusPopup=true;
+        await loadInvite(backend,action==='invite');
       }
       else if (action==='invite-copy') {
         try { await navigator.clipboard.writeText(inviteLink); inviteCopied=true; }
         catch { window.prompt('Copy this invite link:',inviteLink); }
       }
       else if (action==='invite-close') {inviteLink='';inviteCopied=false;}
-      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;}
+      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;

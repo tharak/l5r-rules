@@ -144,3 +144,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .route-campaigns .topbar.topbar-slim{padding-left:clamp(12px,2vw,24px);padding-right:clamp(12px,2vw,24px)}
 .campaign-timeline-row>.campaign-content{width:var(--page-width,100vw);margin-left:calc(50% - var(--page-width,100vw) / 2);border-width:1px 0 0;border-radius:0;padding:12px clamp(12px,2vw,24px) 0}
 .campaign-timeline-row .timeline-list{flex-wrap:wrap;overflow-x:visible}
+/* Invite players, inside the + PC popup (GM only). */
+.campaign-invite{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.campaign-invite h4{margin:0 0 8px;font:17px var(--serif)}
