@@ -169,18 +169,18 @@ test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',asy
  const [id]=[...d.data.keys()].filter(path=>path.startsWith('campaigns/c/npcs/'));
  assert.equal(d.data.get(id).portrait,picture);
  await d.click('npc-open',id.split('/').pop());
- d.documentListeners.input({target:{dataset:{campaignField:'npc-notes'},value:'Carries a sealed letter.'}});
- assert.equal(d.data.get(id).portrait,picture,'editing notes kept the picture');
+ d.documentListeners.input({target:{dataset:{campaignField:'npc-name'},value:'Court envoy'}});
+ assert.equal(d.data.get(id).portrait,picture,'editing the name kept the picture');
  await d.click('npc-portrait-remove');
  assert.equal(d.data.get(id).portrait,undefined);
- assert.equal(d.data.get(id).notes,'Carries a sealed letter.');
+ assert.equal(d.data.get(id).name,'Court envoy');
  await pick();
  assert.equal(d.data.get(id).portrait,picture);
  // Create picture hands the NPC to the portrait creator and saves its result.
  let request;d.window.PortraitCreator={open:next=>{request=next;}};
  await d.click('npc-portrait-remove');
  await d.click('npc-portrait-create');
- assert.equal(request.title,'Court messenger');assert.equal(request.returnHref,'#/campaigns/c');
+ assert.equal(request.title,'Court envoy');assert.equal(request.returnHref,'#/campaigns/c');
  request.onUse(picture);
  assert.equal(d.data.get(id).portrait,picture);
 });
@@ -358,12 +358,13 @@ test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on 
  d.store.uid='alice';await d.click('section','pcs');
  assert.doesNotMatch(render(),/timeline-visibility/,'only the GM sees the checkbox');
 });
-test('session and plot descriptions become their first journal entry; entries carry titles',async()=>{
+test('session, plot and NPC descriptions become their first journal entry; entries carry titles',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'We met at the inn.',createdAt:'2026-11-01'});
  d.data.set('campaigns/c/plots/p',{title:'Seal',text:'Someone stole the seal.',creatorUid:'gm',createdAt:'2026-11-02'});
  d.data.set('campaigns/c/plots/q',{title:'Other',text:'Not mine.',creatorUid:'alice',createdAt:'2026-11-02'});
+ d.data.set('campaigns/c/npcs/n',{name:'Shrine keeper',notes:'Keeps the old shrine.',portrait:'x',updatedAt:'2026-11-03'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  render();
  assert.equal(d.data.get('campaigns/c/notes/desc_sessions_s').text,'We met at the inn.');
@@ -371,6 +372,9 @@ test('session and plot descriptions become their first journal entry; entries ca
  assert.equal(d.data.get('campaigns/c/notes/desc_plots_p').targetCreatorUid,'gm');
  assert.equal(d.data.get('campaigns/c/plots/p').text,'');
  assert.equal(d.data.has('campaigns/c/notes/desc_plots_q'),false,'only the creator moves a plot description');
+ const npcNote=d.data.get('campaigns/c/notes/desc_npcs_n');
+ assert.equal(npcNote.text,'Keeps the old shrine.');assert.equal(npcNote.targetKind,'npcs');assert.equal('targetCreatorUid' in npcNote,false);
+ const npc=d.data.get('campaigns/c/npcs/n');assert.equal(npc.notes,'');assert.equal(npc.name,'Shrine keeper');assert.equal(npc.portrait,'x');
  await d.click('section','sessions');await d.click('note-new','sessions:s');
  let html=render();
  assert.match(html,/data-entry-field="title"/);

@@ -141,7 +141,6 @@
     const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')});
     return picture+UI.recordEditor({fields:[
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
-      {label:'Notes',kind:'textarea',value:npc.notes,attrs:{'data-campaign-field':'npc-notes'}},
     ],actionsHtml:button('npc-save','Save','',!npc.name.trim())+(npcId?button('npc-delete','Delete',npcId):'')});
   }
   // Sessions, NPCs and plots each have a journal of entries (stored as campaign notes).
@@ -172,8 +171,8 @@
       } catch (error) { movingNotes.delete(note.id); }
     }
   }
-  // Session and plot descriptions used to be a text field; each moves once into the first
-  // entry of its journal (written by the GM for sessions, by the creator for plots).
+  // Session, plot and NPC descriptions used to be a text field; each moves once into the
+  // first entry of its journal (written by the GM for sessions and NPCs, by the creator for plots).
   function migrateDescriptions() {
     const uid = store().uid, now = new Date().toISOString();
     const move = (kind,item,clear) => {
@@ -186,6 +185,10 @@
     if (gm()) for (const session of store().list(path('sessions',''))) if (String(session.text || '').trim()) {
       const {id,...rest} = session;
       move('sessions',session,() => store().queue(path('sessions',id),{...rest,text:'',updatedAt:rest.updatedAt || now}));
+    }
+    if (gm()) for (const npc of store().list(path('npcs',''))) if (String(npc.notes || '').trim()) {
+      const {id,text,...rest} = npc;
+      move('npcs',{...npc,text:npc.notes},() => store().queue(path('npcs',id),{...rest,notes:''}));
     }
     for (const plot of store().list(path('plots',''))) if (plot.creatorUid === uid && String(plot.text || '').trim()) {
       const {id,...rest} = plot;
@@ -308,7 +311,7 @@
     const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.notes ? `<p class="entry-text">${e(npc.notes)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
     return `${sectionBar('NPCs',isGM?button('npc-new','+ NPC'):'')}${fresh}<div class="campaign-entries">${list}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
@@ -499,7 +502,7 @@
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
         if (!gm() || !draft || !draft.name.trim()) return;
-        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:draft.notes,...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
+        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),notes:'',...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
         npcId='';npcDraft=null;
         store().flush();
       }

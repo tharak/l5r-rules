@@ -32,16 +32,13 @@ async page => {
   check(await page.locator('[data-campaign-field="session-text"]').count()===0,'Sessions remain in NPC panel');
   await page.getByRole('button',{name:'+NPC',exact:true}).click();
   await page.locator('[data-campaign-field="npc-name"]').fill('Hidden NPC');
-  await page.locator('[data-campaign-field="npc-notes"]').fill('GM-only notes');
   await page.getByRole('button',{name:'Save NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="npc-name"]').count()===0,'NPC creation editor did not close');
   await page.getByRole('button',{name:'Hidden NPC',exact:true}).waitFor();
   await page.getByRole('button',{name:'+NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='','New NPC retained a previous name');
-  check(await page.locator('[data-campaign-field="npc-notes"]').inputValue()==='','New NPC retained previous notes');
   check(await page.getByRole('button',{name:'Save NPC',exact:true}).isDisabled(),'Blank NPC can be saved');
   await page.locator('[data-campaign-field="npc-name"]').fill('Second NPC');
-  await page.locator('[data-campaign-field="npc-notes"]').fill('\nSecond notes\nLast line');
   await page.getByRole('button',{name:'PC',exact:true}).click();
   await page.getByRole('button',{name:'NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='Second NPC','Switching sections lost NPC draft');
@@ -52,7 +49,6 @@ async page => {
   await page.getByRole('button',{name:'NPC',exact:true}).click();
   await page.getByRole('button',{name:'Hidden NPC',exact:true}).waitFor();
   await page.getByRole('button',{name:'Second NPC',exact:true}).click();
-  check(await page.locator('[data-campaign-field="npc-notes"]').inputValue()==='\nSecond notes\nLast line','NPC save changed line breaks');
   check(await page.locator('.npc-list button').count()===2,'NPC save overwrote a record or created a blank NPC');
   await page.locator('[data-campaign-field="npc-name"]').fill('');
   check(await page.getByRole('button',{name:'Save NPC',exact:true}).isDisabled(),'Empty name enables save');
