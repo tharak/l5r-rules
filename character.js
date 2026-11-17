@@ -663,33 +663,32 @@
     const free = R.freeAbilityLeft(kind,d);
     const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
     const ownedGroups = abilityGroups(kind,owned);
-    const groups = catalogGroups.map(group => {
-      const offers = group.items.map(a => [a,abilityOffer(a,d,free)]);
+    // A unit is one list with its Add button. Spells split each ring into a unit per Mastery level;
+    // the other types use one unit per ring (or list).
+    const levels = items => [...new Set(items.map(a => a.mastery || 0))].sort((x,y) => x-y);
+    const unitsOf = group => kind === 'spell'
+      ? levels(group.items).map(level => ({key:`${group.key}-${level}`,title:`Mastery ${level}`,items:group.items.filter(a => (a.mastery || 0) === level),level}))
+      : [{key:group.key,title:'',items:group.items}];
+    const units = catalogGroups.flatMap(group => unitsOf(group).map(unit => {
+      const offers = unit.items.map(a => [a,abilityOffer(a,d,free)]);
       const addable = offers.some(([,offer]) => !offer.blocked);
-      // The first entry not already known explains a closed block (lowest mastery first).
+      // The first entry not already known explains a closed list (lowest mastery first).
       const reasons = addable ? [] : (offers.find(([,offer]) => offer.reason !== 'Already known.')?.[1].reasons || ['All known.']);
-      return {group,offers,addable,reasons};
-    });
-    const closedGroups = groups.filter(entry => !entry.addable);
-    const shared = closedGroups.length === groups.length && groups.length > 1 ? closedGroups[0].reasons.filter(reason => closedGroups.every(entry => entry.reasons.includes(reason))) : [];
-    const blocks = groups.map(({group,offers,addable,reasons}) => {
-      const id = `ability-choice-${kind}-${group.key}`, name = group.title || title;
-      const optionHtml = ([a,offer]) => UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}});
-      // Spells split further by Mastery level: list sections and headings over the known ones.
-      const byLevel = kind === 'spell';
-      const levels = items => [...new Set(items.map(a => a.mastery || 0))].sort((x,y) => x-y);
-      const optionsHtml = option('',`Choose a ${label}`,true)+(byLevel
-        ? levels(offers.map(([a]) => a)).map(level => `<optgroup label="Mastery ${level}">${offers.filter(([a]) => (a.mastery || 0) === level).map(optionHtml).join('')}</optgroup>`).join('')
-        : offers.map(optionHtml).join(''));
-      const known = ownedGroups.find(entry => entry.key === group.key)?.items || [];
-      const knownHtml = byLevel
-        ? levels(known).map(level => `<div class="creator-ability-level"><h5>Mastery ${level}</h5>${known.filter(a => (a.mastery || 0) === level).map(a=>renderAbility(a,d)).join('')}</div>`).join('')
-        : known.map(a=>renderAbility(a,d)).join('');
-      return `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:
-        UI.field({kind:'select',attrs:{id,'aria-label':name,disabled:!addable},optionsHtml})+
-        UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'data-ability-group':group.key,'aria-label':`Add ${label}${group.title?` (${group.title})`:''}`,disabled:!addable}})
-      })}${locked(reasons.filter(reason => !shared.includes(reason)).join(' '))}${knownHtml}</div>`;
-    }).join('');
+      return {...unit,group,offers,addable,reasons};
+    }));
+    const closedUnits = units.filter(unit => !unit.addable);
+    const shared = closedUnits.length === units.length && units.length > 1 ? closedUnits[0].reasons.filter(reason => closedUnits.every(unit => unit.reasons.includes(reason))) : [];
+    const renderUnit = unit => {
+      const id = `ability-choice-${kind}-${unit.key}`, name = [unit.group.title || title,unit.title].filter(Boolean).join(' ');
+      const optionsHtml = option('',`Choose a ${label}`,true)+unit.offers.map(([a,offer]) => UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}})).join('');
+      const known = (ownedGroups.find(entry => entry.key === unit.group.key)?.items || []).filter(a => unit.level == null || (a.mastery || 0) === unit.level);
+      const picker = UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:
+        UI.field({kind:'select',attrs:{id,'aria-label':name,disabled:!unit.addable},optionsHtml})+
+        UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'data-ability-group':unit.key,'aria-label':`Add ${label}${name!==title?` (${name})`:''}`,disabled:!unit.addable}})});
+      const body = `${picker}${locked(unit.reasons.filter(reason => !shared.includes(reason)).join(' '))}${known.map(a=>renderAbility(a,d)).join('')}`;
+      return unit.level == null ? body : `<div class="creator-ability-level" data-ability-level="${unit.level}"><h5>${unit.title}</h5>${body}</div>`;
+    };
+    const blocks = catalogGroups.map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${units.filter(unit => unit.group === group).map(renderUnit).join('')}</div>`).join('');
     // Owned entries outside every catalog group (e.g. a renamed catalog entry) still show.
     const stray = owned.filter(a => !catalogGroups.some(group => group.key === abilityGroups(kind,[a])[0]?.key));
     return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}">${heading(shared.join(' '))}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}${stray.map(a=>renderAbility(a,d)).join('')}</div></div>`;
@@ -1143,9 +1142,14 @@
       for(const select of selects){
         for(const option of select.options)option.hidden=!!option.value && !option.textContent.toLowerCase().includes(query);
         for(const group of select.querySelectorAll?.('optgroup') || [])group.hidden=![...group.children].some(option=>!option.hidden);
-        // An element block with no match steps aside while searching.
-        const block=select.closest?.('.creator-ability-group');
+        // A list with no match steps aside while searching (a Mastery level, or the whole block).
+        const block=select.closest?.('.creator-ability-level') || select.closest?.('.creator-ability-group');
         if(block)block.hidden=!!query && ![...select.options].some(option=>option.value && !option.hidden) && !block.querySelector('details');
+      }
+      // A ring whose every Mastery level is hidden steps aside too.
+      for(const group of scope?root.querySelectorAll(`[data-ability-kind="${scope}"] .creator-ability-group`):[]){
+        const levels=[...group.querySelectorAll('.creator-ability-level')];
+        if(levels.length)group.hidden=levels.every(level=>level.hidden);
       }
       return;
     }

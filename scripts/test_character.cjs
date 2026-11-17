@@ -966,7 +966,7 @@ test('specific choice is shown only for parameterized options and variants',asyn
 test('ability sections stay visible but closed with a reason; Add decides Free or XP; unmet requirements are disabled',async()=>{
   const id=(kind,name)=>catalog.abilities.find(a=>a.kind===kind&&a.name===name).id;
   const esc=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const groupOf=value=>{const a=catalog.abilities.find(e=>e.id===value);return a.kind==='tattoo'?'tattoos':a.kind==='shadowlands'?a.slug:a.ring;};
+  const groupOf=value=>{const a=catalog.abilities.find(e=>e.id===value);return a.kind==='tattoo'?'tattoos':a.kind==='shadowlands'?a.slug:a.kind==='spell'?`${a.ring}-${a.mastery}`:a.ring;};
   const add=(c,kind,value)=>{const group=groupOf(value);c.inputs[`#ability-choice-${kind}-${group}`]={value};c.click({action:'add-ability',abilityKind:kind,abilityGroup:group});};
   // Every type is always shown; the ones this character cannot learn are closed with a reason.
   const all=c=>[...sectionHtml(c,'abilities').matchAll(/creator-ability-kind[^"]*" data-ability-kind="([^"]+)"/g)].map(m=>m[1]);
@@ -1125,11 +1125,12 @@ test('abilities: one subsection per type, lists grouped by element or Shadowland
   assert.match(html,/· 3 XP</,'kata show their XP price');
   const c=await character();c.school('Crane','Asahina Shugenja');
   html=sectionHtml(c,'abilities');
-  assert.deepEqual(groups(html,'spell'),['All','Air','Earth','Fire','Water','Void']);
+  assert.deepEqual([...new Set(groups(html,'spell').map(key=>key.split('-')[0]))],['All','Air','Earth','Fire','Water','Void']);
+  assert.ok(groups(html,'spell').includes('Air-1') && groups(html,'spell').includes('Air-2'),'a list per Mastery level');
   assert.match(html,/data-ability-group="All"><h4>Universal<\/h4>/);
   assert.match(html,/<input[^>]*data-option-search="spell"[^>]*data-search-scope="spell"/);
   const earth=catalog.abilities.find(a=>a.kind==='spell'&&a.ring==='Earth'&&a.mastery===1&&a.slug==='earth-spells');
-  for(const [id,group] of [['spell:air-spells:Blessed Wind','Air'],[earth.id,'Earth']]){c.inputs[`#ability-choice-spell-${group}`]={value:id};c.click({action:'add-ability',abilityKind:'spell',abilityGroup:group});}
+  for(const [id,group] of [['spell:air-spells:Blessed Wind','Air-1'],[earth.id,'Earth-1']]){c.inputs[`#ability-choice-spell-${group}`]={value:id};c.click({action:'add-ability',abilityKind:'spell',abilityGroup:group});}
   html=sectionHtml(c,'abilities');
   assert.match(html,/creator-ability-group" data-ring="Air" data-ability-group="Air"><h4>Air<\/h4>[\s\S]*<h5>Mastery 1<\/h5>[\s\S]*Blessed Wind · 0 XP/);
   assert.match(html,new RegExp(`creator-ability-group" data-ring="Earth" data-ability-group="Earth"><h4>Earth</h4>[\\s\\S]*<h5>Mastery 1</h5>[\\s\\S]*${earth.name} · 0 XP`));
@@ -1184,13 +1185,18 @@ test('optional ability permissions sit in the subsection they open; closed reaso
   assert.match(sectionHtml(shugenja,'abilities').split('data-ability-kind="kiho"><div class="creator-option-heading">')[1],/^[\s\S]*?data-school-decision="nonBrotherhoodKiho"/);
 });
 
-test('spell lists and known spells split by Mastery level inside each ring',async()=>{
+test('each spell ring splits into a list and Add per Mastery level, known spells under their level',async()=>{
   const c=await character();c.school('Crane','Asahina Shugenja');
-  const html=sectionHtml(c,'abilities');
-  const air=html.match(/<select[^>]*id="ability-choice-spell-Air"[^>]*>([\s\S]*?)<\/select>/)[1];
-  const levels=[...air.matchAll(/<optgroup label="Mastery (\d+)"/g)].map(m=>Number(m[1]));
+  let html=sectionHtml(c,'abilities');
+  const air=html.split('data-ability-group="Air"><h4>Air</h4>')[1].split('creator-ability-group')[0];
+  const levels=[...air.matchAll(/data-ability-level="(\d+)"><h5>Mastery \d+<\/h5>/g)].map(m=>Number(m[1]));
   assert.ok(levels.length>2);assert.deepEqual(levels,[...levels].sort((a,b)=>a-b));
-  assert.doesNotMatch(air,/Blessed Wind · 1</,'the level heading carries the Mastery');
+  assert.match(air,/<select[^>]*id="ability-choice-spell-Air-1"/);
+  assert.match(air,/<select[^>]*id="ability-choice-spell-Air-3"[^>]*disabled/,'Mastery 3 is closed (School Rank 1 + Air affinity)');
+  assert.doesNotMatch(html,/Blessed Wind · 1</,'the level heading carries the Mastery');
+  c.inputs['#ability-choice-spell-Air-1']={value:'spell:air-spells:Blessed Wind'};c.click({action:'add-ability',abilityKind:'spell',abilityGroup:'Air-1'});
+  html=sectionHtml(c,'abilities');
+  assert.match(html,/data-ability-level="1"><h5>Mastery 1<\/h5>[^]*?id="ability-choice-spell-Air-1"[^]*?Blessed Wind · 0 XP/);
   const kata=await character();kata.school('Crab','Hida Bushi');
-  assert.doesNotMatch(sectionHtml(kata,'abilities'),/id="ability-choice-kata-Air"[^>]*>[\s\S]*?<optgroup/,'kata keep one flat list per ring');
+  assert.doesNotMatch(sectionHtml(kata,'abilities'),/id="ability-choice-kata-Air-/,'kata keep one list per ring');
 });
