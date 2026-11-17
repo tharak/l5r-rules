@@ -29,3 +29,7 @@
 .campaign-entry-new{margin:10px 0}
 .campaign-npc{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin-top:10px}
 .public-pc-compact .public-pc-head{margin:10px 0 0}
+.campaign-images{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:8px 0}
+.campaign-image{margin:0;display:grid;gap:4px;justify-items:start}
+.campaign-image img{width:128px;height:128px;object-fit:cover;border:1px solid var(--line);border-radius:3px}
+.campaign-image-add{position:relative;cursor:pointer}

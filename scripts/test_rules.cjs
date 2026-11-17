@@ -58,6 +58,8 @@ test('campaign, session, NPC and membership permissions',async()=>{
  await assertFails(setDoc(r(db('alice'),'campaigns/c/npcs/pictured'),{...npc,portrait:picture}));
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/npcs/pictured')));
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'a\nb',createdAt:'then',updatedAt:'now'}));
+ await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'',createdAt:'then',updatedAt:'now',images:['a','b','c','d']}));
+ await assertFails(setDoc(r(db('gm'),'campaigns/c/sessions/s'),{title:'Edited',text:'',createdAt:'then',updatedAt:'now',images:['a','b','c','d','e']}));
  await assertFails(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'alice'}));
  await assertSucceeds(setDoc(r(db('gm'),'campaigns/c'),{title:'Edited',gmUid:'gm'}));
  await assertFails(setDoc(r(db('outsider'),'campaigns/c/members/outsider'),{gmUid:'gm',membershipId:'new',inviteToken:''}));

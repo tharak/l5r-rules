@@ -89,19 +89,27 @@
   }
   const entryOwner = entry => entry.creatorUid === store().uid;
   const entryAuthor = entry => store().get(path('members',entry.creatorUid))?.displayName || 'Player';
+  // Up to four images per session or plot, cropped and stored like character pictures.
+  const MAX_IMAGES = 4;
+  function gallery(images,{kind = '',editable = false} = {}) {
+    const list = (images || []).filter(UI.isPortrait);
+    const thumbs = list.map((src,index) => `<figure class="campaign-image"><img src="${src}" alt="Image ${index+1}">${editable ? button('image-remove','Remove',`${kind}:${index}`) : ''}</figure>`).join('');
+    const add = editable && list.length < MAX_IMAGES ? `<label class="campaign-image-add ui-button ui-button--secondary ui-button--compact">Add image<input type="file" accept="image/*" class="ui-portrait-input" data-entry-image="${kind}" aria-label="Add image"></label>` : '';
+    return thumbs || add ? `<div class="campaign-images">${thumbs}${add}</div>` : '';
+  }
   function entryEditor(kind,draft) {
     const plot=kind==='plot';
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
       ...(plot?[{label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}}]:[]),
       {label:plot?'Plot point':'Note',kind:'textarea',value:draft.text,attrs:{...attrs('text'),maxlength:400000}},
-    ],actionsHtml:button(kind+'-save',plot?'Save plot':'Save note','',!draft.text.trim()||(plot&&!draft.title.trim()))+button(kind+'-cancel','Cancel')});
+    ],extraHtml:plot?gallery(draft.images,{kind:'plot',editable:true}):'',actionsHtml:button(kind+'-save',plot?'Save plot':'Save note','',!draft.text.trim()||(plot&&!draft.title.trim()))+button(kind+'-cancel','Cancel')});
   }
   function sessionEditor(session,isGM) {
     return UI.recordEditor({fields:[
       {label:'Title',value:session.title,attrs:{'data-campaign-field':'session-title',maxlength:200,readonly:!isGM}},
       {label:'Session notes',kind:'textarea',value:session.text,attrs:{class:'session-text','data-campaign-field':'session-text',readonly:!isGM}},
-    ],actionsHtml:isGM?button('session-save','Save session')+button('session-delete','Delete session',session.id):button('session-close','Close')});
+    ],extraHtml:gallery(session.images,{kind:'session',editable:isGM}),actionsHtml:isGM?button('session-save','Save session')+button('session-delete','Delete session',session.id):button('session-close','Close')});
   }
   function npcEditor(npc) {
     const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')});
@@ -120,7 +128,7 @@
     const fresh = plotDraft && !plotId ? `<div class="campaign-entry-new">${entryEditor('plot',plotDraft)}</div>` : '';
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`),
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
-        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
+        : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
     return `${UI.sectionHeading({title:'Plots',level:2,actionsHtml:`${button('plot-new','+ Plot')}`})}<p class="entry-help">Add clues and plans. Every plot point and note is visible to all campaign members.</p>${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
   }
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
@@ -139,7 +147,7 @@
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,entryTitle(session.title || 'Untitled session',day(session.updatedAt)),
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
-        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
+        : `<p class="entry-text">${session.text ? e(session.text) : '<em>No session notes yet.</em>'}</p>${gallery(session.images)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit session',session.id)+button('session-delete','Delete session',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
     return `${UI.sectionHeading({title:'Sessions',level:2,actionsHtml:isGM?button('session-new','+ Session'):''})}<div class="campaign-entries">${list || '<p>No sessions yet.</p>'}</div>`;
   }
   function renderNPCs(npcs,isGM) {
@@ -235,6 +243,11 @@
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
+      else if (action==='image-remove') {
+        const [kind,index]=id.split(':');
+        if (kind==='plot' && plotDraft) plotDraft.images=(plotDraft.images||[]).filter((_,i)=>i!==Number(index));
+        if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:(session.images||[]).filter((_,i)=>i!==Number(index)),updatedAt:new Date().toISOString()}); }
+      }
       else if (action==='note-new') {const [kind,targetId]=id.split(':');noteId='';noteTarget={kind,id:targetId};noteDraft={text:'',public:true};}
       else if (action==='note-edit') {const data=store().get(path('notes',id));if(data&&entryOwner(data)){noteId=id;noteTarget={kind:data.targetKind,id:data.targetId};noteDraft={...data};}}
       else if (action==='note-cancel') {noteDraft=noteTarget=null;noteId='';}
@@ -343,6 +356,18 @@
     store().queue(path('npcs',npcId),next);
   }
   document.addEventListener('change',async event=>{
+    const imageKind=event.target.dataset?.entryImage;
+    if (imageKind) {
+      const file=event.target.files?.[0]; event.target.value='';
+      if (!file) return;
+      try {
+        const picture=await UI.readPortrait(file);
+        if (!picture) return;
+        if (imageKind==='plot' && plotDraft) plotDraft.images=[...(plotDraft.images||[]),picture].slice(0,MAX_IMAGES);
+        if (imageKind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
+      } catch (err) { error=err.message || 'This image could not be read.'; }
+      changed(); return;
+    }
     if (event.target.dataset?.npcPortrait === undefined) return;
     const file=event.target.files?.[0], editing=npcDraft || npcId;
     // Clear the input so choosing the same file again still opens the cropper.

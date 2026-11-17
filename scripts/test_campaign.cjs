@@ -197,3 +197,23 @@ test('the public view shows the profile, escapes text, and handles missing or ol
  assert.match(P.page(null),/Character unavailable/);
  assert.match(P.page({sections:{identity:{name:'Old Format'}}}),/Old Format[\s\S]*saves it again/);
 });
+
+test('the GM adds and removes session images; plot drafts carry their images to the save',async()=>{
+ const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-01'});
+ d.window.UI.readPortrait=async()=>picture;
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();
+ await d.click('session-open','s');
+ assert.match(render(),/data-entry-image="session"/);
+ await d.documentListeners.change({target:{dataset:{entryImage:'session'},files:[{type:'image/png'}],value:'x'}});
+ assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),JSON.stringify([picture]));
+ assert.match(render(),/campaign-image"><img src="data:image\/png/);
+ await d.click('image-remove','session:0');
+ assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),'[]');
+ render();d.click('section','plots');await d.click('plot-new');
+ await d.documentListeners.change({target:{dataset:{entryImage:'plot'},files:[{type:'image/png'}],value:'x'}});
+ assert.match(render(),/data-campaign="image-remove" data-id="plot:0"/);
+});
