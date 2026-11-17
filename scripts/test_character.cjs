@@ -1176,7 +1176,7 @@ test('abilities are button lists: bought, then available, then unavailable; clic
   assert.deepEqual([...section(tainted,'shadowlands').matchAll(/data-ability-group="([^"]+)"/g)].map(m=>m[1]),['mutations','minor-shadowlands-powers','major-shadowlands-powers','akutenshi-powers']);
 });
 
-test('bought abilities appear in Rolls: spells roll from their ring card, kata and kiho open their rules',async()=>{
+test('bought abilities appear in Rolls: spells in their ring card; kata, kiho, tattoos and Shadowlands powers in their own cards',async()=>{
   const id=(kind,name)=>catalog.abilities.find(a=>a.kind===kind&&a.name===name).id;
   const c=await character();c.school('Crane','Asahina Shugenja');
   c.click({action:'buy-ability',abilityKind:'spell',id:id('spell','Blessed Wind')});
@@ -1187,10 +1187,15 @@ test('bought abilities appear in Rolls: spells roll from their ring card, kata a
   // Universal spells (school grants) can be cast in each of the four elements.
   for(const ring of ['Air','Earth','Fire','Water'])assert.match(rolls.split(`ring-watermark" data-ring="${ring}"`)[1].split('creator-ring ring-watermark')[0],/aria-label="Cast Commune \(/,ring);
   assert.doesNotMatch(rolls.split('ring-watermark" data-ring="Void"')[1].split('creator-ring ring-watermark')[0].split('creator-roll-details')[0],/Cast Commune/);
-  // A bushi's kata sits in its ring card and links to its rules.
-  const bushi=await character();bushi.school('Crab','Hida Bushi');
+  // Kata, kiho, tattoos and Shadowlands powers each get their own card; kata link to their rules.
+  const bushi=await character({taint:1,schoolDecisions:{shadowlands:true}});bushi.school('Crab','Hida Bushi');
   bushi.click({action:'buy-ability',abilityKind:'kata',id:id('kata','Striking as Earth')});
-  assert.match(sectionHtml(bushi,'rolls').split('ring-watermark" data-ring="Earth"')[1].split('creator-ring ring-watermark')[0],/<a class="creator-roll-ability" data-rule-reference href="#\/katas#[^"]*"[^>]*><span>Striking as Earth<\/span><small>Kata<\/small>/);
+  bushi.click({action:'buy-ability',abilityKind:'shadowlands',id:catalog.abilities.find(a=>a.kind==='shadowlands').id});
+  const rollsHtml=sectionHtml(bushi,'rolls');
+  assert.doesNotMatch(rollsHtml.split('ring-watermark" data-ring="Earth"')[1].split('creator-ring ring-watermark')[0],/Striking as Earth/,'not in the ring card');
+  assert.match(rollsHtml,/data-ability-kind="kata"><div class="creator-ring-head"><strong>Kata<\/strong><\/div>[^]*?<a class="creator-roll-ability" data-ring="Earth" data-rule-reference href="#\/katas#[^"]*"><span>Striking as Earth<\/span><small>Earth 3<\/small>/);
+  assert.match(rollsHtml,/data-ability-kind="shadowlands"><div class="creator-ring-head"><strong>Shadowlands powers<\/strong>/);
+  assert.doesNotMatch(rollsHtml,/data-ability-kind="kiho"|data-ability-kind="tattoo"/,'no empty cards');
 });
 
 test('rings are ordered by value in Rolls and ability blocks; section 02 keeps its layout',async()=>{

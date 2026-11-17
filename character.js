@@ -474,19 +474,21 @@
     return `<div class="creator-roll-wounds creator-ring" style="--wound-hue:${hue}" data-wound-level="${severity}" aria-label="Wound levels and current wounds"><div class="creator-ring-head"><strong>Wounds</strong>${renderNumber('woundsTaken',wounds.current,{...numericFields.woundsTaken,showLabel:false})}</div><div class="creator-wounds creator-value-tiles">${wounds.levels.map((level,index) => `<div${index===levelIndex?' aria-current="true"':''}><span${index===levelIndex?' class="creator-wound-status" role="status"':''}>${escapeHtml(level.label)}</span>: <strong>${level.total}</strong></div>`).join('')}<div${levelIndex<0?' aria-current="true"':''}><span${levelIndex<0?' class="creator-wound-status" role="status"':''}>Dead</span>: <strong>${Math.floor(wounds.maximum)+1}</strong></div>${UI.button({text:`Heal · ${data.combat.healing}`,variant:'secondary',size:'compact',attrs:{'data-action':'heal-wounds','aria-label':`Heal ${data.combat.healing} wounds`,'disabled':wounds.current<=0 || data.combat.healing<=0}})}</div></div>`;
   }
 
-  // Bought abilities in Rolls: spells roll their Spell Casting Roll (universal spells in each of
-  // Air, Earth, Fire and Water); kata and kiho sit in their ring and open their rules.
-  const abilityRule = a => `<a class="creator-roll-ability" data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}" title="${escapeHtml(a.kind === 'kata' ? 'Kata' : a.kind === 'kiho' ? 'Kiho' : 'Rules')}"><span>${escapeHtml(a.name)}</span><small>${escapeHtml(a.kind === 'kata' ? 'Kata' : a.kind === 'kiho' ? 'Kiho' : a.kind === 'tattoo' ? 'Tattoo' : 'Shadowlands')}</small></a>`;
+  // Bought abilities in Rolls: spells sit in their ring card and roll their Spell Casting Roll
+  // (universal spells in each of Air, Earth, Fire and Water); kata, kiho, tattoos and
+  // Shadowlands powers each get their own card, and open their rules.
+  const abilityRule = a => `<a class="creator-roll-ability"${a.ring && a.ring !== 'All' ? ` data-ring="${a.ring}"` : ''} data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}"><span>${escapeHtml(a.name)}</span>${a.ring && a.mastery ? `<small>${escapeHtml(a.ring)} ${a.mastery}</small>` : ''}</a>`;
   function renderRingAbilities(ring,data) {
     const spells = data.abilities.filter(a => a.kind === 'spell' && a.spellRolls?.[ring]).sort((a,b) => (a.mastery || 0)-(b.mastery || 0) || a.name.localeCompare(b.name));
-    const others = data.abilities.filter(a => ['kata','kiho'].includes(a.kind) && a.ring === ring).sort((a,b) => a.name.localeCompare(b.name));
-    if (!spells.length && !others.length) return '';
-    const spellHtml = spells.map(a => `<button type="button" class="creator-roll-skill creator-roll-ability" data-action="open-roll" data-roll-kind="spell" data-roll-name="${escapeHtml(a.selectionId)}" data-roll-skill="${ring}" aria-label="Cast ${escapeHtml(a.name)} (${ring})"><span>${escapeHtml(a.name)}</span><small>${a.spellRolls[ring].notation} · TN ${(a.mastery || 0)*5+5}</small></button>`).join('');
-    return `<div class="creator-ring-abilities">${spellHtml}${others.map(abilityRule).join('')}</div>`;
+    if (!spells.length) return '';
+    return `<div class="creator-ring-abilities">${spells.map(a => `<button type="button" class="creator-roll-skill creator-roll-ability" data-action="open-roll" data-roll-kind="spell" data-roll-name="${escapeHtml(a.selectionId)}" data-roll-skill="${ring}" aria-label="Cast ${escapeHtml(a.name)} (${ring})"><span>${escapeHtml(a.name)}</span><small>${a.spellRolls[ring].notation} · TN ${(a.mastery || 0)*5+5}</small></button>`).join('')}</div>`;
   }
   function renderOtherAbilities(data) {
-    const items = data.abilities.filter(a => ['tattoo','shadowlands'].includes(a.kind)).sort((a,b) => a.name.localeCompare(b.name));
-    return items.length ? `<div class="creator-roll-abilities creator-ring"><div class="creator-ring-head"><strong>Abilities</strong></div><div class="creator-ring-abilities">${items.map(abilityRule).join('')}</div></div>` : '';
+    const ringOrder = byRingValue(['Void','Earth','Water','Air','Fire'],data.rings);
+    return [['kata','Kata'],['kiho','Kiho'],['tattoo','Tattoos'],['shadowlands','Shadowlands powers']].map(([kind,title]) => {
+      const items = data.abilities.filter(a => a.kind === kind).sort((a,b) => ringOrder.indexOf(a.ring)-ringOrder.indexOf(b.ring) || (a.mastery || 0)-(b.mastery || 0) || a.name.localeCompare(b.name));
+      return items.length ? `<div class="creator-roll-abilities creator-ring" data-ability-kind="${kind}"><div class="creator-ring-head"><strong>${title}</strong></div><div class="creator-ring-abilities">${items.map(abilityRule).join('')}</div></div>` : '';
+    }).join('');
   }
   function renderCombat(data) {
     return `<div class="creator-roll-combat creator-ring"><div class="creator-ring-head"><strong>Combat values</strong></div><div class="creator-combat creator-value-tiles"><div><button type="button" class="creator-roll-skill" data-action="open-roll" data-roll-kind="initiative" data-roll-name="Initiative" aria-label="Roll Initiative"><span>Initiative roll</span>: <strong>${data.combat.initiative.notation}</strong></button></div><div><span>Armor TN (equipped)</span>: <strong>${data.combat.armorTN}</strong></div><div><span>Reduction</span>: <strong>${data.combat.reduction}</strong></div></div></div>`;

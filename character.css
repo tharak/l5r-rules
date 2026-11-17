@@ -511,3 +511,7 @@ details.creator-ability-more > summary { padding: 0; min-height: 0; }
 .creator-ability-level-folded > h5, .creator-ability-level-folded > details.creator-ability-more { margin-top: 0; margin-bottom: 0; }
 /* The "Table permits ..." switch sits on the subsection heading line. */
 .creator-option-heading > .creator-ability-permission { margin: 0; }
+/* Kata and kiho pills in their own Rolls cards carry their ring colour. */
+.creator-roll-ability[data-ring="Air"] { background: #eef1e3; } .creator-roll-ability[data-ring="Earth"] { background: #f1ead8; }
+.creator-roll-ability[data-ring="Water"] { background: #e8f0f3; } .creator-roll-ability[data-ring="Fire"] { background: #f8e9e2; }
+.creator-roll-ability[data-ring="Void"] { background: #efe9f4; }
