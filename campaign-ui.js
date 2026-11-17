@@ -268,7 +268,7 @@
     const selected = sessions.find(item => item.id === timelineSession) || sessions[0] || null;
     const events = selected ? timelineEvents(selected.id) : [];
     const list = sessions.map(session => { const count = timelineEvents(session.id).length; return `<li>${UI.button({html:`<small>${e(day(session.createdAt || session.updatedAt))}</small><span>${e(session.title || 'Untitled session')}</span><small>${count} event${count===1?'':'s'}</small>`,variant:'quiet',attrs:{class:'timeline-event','data-campaign':'timeline-session','data-id':session.id,'aria-current':selected?.id === session.id ? 'true' : false}})}</li>`; }).join('');
-    const pinHtml = events.map(item => `<span class="timeline-pin" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${isGM ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
+    const pinHtml = events.map(item => `<span class="timeline-pin timeline-pin-${item.kind}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${isGM ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{class:'timeline-pin-remove','data-campaign':'timeline-unpin','data-id':item.id,'aria-label':`Remove ${item.note.title} from the map`}}) : ''}</span>`).join('');
     let controls = '';
     if (isGM && selected) {
       // An entry already pinned in any session cannot be added again.
@@ -286,7 +286,7 @@
     const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
     // The selectors float over the map's top-left corner (above it on narrow screens).
     const map = `<div class="timeline-stage">${controls}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div></div>`;
-    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}${eventList}</article></div>${renderNotePopup()}`;
+    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
   }
   // The full entry behind a timeline event, in an overlay dialog.
   function renderNotePopup() {
@@ -366,7 +366,35 @@
       ${section==='timeline'?renderTimeline(isGM,pcs,npcs,plots):''}`})}
       </div>${section==='pcs'&&selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
+  // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
+  // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
+  let arrowFrame = 0;
+  function updatePinArrows() {
+    arrowFrame = 0;
+    const layer = document.querySelector('.timeline-arrows'), map = document.querySelector('.timeline-map');
+    const width = document.documentElement.clientWidth, height = window.innerHeight;
+    document.documentElement.style.setProperty('--page-width',`${width}px`);
+    if (!layer || !map) return;
+    const box = map.getBoundingClientRect(), pad = 28;
+    const html = box.bottom <= 0 || box.top >= height ? '' : [...map.querySelectorAll('.timeline-pin')].map(pin => {
+      const r = pin.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+      if (x >= 0 && x <= width && y >= 0 && y <= height) return '';
+      const cx = Math.min(width - pad,Math.max(pad,x)), cy = Math.min(height - pad,Math.max(pad,y));
+      const angle = Math.round(Math.atan2(y - cy,x - cx) * 180 / Math.PI);
+      const image = pin.querySelector('img')?.getAttribute('src');
+      const kind = [...pin.classList].find(name => name.startsWith('timeline-pin-') && name !== 'timeline-pin-open')?.slice(13) || '';
+      const name = pin.querySelector('.timeline-pin-open')?.getAttribute('aria-label') || '';
+      return `<button type="button" class="timeline-arrow timeline-arrow-${e(kind)}" data-campaign="timeline-arrow" data-id="${e(pin.dataset.pinId)}" style="left:${Math.round(cx)}px;top:${Math.round(cy)}px" title="${e(name)}" tabindex="-1" aria-hidden="true"><span class="timeline-arrow-head" style="transform:rotate(${angle}deg)"></span>${image ? `<img src="${e(image)}" alt="">` : '<span class="timeline-arrow-dot"></span>'}</button>`;
+    }).join('');
+    if (layer.dataset.html !== html) { layer.dataset.html = html; layer.innerHTML = html; }
+  }
+  const schedulePinArrows = () => { if (!arrowFrame) arrowFrame = requestAnimationFrame(updatePinArrows); };
+  window.addEventListener('scroll',schedulePinArrows,{passive:true});
+  window.addEventListener('resize',schedulePinArrows);
   function mountEditor() {
+    schedulePinArrows();
+    const mapImage = document.querySelector('.timeline-map>img');
+    if (mapImage && !mapImage.complete) mapImage.addEventListener('load',schedulePinArrows,{once:true});
     // Move focus into a timeline note popup once, right after it opens.
     if (focusPopup) { focusPopup=false; document.querySelector('.timeline-popup')?.focus(); }
     const target = document.getElementById('campaign-editor');
@@ -520,7 +548,9 @@
     } catch(err) {error=err.code==='permission-denied'?'Access denied. Check membership or invitation expiry.':err.message;}
     finally {busy=false;changed();}
   }
-  document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');if(b)act(b.dataset.campaign,b.dataset.id);else placePin(event);});
+  document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');
+    if(b?.dataset.campaign==='timeline-arrow'){const pin=document.querySelector(`.timeline-pin[data-pin-id="${CSS.escape(b.dataset.id)}"]`);if(pin){const r=pin.getBoundingClientRect();window.scrollTo({top:window.scrollY+r.top+r.height/2-window.innerHeight/2,left:window.scrollX+r.left+r.width/2-document.documentElement.clientWidth/2,behavior:'smooth'});}return;}
+    if(b)act(b.dataset.campaign,b.dataset.id);else placePin(event);});
   // A new NPC keeps its picture in the draft until saved; an existing NPC saves it at once.
   function setNPCPortrait(url) {
     if (!gm()) return;

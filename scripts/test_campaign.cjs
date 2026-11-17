@@ -263,7 +263,7 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  const [key]=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/'));
  assert.equal(d.data.get(key).noteId,'note1');assert.equal(d.data.get(key).sessionId,'s2');
  html=render();
- assert.match(html,/timeline-pin" style="left:50%;top:25%"[\s\S]*Carries a sealed letter/);
+ assert.match(html,/timeline-pin timeline-pin-npcs" data-pin-id="[^"]+" style="left:50%;top:25%"[\s\S]*Carries a sealed letter/);
  // The pinned entry is now disabled for every session.
  await d.click('timeline-session','s1');await d.click('timeline-target','npcs:n');
  assert.match(render(),/data-campaign="timeline-entry" data-id="note1"[^>]*disabled/);
