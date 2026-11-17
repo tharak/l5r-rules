@@ -628,7 +628,7 @@ test('board: a card per NPC, PC and plot; link two cards; strings in the maker\'
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  d.store.uid='alice';let html=render();
  for (const key of ['npcs:a','npcs:b','pcs:p']) assert.match(html,new RegExp(`class="board-card[^"]*" data-campaign="board-card" data-id="${key}"`));
- assert.match(html,/data-id="npcs:b" style="left:500px;top:300px"/,'a saved position is used');
+ assert.match(html,/data-id="npcs:b" data-x="500" style="left:20.833%;top:300px"/,'a saved position is used');
  assert.match(html,/class="board-legend-item"><i style="background:#123456"><\/i>(Hida Kaito|Alice)<input type="color"/,'a player\'s colour is named once, by their PC or name');
  assert.match(html,/<\/i>GM</);
  await d.click('board-link-mode');await d.click('board-card','npcs:a');await d.click('board-card','npcs:b');

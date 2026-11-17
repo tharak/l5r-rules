@@ -180,28 +180,40 @@ body:has(.campaign-entry[open]){overflow:hidden}
 /* Investigation board: a corkboard of NPC, PC and plot cards joined by coloured strings. */
 .campaign-board-row{grid-column:1/-1;display:grid;gap:8px}
 .board-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.board-head .ui-field{max-width:200px}
+.board-head .ui-field{flex:0 1 200px;width:200px;min-width:120px}
 .board-hint{font-size:.85rem;color:var(--muted)}
 .board-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-left:auto;font-size:.82rem}
 .board-legend-item{display:inline-flex;align-items:center;gap:5px}
 .board-legend-item i,.board-made-by i{display:inline-block;width:18px;height:4px;border-radius:2px}
 .board-legend-item input[type=color]{width:22px;height:22px;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer}
 .board-made-by{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
-.board-viewport{height:70vh;min-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px;overscroll-behavior:contain}
-.board-surface{position:relative;background-color:#b98d5e;background-image:radial-gradient(#0000001a 1px,transparent 1.5px),radial-gradient(#ffffff14 1px,transparent 1.5px);background-size:9px 9px,13px 13px;background-position:0 0,4px 6px}
+.board-viewport{overflow:hidden;border:1px solid var(--line);border-radius:8px;overscroll-behavior:contain}
+.board-surface{position:relative;width:100%;background-color:#b98d5e;background-image:radial-gradient(#0000001a 1px,transparent 1.5px),radial-gradient(#ffffff14 1px,transparent 1.5px);background-size:9px 9px,13px 13px;background-position:0 0,4px 6px}
 .board-surface-linking .board-card{cursor:crosshair}
 .board-strings{position:absolute;inset:0;pointer-events:none}
 .board-strings line{stroke-width:3;stroke-linecap:round;filter:drop-shadow(0 1px 1px #0005)}
-.board-card{position:absolute;width:210px;height:64px;display:flex;align-items:center;gap:8px;padding:6px 10px;box-sizing:border-box;background-color:var(--paper,#fffaf0);background-size:cover;background-position:center;border-radius:4px;box-shadow:0 3px 8px #0005;cursor:grab;touch-action:none;user-select:none;overflow:hidden;border-left:5px solid var(--muted)}
+.board-card{position:absolute;width:clamp(84px,13%,220px);height:64px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 10px;box-sizing:border-box;background-color:var(--paper,#fffaf0);background-size:cover;background-position:center;border-radius:4px;box-shadow:0 3px 8px #0005;cursor:grab;touch-action:none;user-select:none;overflow:hidden;border-left:5px solid var(--muted)}
 .board-card-npcs{border-left-color:var(--npc,#7a5a2b)}
 .board-card-pcs{border-left-color:var(--pc,#2f6f9f)}
 .board-card-plots{border-left-color:var(--red)}
 .board-card .character-tile-body,.board-card>*:not(.board-pushpin){min-width:0}
-.board-card strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.board-card small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.75rem}
+.board-card{padding:6px 8px;gap:6px}
+.board-card .character-avatar{width:36px;height:36px;min-width:36px;flex:none}
+.board-card strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:.82rem;line-height:1.15;overflow-wrap:anywhere}
+.board-card small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.7rem}
 .board-pushpin{position:absolute;top:3px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f88,#a11);box-shadow:0 1px 2px #0007}
 .board-card-linking{outline:3px solid var(--red);outline-offset:2px}
 .board-card-dim{opacity:.3}
 .board-card-dragging{z-index:5;cursor:grabbing;box-shadow:0 10px 18px #0006}
 .board-tag{position:absolute;z-index:2;transform:translate(-50%,-50%);max-width:160px;padding:2px 7px;font-size:.75rem;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fffdf5;color:#222;border:2px solid var(--string,var(--red));border-radius:3px;box-shadow:0 1px 3px #0004;cursor:pointer}
 .board-card img{-webkit-user-drag:none;pointer-events:none}
+/* The lists are gone: NPCs and PCs live on the board, sessions and plots on the map. Their
+   sections stay only to hold an opened entry's panel (a popup over the page). */
+.campaign-row-hidden{position:absolute;width:0;height:0;margin:0;padding:0;overflow:visible}
+.campaign-row-hidden .campaign-add-tile,.campaign-row-hidden .campaign-entry:not([open]),.campaign-row-hidden .campaign-entry[open]>summary{display:none}
+.campaign-row-hidden .campaign-entries{display:block;width:0;height:0}
+.campaign-row-hidden .campaign-entry[open]{border:0;padding:0;width:0;height:0;min-height:0;background:none;box-shadow:none}
+.map-head{margin-bottom:8px}
+.map-head-plots{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.map-head-plot{border-left:3px solid var(--red)!important}
+.board-card .character-tile-text strong{white-space:normal;font-size:.82rem}

@@ -459,7 +459,10 @@
   // Investigation board: a manual corkboard of NPC, PC and plot cards joined by strings. Every
   // member moves cards and adds strings; a string is drawn in its maker's colour (shown once in
   // the legend, so names are not repeated on every string).
-  const BOARD = {w:2400,h:1600,cardW:210,cardH:64};
+  // The board fits the row's width: a card's x is its centre as a share of the width (0–2400),
+  // its y the top in pixels; the board is as tall as its lowest card.
+  const BOARD = {w:2400,h:1600,cardH:64};
+  const pct = x => `${Math.round(x / BOARD.w * 100000) / 1000}%`;
   const PALETTE = ['#b23a2e','#2f6f9f','#3b7d3a','#8a5a9e','#c47a1c','#1f8a87','#a8456f','#5e6b2e'];
   let boardLinking = false, linkFrom = '', linkDraft = null, linkPopup = '', boardSearch = '';
   function memberColor(uid) {
@@ -484,26 +487,32 @@
     return [...plotCards,...pcCards,...npcCards].map(card => {
       const saved = store().get(path('board',card.key));
       if (saved) return {...card,x:Number(saved.x),y:Number(saved.y)};
-      // Gaps wide enough for a string's label to sit between neighbouring cards.
-      const index = slot++, col = index % 8, row = Math.floor(index / 8);
-      return {...card,x:40 + col * (BOARD.cardW + 80),y:50 + row * (BOARD.cardH + 110)};
+      // Six across, with gaps wide enough for a string's label between neighbouring cards.
+      const index = slot++, col = index % 6, row = Math.floor(index / 6);
+      return {...card,x:(col + 0.5) * BOARD.w / 6,y:40 + row * (BOARD.cardH + 110)};
     });
   }
-  const centre = card => [card.x + BOARD.cardW / 2,card.y + BOARD.cardH / 2];
+  const centre = card => [card.x,card.y + BOARD.cardH / 2];
   function renderBoard(npcs,pcs,plots) {
     const cards = boardCards(npcs,pcs,plots), byKey = new Map(cards.map(card => [card.key,card]));
     const links = store().list(path('links','')).filter(link => byKey.has(link.from) && byKey.has(link.to));
     const strings = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
-      return `<line data-link="${e(link.id)}" data-from="${e(link.from)}" data-to="${e(link.to)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${memberColor(link.creatorUid)}"/>`; }).join('');
+      return `<line data-link="${e(link.id)}" data-from="${e(link.from)}" data-to="${e(link.to)}" data-x1="${x1}" data-x2="${x2}" x1="${pct(x1)}" y1="${y1}" x2="${pct(x2)}" y2="${y2}" stroke="${memberColor(link.creatorUid)}"/>`; }).join('');
     const tags = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
-      return `<button type="button" class="board-tag" data-campaign="board-link" data-id="${e(link.id)}" data-tag-from="${e(link.from)}" data-tag-to="${e(link.to)}" style="left:${(x1+x2)/2}px;top:${(y1+y2)/2}px;--string:${memberColor(link.creatorUid)}" aria-label="${e(byKey.get(link.from).name)} – ${e(byKey.get(link.to).name)}${link.label ? `: ${e(link.label)}` : ''}">${link.label ? e(link.label) : '·'}</button>`; }).join('');
+      return `<button type="button" class="board-tag" data-campaign="board-link" data-id="${e(link.id)}" data-tag-from="${e(link.from)}" data-tag-to="${e(link.to)}" style="left:${pct((x1+x2)/2)};top:${(y1+y2)/2}px;--string:${memberColor(link.creatorUid)}" aria-label="${e(byKey.get(link.from).name)} – ${e(byKey.get(link.to).name)}${link.label ? `: ${e(link.label)}` : ''}">${link.label ? e(link.label) : '·'}</button>`; }).join('');
     const query = boardSearch.trim().toLowerCase();
-    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" style="left:${card.x}px;top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
+    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" data-x="${card.x}" style="left:${pct(card.x)};top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
     const members = store().list(path('members','')).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
     const legend = `<div class="board-legend" aria-label="String colours">${members.map(m => `<span class="board-legend-item"><i style="background:${memberColor(m.id)}"></i>${e(legendName(m))}${m.id === store().uid ? `<input type="color" data-board-color value="${memberColor(m.id)}" aria-label="Your string colour" title="Your string colour">` : ''}</span>`).join('')}</div>`;
     const hint = boardLinking ? `<span class="board-hint">${linkFrom ? 'Now click the card to link to.' : 'Click the first card.'}</span>` : '';
-    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}${hint}${UI.field({attrs:{type:'search','data-board-search':true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
-      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="width:${BOARD.w}px;height:${BOARD.h}px"><svg class="board-strings" width="${BOARD.w}" height="${BOARD.h}" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
+    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${gm() ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}${hint}${UI.field({attrs:{type:'search','data-board-search':true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
+      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="height:${Math.max(480,...cards.map(card => card.y + BOARD.cardH + 60))}px"><svg class="board-strings" width="100%" height="100%" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
+  }
+  // The map is the sessions and plots view: their + buttons, the selected session, and every plot.
+  function renderMapHead(isGM,sessions,plots) {
+    const selected = sessions.find(item => item.id === timelineSession) || [...sessions].sort(newestFirst)[0];
+    const plotChips = [...plots].sort(byNewest).map(plot => UI.button({text:plot.title || 'Untitled plot',variant:'quiet',size:'compact',attrs:{class:'map-head-plot','data-campaign':'plot-open','data-id':plot.id}})).join('');
+    return `<div class="board-head map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${selected ? button('session-open','Open session',selected.id) : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
   }
   // Popups: a new string (optional label), or an existing one (label, remove).
   function renderBoardPopup(npcs,pcs,plots) {
@@ -618,12 +627,12 @@
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('handover','Hand over')+button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       ${renderOffers()}<div class="campaign-rows">
-      <section class="home-row campaign-row" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
-      <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
-      <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
-      <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
-      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs,plots)}</section>
-      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
+      <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
+      <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="plots">${renderPlots(plots)}</section>
+      <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
+      <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
+      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs,[])}</section>
+      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderMapHead(isGM,sessions,plots)}${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
       </div>${renderBoardPopup(npcs,pcs,plots)}${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
@@ -893,26 +902,29 @@
   // Board cards drag the same way (any member); their strings and tags follow.
   let cardDrag=null;
   function moveStrings(key,x,y) {
-    const cx=x+BOARD.cardW/2, cy=y+BOARD.cardH/2;
-    for (const line of document.querySelectorAll(`.board-strings line[data-from="${CSS.escape(key)}"]`)) {line.setAttribute('x1',cx);line.setAttribute('y1',cy);}
-    for (const line of document.querySelectorAll(`.board-strings line[data-to="${CSS.escape(key)}"]`)) {line.setAttribute('x2',cx);line.setAttribute('y2',cy);}
+    const cy=y+BOARD.cardH/2;
+    for (const line of document.querySelectorAll(`.board-strings line[data-from="${CSS.escape(key)}"]`)) {line.dataset.x1=x;line.setAttribute('x1',pct(x));line.setAttribute('y1',cy);}
+    for (const line of document.querySelectorAll(`.board-strings line[data-to="${CSS.escape(key)}"]`)) {line.dataset.x2=x;line.setAttribute('x2',pct(x));line.setAttribute('y2',cy);}
     for (const tag of document.querySelectorAll(`.board-tag[data-tag-from="${CSS.escape(key)}"], .board-tag[data-tag-to="${CSS.escape(key)}"]`)) {
       const line=document.querySelector(`.board-strings line[data-link="${CSS.escape(tag.dataset.id)}"]`);
-      if(line){tag.style.left=`${(Number(line.getAttribute('x1'))+Number(line.getAttribute('x2')))/2}px`;tag.style.top=`${(Number(line.getAttribute('y1'))+Number(line.getAttribute('y2')))/2}px`;}
+      if(line){tag.style.left=pct((Number(line.dataset.x1)+Number(line.dataset.x2))/2);tag.style.top=`${(Number(line.getAttribute('y1'))+Number(line.getAttribute('y2')))/2}px`;}
     }
   }
   document.addEventListener('pointerdown',event=>{
     const card=event.target.closest?.('.board-card[data-id]');
     if(!card||boardLinking||event.button!==0)return;
-    cardDrag={card,key:card.dataset.id,x0:event.clientX,y0:event.clientY,left:parseFloat(card.style.left)||0,top:parseFloat(card.style.top)||0,moved:false};
+    const surface=card.closest('.board-surface');
+    cardDrag={card,key:card.dataset.id,x0:event.clientX,y0:event.clientY,left:Number(card.dataset.x)||0,top:parseFloat(card.style.top)||0,width:surface.clientWidth||1,half:card.offsetWidth/2,moved:false};
   });
   document.addEventListener('pointermove',event=>{
     if(!cardDrag)return;
     if(!cardDrag.moved&&Math.hypot(event.clientX-cardDrag.x0,event.clientY-cardDrag.y0)<5)return;
     cardDrag.moved=true;event.preventDefault();
-    cardDrag.x=Math.min(BOARD.w-BOARD.cardW,Math.max(0,Math.round(cardDrag.left+event.clientX-cardDrag.x0)));
+    // Pointer pixels become shares of the board's width; the card stays inside the board.
+    const unit=BOARD.w/cardDrag.width, edge=Math.min(BOARD.w/2,cardDrag.half*unit);
+    cardDrag.x=Math.min(BOARD.w-edge,Math.max(edge,Math.round(cardDrag.left+(event.clientX-cardDrag.x0)*unit)));
     cardDrag.y=Math.min(BOARD.h-BOARD.cardH,Math.max(0,Math.round(cardDrag.top+event.clientY-cardDrag.y0)));
-    cardDrag.card.style.left=`${cardDrag.x}px`;cardDrag.card.style.top=`${cardDrag.y}px`;cardDrag.card.classList.add('board-card-dragging');
+    cardDrag.card.style.left=pct(cardDrag.x);cardDrag.card.style.top=`${cardDrag.y}px`;cardDrag.card.classList.add('board-card-dragging');
     moveStrings(cardDrag.key,cardDrag.x,cardDrag.y);
   });
   // Pictures inside a card would start the browser's own image drag and cancel ours.
