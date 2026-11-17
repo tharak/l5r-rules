@@ -205,7 +205,13 @@ service cloud.firestore {
         }
         // Only ownership, visibility, and attachment metadata are shared. Text lives in protected bodies.
         allow read: if entryKind() && joined(c);
-        allow create: if entryKind() && joined(c) && validMetadata();
+        // Journal entries (stored as notes): anyone on sessions, the GM on NPCs, the GM or the
+        // plot's creator on plots. PC journals live with the character, so no new PC notes.
+        function canAddEntry(m) {
+          return kind == 'plots' || m.targetKind == 'sessions' || (m.targetKind == 'npcs' && gm(c))
+            || (m.targetKind == 'plots' && (gm(c) || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == request.auth.uid));
+        }
+        allow create: if entryKind() && joined(c) && validMetadata() && canAddEntry(request.resource.data);
         allow update: if entryKind() && joined(c) && resource.data.creatorUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['public','updatedAt','revision']) && validMetadata();
         allow delete: if entryKind() && joined(c) && (resource.data.creatorUid == request.auth.uid || gm(c) || parentOwner(resource.data))

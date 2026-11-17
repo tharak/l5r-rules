@@ -100,12 +100,16 @@ test('plots and attached notes are readable by every member and writable only by
  await assertFails(setDoc(r(db('alice'),plotPath),{...m,revision:'not-atomic'}));
  await assertSucceeds(writeEntry('alice','plots','alice_plot',{...m,public:true,revision:'p2'},'UPDATED','Updated plot'));
  const target={targetKind:'plots',targetId:'alice_plot',targetCreatorUid:'alice'};
- await assertSucceeds(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n1',target)));
+ // Only the GM or the plot's creator adds entries to a plot's journal.
+ await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n1',target)));
+ await assertSucceeds(writeEntry('alice','notes','bob_plot_note',metadata('alice',true,'n1',target)));
  const notePath='campaigns/c/notes/bob_plot_note/content/body';
  for(const u of ['alice','bob','gm'])await assertSucceeds(getDoc(r(db(u),notePath)));
- await assertFails(writeEntry('alice','notes','bob_plot_note',metadata('bob',true,'n2',target)));
- await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('bob',true,'n2',{targetKind:'sessions',targetId:'s'})));
- for(const [targetKind,targetId] of [['sessions','s'],['pcs','alice_pc']]) {
+ await assertFails(writeEntry('bob','notes','bob_plot_note',metadata('alice',true,'n2',target)));
+ await assertFails(writeEntry('alice','notes','bob_plot_note',metadata('alice',true,'n2',{targetKind:'sessions',targetId:'s'})));
+ // Any member writes in a session's journal; PC journals live with the character.
+ await assertFails(writeEntry('alice','notes','note_pcs',metadata('alice',true,'n1',{targetKind:'pcs',targetId:'alice_pc'})));
+ for(const [targetKind,targetId] of [['sessions','s']]) {
   const id='note_'+targetKind;
   await assertSucceeds(writeEntry('alice','notes',id,metadata('alice',true,'n1',{targetKind,targetId})));
   for(const u of ['bob','gm'])await assertSucceeds(getDoc(r(db(u),`campaigns/c/notes/${id}/content/body`)));
@@ -114,7 +118,7 @@ test('plots and attached notes are readable by every member and writable only by
  await assertSucceeds(writeEntry('gm','notes','npc_note',metadata('gm',true,'n1',{targetKind:'npcs',targetId:'n'})));
  // NPCs and their notes are public to every member; members may add notes to them.
  await assertSucceeds(getDoc(r(db('alice'),'campaigns/c/notes/npc_note/content/body')));
- await assertSucceeds(writeEntry('alice','notes','npc_member_note',metadata('alice',true,'n1',{targetKind:'npcs',targetId:'n'})));
+ await assertFails(writeEntry('alice','notes','npc_member_note',metadata('alice',true,'n1',{targetKind:'npcs',targetId:'n'})));
  for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c/notes/npc_note/content/body')));
  await assertFails(writeEntry('alice','notes','missing_target',metadata('alice',true,'n1',{targetKind:'sessions',targetId:'missing'})));
  await assertFails(writeEntry('outsider','plots','outside',metadata('outsider',true,'p1')));

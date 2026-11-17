@@ -71,6 +71,20 @@
     activeId = id;
     return true;
   }
+  // Add journal entries to one of your characters (used to move old campaign notes about it
+  // into its journal). Entries whose id is already present are skipped.
+  function addJournalEntries(id,entries) {
+    const records = roster(), record = records.find(item => item.id === id);
+    if (!record) return false;
+    const sheetData = R.normalize(record.sheet), known = new Set(sheetData.journal.map(entry => entry.id));
+    const added = entries.filter(entry => !known.has(entry.id));
+    if (!added.length) return true;
+    sheetData.journal.push(...added);
+    record.sheet = R.normalize(sheetData);
+    record.updatedAt = new Date().toISOString();
+    if (id === activeId && !external && sheet) sheet.journal = record.sheet.journal;
+    return storeRoster(records);
+  }
   // Save a picture (and the portrait creator's choices) to one character.
   function setPortrait(id,picture,recipe = null) {
     if (!UI.isPortrait(picture)) return false;
@@ -1030,7 +1044,7 @@
     finally { sheet = previous; }
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
-  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, read:readRecord, profile, normalize:R.normalize };
+  window.CharacterBuilder = { mount, list, create, open, remove, setPortrait, addJournalEntries, read:readRecord, profile, normalize:R.normalize };
   const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
   function refreshRemoteSheet() {

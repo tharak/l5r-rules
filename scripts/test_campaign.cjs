@@ -297,3 +297,40 @@ test('campaign sections show actions without visible titles or helper text',()=>
   assert.doesNotMatch(html,/entry-help|Add clues and plans/,section);
  }
 });
+test('journals: anyone adds to sessions, the GM to NPCs, the GM or creator to plots, nobody to PCs from the campaign',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/npcs/n',{name:'Court messenger',notes:''});
+ d.data.set('campaigns/c/plots/p',{title:'Seal',text:'',creatorUid:'alice',createdAt:'2026-11-01'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ const canAdd=(kind,id)=>new RegExp(`data-campaign="note-new" data-id="${kind}:${id}"`).test(render());
+ for(const [uid,expected] of [['gm',{sessions:true,npcs:true,plots:true}],['alice',{sessions:true,npcs:false,plots:true}],['bob',{sessions:true,npcs:false,plots:false}]]) {
+  d.store.uid=uid;
+  for(const [section,kind,id] of [['sessions','sessions','s'],['npcs','npcs','n'],['plots','plots','p']]) {
+   render();await d.click('section',section);
+   assert.equal(canAdd(kind,id),expected[kind],`${uid} ${kind}`);
+  }
+ }
+});
+test('old campaign notes about a PC move into its journal, then the note is removed',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});
+ d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'a-pc'});
+ d.data.set('campaigns/c/notes/own',{creatorUid:'alice',targetKind:'pcs',targetId:'p',text:'My own note',createdAt:'2026-11-01',updatedAt:'2026-11-01'});
+ d.data.set('campaigns/c/notes/gmnote',{creatorUid:'gm',targetKind:'pcs',targetId:'p',text:'GM note',createdAt:'2026-11-02',updatedAt:'2026-11-02'});
+ let added=[],written=[];
+ d.window.CharacterBuilder.addJournalEntries=(id,entries)=>{added.push([id,entries]);return true;};
+ d.window.SheetJournal={write:async(owner,id,entryId,data)=>{written.push([owner,id,entryId,data]);}};
+ d.store.uid='alice';d.window.CampaignUI.render('campaigns/c');
+ await new Promise(r=>setImmediate(r));
+ assert.equal(added.length,1);assert.equal(added[0][0],'a-pc');assert.equal(added[0][1][0].text,'My own note');assert.equal(added[0][1][0].public,true);
+ assert.equal(d.data.has('campaigns/c/notes/own'),false);assert.equal(d.data.has('campaigns/c/notes/gmnote'),true,'not moved by another member');
+ d.store.uid='gm';d.window.CampaignUI.render('campaigns/c');
+ await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r));
+ assert.equal(written.length,1);assert.deepEqual([written[0][0],written[0][1],written[0][2]],['alice','a-pc','gmnote']);
+ assert.equal(written[0][3].authorUid,'gm');assert.equal(written[0][3].text,'GM note');
+ assert.ok(d.watches.some(w=>w.pcId==='p'&&w.full),'the GM requested a full grant first');
+ assert.equal(d.data.has('campaigns/c/notes/gmnote'),false);
+});
