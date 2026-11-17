@@ -96,7 +96,9 @@ service cloud.firestore {
         && request.resource.data.gmUid == request.auth.uid && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
         && getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid)).data.gmUid == request.auth.uid;
-      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title'])
+      // The GM edits the title and which PCs/NPCs appear on the timeline picker.
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden'])
+        && (!('timelineHidden' in request.resource.data) || (request.resource.data.timelineHidden is list && request.resource.data.timelineHidden.size() <= 1000))
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
       allow delete: if gm(c);
       match /members/{u} {

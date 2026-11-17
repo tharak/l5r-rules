@@ -205,7 +205,7 @@ test('the GM adds and removes session images; plot drafts carry their images to 
  d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-01'});
  d.window.UI.readPortrait=async()=>picture;
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();
+ render();await d.click('section','sessions');
  await d.click('session-open','s');
  assert.match(render(),/data-entry-image="session"/);
  await d.documentListeners.change({target:{dataset:{entryImage:'session'},files:[{type:'image/png'}],value:'x'}});
@@ -226,6 +226,7 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  d.store.uid='alice';
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  assert.match(d.window.CampaignUI.render('campaigns'),/campaign-unread/);
+ render();await d.click('section','sessions');
  let html=render();
  assert.match(html,/Sessions !/);assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/Not read yet/);
  await d.click('mark-read','sessions:s');
@@ -333,4 +334,27 @@ test('old campaign notes about a PC move into its journal, then the note is remo
  assert.equal(written[0][3].authorUid,'gm');assert.equal(written[0][3].text,'GM note');
  assert.ok(d.watches.some(w=>w.pcId==='p'&&w.full),'the GM requested a full grant first');
  assert.equal(d.data.has('campaigns/c/notes/gmnote'),false);
+});
+
+test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on its picker',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'New session 1',text:'',createdAt:'2026-10-08'});
+ d.data.set('campaigns/c/npcs/n',{name:'Old rival',notes:''});
+ d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'a-pc'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ let html=render();
+ assert.ok(html.indexOf('>Timeline<')<html.indexOf('>Sessions<'),'Timeline tab first');
+ assert.match(html,/data-timeline-map="s"/,'Timeline open by default');
+ assert.doesNotMatch(html.slice(html.indexOf('timeline-detail')),/<h3>New session 1<\/h3>/,'no session heading above the map');
+ assert.match(html,/data-id="npcs:n"/);
+ await d.click('timeline-visibility','npcs:n');
+ assert.equal(JSON.stringify(d.data.get('campaigns/c').timelineHidden),JSON.stringify(['npcs:n']));
+ assert.doesNotMatch(render(),/data-campaign="timeline-target" data-id="npcs:n"/);
+ await d.click('section','npcs');
+ assert.match(render(),/data-campaign="timeline-visibility" data-id="npcs:n"(?![^>]*checked)/);
+ await d.click('timeline-visibility','npcs:n');
+ assert.equal(JSON.stringify(d.data.get('campaigns/c').timelineHidden),'[]');
+ d.store.uid='alice';await d.click('section','pcs');
+ assert.doesNotMatch(render(),/timeline-visibility/,'only the GM sees the checkbox');
 });

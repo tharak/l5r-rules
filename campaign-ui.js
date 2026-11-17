@@ -2,7 +2,7 @@
   const UI = window.UI;
   const store = () => window.CampaignStorage;
   const e = UI.escape;
-  let accountUid = null, active = '', section = 'sessions', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
+  let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
   let timelineSession='', pickTarget='', pickNote='', notePopup='', focusPopup=false;
   const sheets = new Map(), stops = new Map();
@@ -88,7 +88,7 @@
     if (next === active) return;
     watchGeneration++;
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
-    active = next; section = 'sessions'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
+    active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
     timelineSession='';pickTarget='';pickNote='';notePopup='';
   }
@@ -195,6 +195,10 @@
         : `<article class="campaign-plot"><p class="entry-text">${e(plot.text || '')}</p>${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
     return `${sectionBar('Plots',button('plot-new','+ Plot'))}${fresh}<div class="campaign-entries">${list || (fresh ? '' : '<p>No plot points yet.</p>')}</div>`;
   }
+  // The GM can keep PCs and NPCs off the timeline picker (their existing pins stay).
+  const hiddenOnPicker = () => new Set(store().get(`campaigns/${active}`)?.timelineHidden || []);
+  const onPicker = (kind,id) => !hiddenOnPicker().has(`${kind}:${id}`);
+  const pickerToggle = (kind,id) => gm() ? UI.checkbox({label:'Show on timeline picker',attrs:{type:'checkbox','data-campaign':'timeline-visibility','data-id':`${kind}:${id}`,checked:onPicker(kind,id),disabled:busy},labelAttrs:{class:'creator-check campaign-picker-toggle'}}) : '';
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
   // across re-renders (toggle events do not bubble, so listen in the capture phase).
   const openEntries = new Set();
@@ -249,7 +253,7 @@
       const used = new Set(store().list(path('timeline','')).map(item => `${item.kind}:${item.targetId}:${item.noteId}`));
       // Plots on one row; PCs and NPCs share the next, told apart by colour.
       const chip = (kind,id,name) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:`timeline-target timeline-target-${kind}`,'data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`,'aria-label':`${{plots:'Plot',pcs:'PC',npcs:'NPC'}[kind]}: ${name}, ${entriesOf(kind,id).length} entries`}});
-      const characters = [...pcs.map(pc => ['pcs',pc.id,label(pc)]),...npcs.map(n => ['npcs',n.id,n.name || 'Unnamed NPC'])].sort((a,b) => a[2].localeCompare(b[2]));
+      const characters = [...pcs.map(pc => ['pcs',pc.id,label(pc)]),...npcs.map(n => ['npcs',n.id,n.name || 'Unnamed NPC'])].filter(([kind,id]) => onPicker(kind,id)).sort((a,b) => a[2].localeCompare(b[2]));
       const groups = [plots.length ? `<div class="timeline-target-group" role="group" aria-label="Plots">${plots.map(p => chip('plots',p.id,p.title || 'Untitled plot')).join('')}</div>` : '',
         characters.length ? `<div class="timeline-target-group" role="group" aria-label="PCs and NPCs">${characters.map(([kind,id,name]) => chip(kind,id,name)).join('')}</div>` : ''].join('');
       const [kind,id] = pickTarget.split(':'), entries = pickTarget ? entriesOf(kind,id) : [];
@@ -257,10 +261,9 @@
       controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}</div>`;
     }
     const placing = isGM && selected && pickTarget && pickNote;
-    const head = selected ? `<p class="timeline-date">${e(day(selected.createdAt || selected.updatedAt))}</p><h3>${e(selected.title || 'Untitled session')}</h3>` : '';
     const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
     const map = `<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="public/assets/rokugan-map.webp" alt="Map of Rokugan">${pinHtml}</div>`;
-    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${head}${controls}${map}${eventList}</article></div>${renderNotePopup()}`;
+    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${controls}${map}${eventList}</article></div>${renderNotePopup()}`;
   }
   // The full entry behind a timeline event, in an overlay dialog.
   function renderNotePopup() {
@@ -282,13 +285,13 @@
     const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}<p class="entry-text">${npc.notes ? e(npc.notes) : '<em>No description yet.</em>'}</p></div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit NPC',npc.id)+button('npc-delete','Delete NPC',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}<p class="entry-text">${npc.notes ? e(npc.notes) : '<em>No description yet.</em>'}</p></div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit NPC',npc.id)+button('npc-delete','Delete NPC',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
     return `${sectionBar('NPCs',isGM?button('npc-new','+NPC'):'')}${fresh}<div class="campaign-entries">${list || '<p>No NPCs yet.</p>'}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
-      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`;
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${pickerToggle('pcs',pc.id)}`;
       return entry(`pcs:${pc.id}`,`${avatar(profile?.portrait,profile?.clan)}${entryTitle(label(pc),e(playerName(pc)))}`,
         `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
     }).join('');
@@ -331,7 +334,7 @@
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace"><a href="#/campaigns">← Campaigns</a><div class="workspace-head">${isGM?UI.field({label:'Campaign title',labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
-      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC'],['timeline','Timeline']].map(([value,label])=>({value,label:READ_KINDS.includes(value)&&unreadIn(active,value)?`${label} !`:label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
+      <div class="campaign-grid">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`${UI.choiceGroup({label:'Campaign sections',value:section,attrs:{class:'campaign-segments'},choices:[['timeline','Timeline'],['sessions','Sessions'],['plots','Plots'],['npcs','NPC'],['pcs','PC']].map(([value,label])=>({value,label:READ_KINDS.includes(value)&&unreadIn(active,value)?`${label} !`:label,attrs:{'data-campaign':'section','data-id':value,disabled:busy}}))})}
       ${section==='sessions'?renderSessions(sessions,isGM):''}
       ${section==='plots'?renderPlots(plots):''}
       ${section==='npcs'?renderNPCs(npcs,isGM):''}
@@ -375,6 +378,12 @@
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
+      else if (action==='timeline-visibility' && gm()) {
+        const c=store().get(`campaigns/${active}`),hidden=new Set(c?.timelineHidden||[]);
+        if(hidden.has(id))hidden.delete(id);else hidden.add(id);
+        store().queue(`campaigns/${active}`,{...c,timelineHidden:[...hidden]});
+        if(!onPicker(...id.split(':'))&&pickTarget===id){pickTarget='';pickNote='';}
+      }
       else if (action==='timeline-session') {timelineSession=id;pickTarget='';pickNote='';}
       else if (action==='timeline-target' && gm()) {pickTarget=pickTarget===id?'':id;pickNote='';}
       else if (action==='timeline-entry' && gm()) pickNote=pickNote===id?'':id;
