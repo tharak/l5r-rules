@@ -42,14 +42,14 @@
   function option({value='',label=value,selected=false,attrs={}} = {}) {
     return element('option',{value,...attrs,selected},escape(label));
   }
-  function field({label,kind='input',type='text',value,options=[],optionsHtml,attrs={},labelAttrs={}} = {}) {
+  function field({label,labelExtraHtml='',kind='input',type='text',value,options=[],optionsHtml,attrs={},labelAttrs={}} = {}) {
     const props = {...(kind==='input'?{type}:{}),...attrs,class:classes('ui-field',attrs.class)};
     let control;
     if (kind === 'select') control = element('select',props,optionsHtml ?? options.map(item=>option({...item,selected:item.selected ?? item.value===value})).join(''));
     // HTML discards one initial newline in a textarea; keep the user's own.
     else if (kind === 'textarea') control = element('textarea',props,'\n'+escape(value));
     else control = element('input',{...props,...(value!==undefined?{value}:{})});
-    return label == null ? control : element('label',{...labelAttrs,class:classes('ui-field-label',labelAttrs.class)},escape(label)+control);
+    return label == null ? control : element('label',{...labelAttrs,class:classes('ui-field-label',labelAttrs.class)},escape(label)+labelExtraHtml+control);
   }
   function checkbox({label='',attrs={},labelAttrs={}} = {}) {
     return element('label',{...labelAttrs,class:classes('ui-checkbox',labelAttrs.class)},element('input',{type:'checkbox',...attrs})+escape(label));

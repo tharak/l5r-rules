@@ -421,3 +421,9 @@
 
 /* Required choices still empty: marked on the control itself. */
 .creator-panel [aria-invalid="true"] { border-color: var(--red); box-shadow: inset 3px 0 0 var(--red); }
+
+/* Rules links: on the label line for identity fields, at the end of each ability row. */
+.creator-fields .ui-field-label:has(> .creator-source) { position: relative; }
+.creator-fields .ui-field-label > .creator-source { position: absolute; top: 0; right: 0; margin: 0; line-height: inherit; }
+.creator-ability-picker .creator-add-row > .creator-source, .creator-section-rules { flex: none; align-self: center; white-space: nowrap; }
+#creator-equipment > .creator-panel-head { justify-content: flex-start; }
