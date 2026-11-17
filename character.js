@@ -559,7 +559,7 @@
   function renderAbility(a,d) {
     // The group already names the element or kind; the row shows rank, cost and how it was gained.
     const summary = `${escapeHtml(a.name)}${a.mastery?` · ${a.kind==='spell'?'Mastery':'Rank'} ${a.mastery}`:''} · ${a.cost} XP${a.grant?' · School grant':''}${a.memorized?' · Memorized':''}`;
-    const rules = `${Object.keys(a.fields || {}).length?`<dl>${Object.entries(a.fields).map(([key,value])=>`<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('')}</dl>`:''}<p>${escapeHtml(a.description || '')}</p>${a.spellRoll?`<p>Spell Casting Roll: ${escapeHtml(a.spellRoll.notation)} · TN ${a.mastery*5+5}</p>`:''}${a.reasons?.length?`<p class="creator-error">${a.reasons.map(escapeHtml).join(' ')}</p>`:''}${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}">Local rules ↗</a>${a.kind==='spell'?UI.button({text:a.memorized?'Remove memorization':'Memorize · '+a.mastery+' XP',attrs:{'data-action':'memorize','data-id':a.selectionId}}):''}${sheet.abilities.some(e=>e.id===a.selectionId)?UI.button({text:'Remove ability',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ability','data-id':a.selectionId}}):''}`})}`;
+    const rules = `${Object.keys(a.fields || {}).length?`<dl>${Object.entries(a.fields).map(([key,value])=>`<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('')}</dl>`:''}<p>${escapeHtml(a.description || '')}</p>${a.spellRoll?`<p>Spell Casting Roll: ${escapeHtml(a.spellRoll.notation)} · TN ${a.mastery*5+5}</p>`:''}${a.reasons?.length?`<p class="creator-error">${a.reasons.map(escapeHtml).join(' ')}</p>`:''}${UI.actionRow({attrs:{'class':'creator-header-actions'},bodyHtml:`<a data-rule-reference href="${sourceLink(a.slug || 'magic',a.anchor || '')}">Local rules ↗</a>${a.kind==='spell'?UI.button({text:a.memorized?'Remove memorization':'Memorize · '+a.mastery+' XP',attrs:{'data-action':'memorize','data-id':a.selectionId}}):''}${['spell','kiho'].includes(a.kind) && sheet.abilities.some(e=>e.id===a.selectionId)?UI.checkbox({label:'School grant',attrs:{type:'checkbox','data-ability-grant':a.selectionId,checked:a.grant,'aria-label':`${a.name}: free school grant`},labelAttrs:{class:'creator-check'}}):''}${sheet.abilities.some(e=>e.id===a.selectionId)?UI.button({text:'Remove ability',variant:'quiet',size:'compact',attrs:{'data-action':'remove-ability','data-id':a.selectionId}}):''}`})}`;
     return UI.disclosure({attrs:{},titleHtml:`${summary}`,bodyHtml:`${rules}`});
   }
 
@@ -577,23 +577,36 @@
     return [...groups,...(rest.length?[{key:'other',title:'Other',items:rest}]:[])].filter(group => group.items.length);
   }
   const byMastery = (a,b) => (a.mastery || 0)-(b.mastery || 0) || a.name.localeCompare(b.name);
-  function abilityOption(a) {
-    return `${a.name}${a.mastery?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}`;
+  // What adding this ability now would cost, and why it cannot be added (rings, school, rank).
+  function abilityOffer(a,d,free) {
+    const quote = R.abilityQuote({catalogId:a.id,kind:a.kind,grant:free},sheet,d,catalog);
+    const owned = sheet.abilities.some(e=>e.catalogId===a.id) || d.abilities.some(e=>e.id===a.id);
+    return {cost:quote.cost,blocked:owned || quote.reasons.length>0,reason:owned?'Already known':quote.reasons.join(' ')};
+  }
+  function abilityOption(a,offer,free) {
+    const price = ['kata','kiho'].includes(a.kind) ? (free ? ' · Free' : ` · ${offer.cost} XP`) : '';
+    return `${a.name}${a.mastery?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}${price}`;
   }
   function renderAbilityKind([kind,title,label,rulesPage],d) {
+    const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
+    // Hide what this character can never acquire; keep a section that still lists their entries.
+    if (!R.abilityAccess(kind,sheet,d) && !owned.length) return '';
+    const free = R.freeAbilityLeft(kind,d);
     const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
+    const offers = new Map(catalogGroups.flatMap(group => group.items).map(a => [a.id,abilityOffer(a,d,free)]));
+    // Nothing addable yet (rings too low, no permission): hide the picker, or the whole section.
+    const addable = [...offers.values()].some(offer => !offer.blocked);
+    if (!addable && !owned.length) return '';
     const optionsHtml = option('',`Choose a ${label}`,true)+catalogGroups.map(group => {
-      const options = group.items.map(a => option(a.id,abilityOption(a),false)).join('');
+      const options = group.items.map(a => { const offer = offers.get(a.id); return UI.option({value:a.id,label:abilityOption(a,offer,free),attrs:{disabled:offer.blocked,...(offer.blocked?{title:offer.reason}:{})}}); }).join('');
       return group.title ? `<optgroup label="${escapeHtml(group.title)}">${options}</optgroup>` : options;
     }).join('');
-    const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
     const ownedHtml = abilityGroups(kind,owned).map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''}>${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${group.items.map(a=>renderAbility(a,d)).join('')}</div>`).join('');
-    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}"><div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${rulesLink(rulesPage,'',`${title} rules`)}</div><div class="creator-ability-picker">${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:
+    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}"><div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${rulesLink(rulesPage,'',`${title} rules`)}</div>${addable?`<div class="creator-ability-picker">${UI.actionRow({attrs:{class:'creator-add-row'},bodyHtml:
       UI.field({attrs:{'data-option-search':kind,'data-search-target':`ability-choice-${kind}`,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})+
       UI.field({kind:'select',attrs:{id:`ability-choice-${kind}`,'aria-label':title},optionsHtml})+
-      UI.field({kind:'select',attrs:{id:`ability-payment-${kind}`,'aria-label':`${title}: paid with XP or a free school choice`},options:[{value:'purchase',label:'XP'},{value:'grant',label:'Free (school)'}]})+
       UI.button({text:'Add',attrs:{'data-action':'add-ability','data-ability-kind':kind,'aria-label':`Add ${label}`}})
-    })}</div>${owned.length?`<div class="creator-ability-list">${ownedHtml}</div>`:''}</div>`;
+    })}</div>`:''}${owned.length?`<div class="creator-ability-list">${ownedHtml}</div>`:''}</div>`;
   }
   function renderAbilities(d) {
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
@@ -619,8 +632,11 @@
     } else if(action==='remove-emphasis')sheet.emphases[button.dataset.skill]?.splice(Number(button.dataset.index),1);
     else if(action==='add-ability') {
       const kind=button.dataset.abilityKind, value=read('#ability-choice-'+kind),a=catalog.abilities.find(a=>a.kind===kind && a.id===value);
+      // Free while the school still has picks of this kind (tattoos always); otherwise XP.
+      const d=a?build():null,free=a?R.freeAbilityLeft(kind,d):false,offer=a?abilityOffer(a,d,free):null;
       if(!a)uiError='Choose an ability from the catalog, or add a custom ability below.';
-      else if(!sheet.abilities.some(e=>e.catalogId===a.id))sheet.abilities.push({id:newId(),catalogId:a.id,kind:a.kind,name:a.name,grant:read('#ability-payment-'+kind)==='grant',memorized:false});
+      else if(offer.blocked)uiError=`${a.name}: ${offer.reason}`;
+      else sheet.abilities.push({id:newId(),catalogId:a.id,kind:a.kind,name:a.name,grant:free,memorized:false});
     } else if(action==='remove-ability')sheet.abilities=sheet.abilities.filter(e=>e.id!==button.dataset.id);
     else if(action==='memorize') {const a=sheet.abilities.find(e=>e.id===button.dataset.id);if(a)a.memorized=!a.memorized;else{const granted=build().abilities.find(e=>e.selectionId===button.dataset.id);if(granted?.kind==='spell')sheet.abilities.push({id:newId(),catalogId:granted.id,kind:'spell',name:granted.name,grant:true,memorized:true});}}
     else if(action==='add-custom-ability') {
@@ -993,6 +1009,7 @@
     if (flags.optionPublic) { const entry = sheet[flags.optionPublic === 'advantage' ? 'advantages' : 'disadvantages'][Number(flags.index)]; if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
     if (flags.journalPublic && flags.journalSource === 'gm') { const entry = gmEntries.find(item => item.id === flags.journalPublic); if (entry && viewerIsGM()) writeGMEntry(entry.id,{authorUid:entry.authorUid,authorName:entry.authorName,title:entry.title || '',text:entry.text,public:event.target.checked,createdAt:entry.createdAt,updatedAt:new Date().toISOString()}); return; }
     if (flags.journalPublic) { const entry = sheet.journal.find(item => item.id === flags.journalPublic); if (entry) { entry.public = event.target.checked; commitEdit(); } return; }
+    if (flags.abilityGrant) { const entry = sheet.abilities.find(item => item.id === flags.abilityGrant); if (entry) { entry.grant = event.target.checked; commitEdit(); } return; }
     if (flags.journalDraftPublic !== undefined) { if (journalDraft) journalDraft.public = event.target.checked; return; }
     if (event.target.dataset.portrait !== undefined) {
       const file = event.target.files?.[0];

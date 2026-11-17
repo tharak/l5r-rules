@@ -537,6 +537,12 @@ for slug in ['universal-spells','air-spells','earth-spells','fire-spells','water
 abilities += powers_for('katas','kata') + powers_for('kiho','kiho') + inline_for('tattoos','tattoo')
 for slug in ['minor-shadowlands-powers','major-shadowlands-powers','mutations','akutenshi-powers']:
     abilities += inline_for(slug,'shadowlands')
+# 4e Core errata, p. 202: Dance of the Winds lists "Daidoji Bushi"; it should be Daidoji Iron Warrior.
+for ability in abilities:
+    if ability['kind'] == 'kata' and ability['name'] == 'Dance of the Winds':
+        for holder in (ability, ability.get('fields', {})):
+            if holder.get('schools'):
+                holder['schools'] = holder['schools'].replace('Daidoji Bushi', 'Daidoji Iron Warrior')
 result = {'version': 2, 'clans': clans, 'skills': skills, 'advantages': advantages,
           'disadvantages': disadvantages, 'ancestors': inline_for('ancestors','ancestor'),
           'abilities': abilities, 'training': training, 'weapons': weapons, 'armors': armors}

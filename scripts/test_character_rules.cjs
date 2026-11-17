@@ -184,7 +184,27 @@ test('kata and kiho eligibility use printed mastery, school requirements, and op
  assert.equal(d.abilities[0].cost,3);assert.equal(d.abilities[0].reasons.length,0);
  const shugenja=starting('Crab','Kuni Shugenja');shugenja.abilities=[grant('kiho','Air Fist',{grant:false})];d=calc(shugenja);
  assert.equal(d.abilities[0].cost,6);assert.ok(d.abilities[0].reasons.length);
- const tattooed=starting('Dragon','The Togashi Tattooed Order');tattooed.abilities=[grant('kiho','Air Fist',{grant:false})];assert.equal(calc(tattooed).abilities[0].cost,5);
+ // 4e errata: other monks pay 1.5x Mastery rounded down (Air 3 -> 4), and use only their Ring.
+ const tattooed=starting('Dragon','The Togashi Tattooed Order');tattooed.abilities=[grant('kiho','Air Fist',{grant:false})];assert.equal(calc(tattooed).abilities[0].cost,4);
+ // Friend of the Brotherhood: shugenja pay the Brotherhood price, other limits unchanged.
+ shugenja.advantages=[{name:'Friend of the Brotherhood',cost:5}];d=calc(shugenja);
+ assert.equal(d.abilities[0].cost,3);assert.ok(!d.abilities[0].reasons.some(r=>/table permission/.test(r)));
+ assert.ok(d.abilities[0].reasons.some(r=>/exceeds your eligible Air rank 2/.test(r)),'still needs Air 3 from the Ring alone');
+ // Outside the Brotherhood, no more Kiho than Monk or Shugenja School Rank.
+ shugenja.abilities=[grant('kiho','Air Fist',{grant:false}),grant('kiho','Calling the East Wind',{grant:false})];
+ assert.ok(calc(shugenja).violations.some(v=>v.code==='kiho-limit'));
+});
+test('ability sections follow who can learn them; free picks run out',()=>{
+ const access=(sheet,kind)=>R.abilityAccess(kind,sheet,calc(sheet));
+ const bushi=starting(),shugenja=starting('Crab','Kuni Shugenja'),monk=starting('Brotherhood of Shinsei','Four Temples Monk');
+ assert.deepEqual(['spell','kata','kiho','tattoo','shadowlands'].map(kind=>access(bushi,kind)),[false,true,false,false,false]);
+ assert.deepEqual(['spell','kata','kiho','tattoo','shadowlands'].map(kind=>access(shugenja,kind)),[true,false,true,false,false]);
+ assert.equal(access(monk,'kiho'),true);assert.equal(access(monk,'kata'),false);
+ bushi.taint=1;assert.equal(access(bushi,'shadowlands'),true);
+ const d=calc(monk);assert.equal(R.freeAbilityLeft('kiho',d),d.freeLimits.kiho>0);
+ monk.abilities=Array.from({length:d.freeLimits.kiho},(_,i)=>({id:'k'+i,catalogId:catalog.abilities.filter(a=>a.kind==='kiho')[i].id,kind:'kiho',grant:true}));
+ assert.equal(R.freeAbilityLeft('kiho',calc(monk)),false);
+ assert.equal(R.freeAbilityLeft('kata',calc(bushi)),false);assert.equal(R.freeAbilityLeft('tattoo',calc(bushi)),true);
 });
 test('affinity/deficiency, Void permission, and memorization have separate rules and costs',()=>{
  const s=starting('Crab','Kuni Shugenja');assert.deepEqual(plain(R.spellElements(s,calc(s).school)),{affinities:['Earth'],deficiencies:['Air']});

@@ -174,11 +174,16 @@
       cost = mastery;
       let eligible = (d.rings[ring] || 0) + sr;
       if (!school?.brotherhood && !/Hoshi Tsurui/i.test(school?.name || '')) {
-        if (school?.discipline === 'Monk') cost = Math.ceil(mastery*1.5);
-        else if (school?.discipline === 'Shugenja') {cost=mastery*2;eligible=d.rings[ring] || 0;}
-        else if (school?.discipline === 'Ninja') {cost=mastery*2;eligible=sr;}
+        // Core p. 266 sidebar with the 4e errata: everyone outside the Brotherhood uses only the
+        // Ring for Mastery (Ninja included); other monks pay 1.5x, always rounded down.
+        eligible = d.rings[ring] || 0;
+        // Friend of the Brotherhood (Monk or Shugenja schools): Kiho cost as for a Brotherhood monk.
+        const friend = has(s,'Friend of the Brotherhood') && ['Monk','Shugenja'].includes(school?.discipline);
+        if (school?.discipline === 'Monk') cost = friend ? mastery : Math.floor(mastery*1.5);
+        else if (school?.discipline === 'Shugenja') cost = friend ? mastery : mastery*2;
+        else if (school?.discipline === 'Ninja') cost = mastery*2;
         else reasons.push('Kiho require monk training or the optional non-Brotherhood rules.');
-        if (!s.schoolDecisions.nonBrotherhoodKiho) reasons.push('Record table permission for the optional non-Brotherhood Kiho rules.');
+        if (!s.schoolDecisions.nonBrotherhoodKiho && !friend) reasons.push('Record table permission for the optional non-Brotherhood Kiho rules.');
       }
       if (/Seven Thunders/i.test(school?.name || '') && s.schoolDecisions.kihoElement===ring) eligible++;
       if (eligible < mastery) reasons.push(`Kiho Mastery ${mastery} exceeds your eligible ${ring} rank ${eligible}.`);
@@ -397,6 +402,12 @@
     const paidKiho=d.abilities.filter(a=>a.kind==='kiho'&&!a.grant).length;
     const monkRank=d.training.filter(t=>t.school.discipline==='Monk').reduce((sum,t)=>sum+t.rank,0);
     if(paidKiho>monkRank && d.school?.discipline==='Monk')issue('kiho-purchases',`Purchased bonus Kiho cannot exceed cumulative Monk School Rank ${monkRank}.`);
+    // Core p. 266: outside the Brotherhood, never more Kiho than total Monk or Shugenja School Rank.
+    if(d.school && !d.school.brotherhood && !/Hoshi Tsurui/i.test(d.school.name || '')) {
+      const kihoRank=d.training.filter(t=>['Monk','Shugenja'].includes(t.school.discipline)).reduce((sum,t)=>sum+t.rank,0);
+      const known=d.abilities.filter(a=>a.kind==='kiho').length;
+      if(known>kihoRank)issue('kiho-limit',`Outside the Brotherhood you may know at most ${kihoRank} Kiho (your Monk or Shugenja School Rank).`);
+    }
     if(d.school?.spells && counts.spell>d.freeLimits.spellTotal+d.freeLimits.extraSpells)issue('spell-grants',`School progression grants at most ${d.freeLimits.spellTotal+d.freeLimits.extraSpells} chosen spells; record additional acquired scrolls as learned spells.`);
     if(d.school?.spells) {
       if(counts.spell<d.freeLimits.spellTotal)issue('spell-grants',`Select ${d.freeLimits.spellTotal} starting spells; ${counts.spell} selected. Universal spells are granted separately.`);
@@ -492,5 +503,26 @@
     s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
     return s;
   }
-  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,optionNeedsChoice,abilityQuote,freeAbilityLimits,spellElements,award,resetSection};
+  // Whether this character can acquire abilities of a kind at all (the builder hides the rest).
+  // Spells: shugenja (or a Void Mystic, or recorded maho training). Kata: bushi (core p. 260).
+  // Kiho: monks, plus shugenja and ninja under the p. 266 sidebar. Tattoos: schools that grant
+  // them. Shadowlands powers: Taint, or recorded table permission.
+  function abilityAccess(kind,s,d) {
+    const school=d.school, discipline=school?.discipline || '';
+    if(kind==='spell')return discipline==='Shugenja' || /Void Mystic/i.test(school?.name || '') || !!s.schoolDecisions.maho;
+    if(kind==='kata')return discipline==='Bushi';
+    if(kind==='kiho')return !!school?.brotherhood || /Hoshi Tsurui/i.test(school?.name || '') || ['Monk','Shugenja','Ninja'].includes(discipline);
+    if(kind==='tattoo')return (d.freeLimits?.tattoos || 0)>0;
+    if(kind==='shadowlands')return number(s.taint)>0 || !!s.schoolDecisions.shadowlands;
+    return true;
+  }
+  // Free school picks left for a kind; a new spell or kiho is free while one remains.
+  function freeAbilityLeft(kind,d) {
+    const granted=d.abilities.filter(a=>a.kind===kind && a.grant && a.slug!=='universal-spells').length;
+    if(kind==='tattoo')return true;
+    if(kind==='spell')return granted<(d.freeLimits.spellTotal+d.freeLimits.extraSpells);
+    if(kind==='kiho')return granted<d.freeLimits.kiho;
+    return false;
+  }
+  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,optionNeedsChoice,abilityQuote,abilityAccess,freeAbilityLeft,freeAbilityLimits,spellElements,award,resetSection};
 })();
