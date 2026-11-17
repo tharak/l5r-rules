@@ -259,3 +259,14 @@ test('campaign lookup and join requests: anyone signed in reads one lookup; only
  await assertFails(updateDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger'),{inviteToken:'x'}),'only the GM approves');
  await assertSucceeds(deleteDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger')));
 });
+test('players place pins; a pin is moved or removed by whoever placed it, or the GM',async()=>{
+ const pin=u=>({sessionId:'s',kind:'npcs',targetId:'n',noteId:'x',x:10,y:10,createdAt:'now',updatedAt:'now',creatorUid:u});
+ await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/timeline/a1'),pin('alice')));
+ await assertFails(setDoc(r(db('alice'),'campaigns/c/timeline/a2'),pin('bob')),'not in someone else\'s name');
+ await assertFails(setDoc(r(db('bob'),'campaigns/c/timeline/a1'),{...pin('bob'),x:50}),'not someone else\'s pin');
+ await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/timeline/a1'),{...pin('alice'),x:50}));
+ await assertSucceeds(setDoc(r(db('gm'),'campaigns/c/timeline/a1'),{...pin('alice'),x:60}),'the GM moves any pin');
+ await assertFails(deleteDoc(r(db('bob'),'campaigns/c/timeline/a1')));
+ await assertSucceeds(deleteDoc(r(db('alice'),'campaigns/c/timeline/a1')));
+ await assertFails(setDoc(r(db('stranger'),'campaigns/c/timeline/a3'),pin('stranger')),'members only');
+});

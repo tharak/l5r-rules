@@ -274,8 +274,9 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  await d.click('note-popup',key.split('/').pop());
  assert.match(render(),/role="dialog"[\s\S]*From the Emerald Champion/);
  await d.click('note-popup-close');
+ // Players place pins too: they get the same picker.
  d.store.uid='alice';
- assert.doesNotMatch(render(),/timeline-target|timeline-unpin/);
+ assert.match(render(),/data-campaign="timeline-target" data-id="npcs:n"/);
 });
 test('timeline entries for a PC include the public entries of the character journal',()=>{
  const d=campaignCards();
@@ -585,4 +586,16 @@ test('the map shows every session\'s pins; pins from other sessions are greyed o
  assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-other" data-pin-id="p1"/);
  assert.match(html,/class="timeline-pin timeline-pin-npcs" data-pin-id="p2"/);
  assert.ok(html.indexOf('data-pin-id="p1"')<html.indexOf('data-pin-id="p2"'),'the selected session\'s pins are drawn on top');
+});
+test('the pin picker only offers plots, PCs and NPCs that have notes',()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/npcs/withNotes',{name:'Mario',notes:''});
+ d.data.set('campaigns/c/npcs/empty',{name:'Lady Doji',notes:''});
+ d.data.set('campaigns/c/plots/p',{title:'Empty plot',creatorUid:'gm',public:true,createdAt:'1',updatedAt:'1',revision:'r'});
+ d.data.set('campaigns/c/notes/a',{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'withNotes',title:'Met at the inn',text:'x',createdAt:'1',updatedAt:'1',revision:'r'});
+ const html=d.window.CampaignUI.render('campaigns/c');
+ assert.match(html,/data-campaign="timeline-target" data-id="npcs:withNotes"/);
+ assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="npcs:empty"/);assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="plots:p"/);
 });

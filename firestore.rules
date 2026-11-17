@@ -158,9 +158,14 @@ service cloud.firestore {
       }
       // Timeline events: a note about a PC, NPC or plot, pinned on the map within a session.
       // Every member reads them; only the GM writes them.
+      // Every member places pins; a pin is moved or removed by whoever placed it, or by the GM.
+      // Pins from before players could place them have no creatorUid and count as the GM's.
       match /timeline/{id} {
+        function placedBy(d) { return 'creatorUid' in d ? d.creatorUid : ''; }
         allow read: if joined(c);
-        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt'])
+        allow create, update: if joined(c)
+          && (gm(c) || (placedBy(request.resource.data) == request.auth.uid && (resource == null || placedBy(resource.data) == request.auth.uid)))
+          && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt','creatorUid'])
           && request.resource.data.kind in ['pcs','npcs','plots']
           && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80
           && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80
@@ -168,7 +173,7 @@ service cloud.firestore {
           && request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 100
           && request.resource.data.y is number && request.resource.data.y >= 0 && request.resource.data.y <= 100
           && request.resource.data.createdAt is string && request.resource.data.updatedAt is string;
-        allow delete: if gm(c);
+        allow delete: if gm(c) || (joined(c) && placedBy(resource.data) == request.auth.uid);
       }
       // Read marks: every member sees who has read what; each member writes only their own.
       match /reads/{u} {
