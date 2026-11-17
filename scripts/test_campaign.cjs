@@ -231,14 +231,14 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  assert.match(d.window.CampaignUI.render('campaigns'),/campaign-unread/);
  render();await d.click('section','sessions');
  let html=render();
- assert.match(html,/<h2>Sessions <span class="campaign-unread"/);assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/data-campaign="mark-read"/);
+ assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/data-campaign="mark-read"/);
  await d.click('mark-read','sessions:s');
  assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-01T10:00:00Z');
  html=render();
- assert.doesNotMatch(html,/<h2>Sessions <span class="campaign-unread"/);assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/aria-label="Read by Alice"/);
+ assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/aria-label="Read by Alice"/);
  // A new note on the session makes it unread again.
  d.data.set('campaigns/c/notes/n',{creatorUid:'gm',targetKind:'sessions',targetId:'s',text:'More',createdAt:'2026-11-02',updatedAt:'2026-11-02T10:00:00Z'});
- assert.match(render(),/<h2>Sessions <span class="campaign-unread"/);assert.match(render(),/data-campaign="mark-read"/);
+ assert.match(render(),/Session one<\/span>[^]*?<span class="campaign-unread"/);assert.match(render(),/data-campaign="mark-read"/);
 });
 
 test('timeline: newest sessions first, an always-visible map, entries chosen with selectors, used entries disabled, and a popup',async()=>{
@@ -248,7 +248,7 @@ test('timeline: newest sessions first, an always-visible map, entries chosen wit
  render();await d.click('section','timeline');
  let html=render();
  assert.match(html,/timeline-map/);assert.doesNotMatch(html,/entry-help/,'no helper text');
- assert.match(html,/<h2>Timeline<\/h2>/,'the map row has its heading like the other rows');
+ assert.match(html,/<h2 class="visually-hidden">Timeline<\/h2>/,'the map row has no visible title');
  d.data.set('campaigns/c/sessions/s1',{title:'First session',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-20'});
  d.data.set('campaigns/c/sessions/s2',{title:'Second session',text:'',createdAt:'2026-11-08',updatedAt:'2026-11-08'});
  d.data.set('campaigns/c/npcs/n',{name:'Court messenger',notes:''});
@@ -290,14 +290,15 @@ test('timeline entries for a PC include the public entries of the character jour
  assert.match(render(),/data-campaign="timeline-entry" data-id="journal:j1"[^>]*>Reached the capital/);
 });
 
-test('one campaign view: a row per kind with its heading and add button, no section selector, no helper text',()=>{
+test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  const html=d.window.CampaignUI.render('campaigns/c');
  assert.doesNotMatch(html,/campaign-segments|data-campaign="section"/);
  const rows=[...html.matchAll(/data-campaign-row="([^"]+)"/g)].map(m=>m[1]);
  assert.equal(rows.join(),'sessions,plots,npcs,pcs,timeline','rows first, the map last');
- for(const [title,action] of [['Sessions','session-new'],['Plots','plot-new'],['NPCs','npc-new'],['PCs','pc-picker']])assert.match(html,new RegExp(`<div class="home-row-head"><h2>${title}</h2><button[^>]*data-campaign="${action}"`),title);
+ for(const [title,action] of [['Sessions','session-new'],['Plots','plot-new'],['NPCs','npc-new'],['PCs','pc-picker']])assert.match(html,new RegExp(`<h2 class="visually-hidden">${title}</h2><div class="campaign-entries"><div class="campaign-add-tile"><button[^>]*data-campaign="${action}"`),title);
+ assert.doesNotMatch(html,/home-row-head|invite-settings/);
  assert.doesNotMatch(html,/entry-help|Add clues and plans/);
 });
 test('journals: anyone adds to sessions, the GM to NPCs, the GM or creator to plots, nobody to PCs from the campaign',async()=>{
@@ -346,7 +347,7 @@ test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on 
  d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'a-pc'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  let html=render();
- assert.ok(html.indexOf('<h2>Sessions')<html.indexOf('<h2>Timeline'),'the map comes after the rows');
+ assert.ok(html.indexOf('>Sessions</h2>')<html.indexOf('>Timeline</h2>'),'the map comes after the rows');
  assert.match(html,/data-timeline-map="s"/,'Timeline open by default');
  assert.doesNotMatch(html.slice(html.indexOf('timeline-detail')),/<h3>New session 1<\/h3>/,'no session heading above the map');
  assert.match(html,/data-id="npcs:n"/);
@@ -423,4 +424,19 @@ test('start page row: campaign cards, + Campaign, or Sign in',()=>{
  assert.equal(home.signedIn,true);assert.match(home.html,/href="#\/campaigns\/emerald-dawn-camp"/);assert.match(home.create,/data-campaign="create"/);
  d.store.uid='';
  assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
+});
+test('Invite opens a popup with the link, Copy link, Replace link and Revoke',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ let copied='';d.window.navigator=undefined;
+ Object.assign(d.store.backend,{get:async()=>null,invitation:async()=>({}),invite:async()=>'tok123',revoke:async()=>{}});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();await d.click('share-invite');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ let html=render();
+ assert.match(html,/class="timeline-popup campaign-invite-popup" role="dialog"/);
+ assert.match(html,/value="http:\/\/localhost\/#\/invite\/tok123"[^>]*readonly|readonly[^>]*value="http:\/\/localhost\/#\/invite\/tok123"/);
+ assert.match(html,/data-campaign="invite-copy"[^>]*>Copy link</);
+ assert.match(html,/data-campaign="invite"[^>]*>Replace link</);assert.match(html,/data-campaign="revoke"[^>]*>Revoke</);
+ await d.click('invite-close');
+ assert.doesNotMatch(render(),/campaign-invite-popup/);
 });

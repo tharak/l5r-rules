@@ -5,10 +5,12 @@
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
   let timelineSession='', pickTarget='', pickNote='', notePopup='', focusPopup=false;
+  // The GM's invite popup: the current invite link while it is open.
+  let inviteLink='', inviteCopied=false;
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -122,7 +124,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
-    timelineSession='';pickTarget='';pickNote='';notePopup='';
+    timelineSession='';pickTarget='';pickNote='';notePopup='';inviteLink='';inviteCopied=false;
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -251,7 +253,7 @@
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
         : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
-    return `${sectionBar('Plots',button('plot-new','+ Plot'),'plots')}${fresh}<div class="campaign-entries">${list || ''}</div>`;
+    return `${sectionBar('Plots')}${fresh}<div class="campaign-entries">${addTile(button('plot-new','+ Plot'))}${list || ''}</div>`;
   }
   // The GM can keep PCs and NPCs off the timeline picker (their existing pins stay).
   const hiddenOnPicker = () => new Set(store().get(`campaigns/${active}`)?.timelineHidden || []);
@@ -278,7 +280,11 @@
   },true);
   // Escape, or a click on the dimmed page around the panel, closes the open entry.
   const closeEntry = details => { if (details?.open) details.open = false; };
-  document.addEventListener('keydown',event => { if (event.key === 'Escape') closeEntry(document.querySelector('.campaign-entry[open]')); });
+  document.addEventListener('keydown',event => {
+    if (event.key !== 'Escape') return;
+    if (inviteLink) { inviteLink = ''; inviteCopied = false; changed(); return; }
+    closeEntry(document.querySelector('.campaign-entry[open]'));
+  });
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
   const day = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : ''; };
   // Each entry is a tile; opened, its body is a panel over the page with its own title and close.
@@ -341,6 +347,13 @@
     return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
   }
   // The full entry behind a timeline event, in an overlay dialog.
+  // Invite settings in a popup: the link, Copy link, Replace link and Revoke.
+  function renderInvitePopup() {
+    if (!inviteLink || !gm()) return '';
+    return `<div class="timeline-popup-backdrop" data-campaign="invite-close"></div><div class="timeline-popup campaign-invite-popup" role="dialog" aria-modal="true" aria-labelledby="invite-popup-title" tabindex="-1"><header><div><h3 id="invite-popup-title">Invite</h3></div>${button('invite-close','✕')}</header>
+      <div class="campaign-invite-link">${UI.field({attrs:{type:'text',readonly:true,value:inviteLink,'aria-label':'Invite link','data-invite-link':true}})}${UI.button({text:inviteCopied?'Copied':'Copy link',attrs:{'data-campaign':'invite-copy','data-id':'',disabled:busy}})}</div>
+      <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
+  }
   function renderNotePopup() {
     if (!notePopup) return '';
     const item = store().get(path('timeline',notePopup)), target = item && pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
@@ -349,21 +362,22 @@
     return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('section',`Open ${sectionName}`,item.kind)+button('note-popup-close','Close')})}</div>`;
   }
   // Section titles are visually hidden; the tabs already name the section. Actions sit on top.
-  // Each kind is a row like the start page: its title and add button, then a grid of tiles.
-  // Sessions and plots carry the unread "!" on their heading when something changed since you read it.
-  const sectionBar = (title,actionsHtml,kind = '') => `<div class="home-row-head"><h2>${e(title)}${READ_KINDS.includes(kind) && unreadIn(active,kind) ? ` ${unreadMark}` : ''}</h2>${actionsHtml || ''}</div>`;
+  // Each kind is a grid of tiles with no visible title: its add button is the first tile.
+  // The title stays for screen readers; unread entries keep their own "!".
+  const sectionBar = title => `<h2 class="visually-hidden">${e(title)}</h2>`;
+  const addTile = actionsHtml => actionsHtml ? `<div class="campaign-add-tile">${actionsHtml}</div>` : '';
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
         : `${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit',session.id)+button('session-delete','Delete',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
-    return `${sectionBar('Sessions',isGM?button('session-new','+ Session'):'','sessions')}<div class="campaign-entries">${list}</div>`;
+    return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','+ Session'):'')}${list}</div>`;
   }
   function renderNPCs(npcs,isGM) {
     const fresh = npcDraft && !npcId ? `<div class="campaign-entry-new">${npcEditor(npcDraft)}</div>` : '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,`${avatar(npc.portrait)}${entryTitle(npc.name || 'Unnamed NPC')}`,
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`)).join('');
-    return `${sectionBar('NPCs',isGM?button('npc-new','+ NPC'):'')}${fresh}<div class="campaign-entries">${list}</div>`;
+    return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
@@ -373,8 +387,7 @@
         `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`);
     }).join('');
     const picker = picking ? `<div class="pc-picker"><h3>Add:</h3>${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>` : '';
-    const invite = invitation ? UI.disclosure({attrs:{'class':'invite-settings'},titleHtml:`Invite settings`,bodyHtml:`<p>Invite links expire after seven days.</p>${button('invite','Replace invite link')}${button('revoke','Revoke invite')}`}) : '';
-    return `${sectionBar('PCs',`${button('pc-picker','+ PC')}${isGM?button('share-invite','Invite'):''}`)}<div class="campaign-entries">${list}</div>${picker}${invite}`;
+    return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(`${button('pc-picker','+ PC')}${isGM?button('share-invite','Invite'):''}`)}${list}</div>${picker}`;
   }
   function render(slug) {
     renderAgain ||= () => {};
@@ -439,8 +452,8 @@
       <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
       <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
-      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<div class="home-row-head"><h2>Timeline</h2></div>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
+      </div>${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -608,15 +621,14 @@
         }
         token ||= await backend.invite(campaign);
         if(active!==campaign || store().backend!==backend || !gm())return;
-        const url=inviteURL(token);
-        try {
-          await navigator.clipboard.writeText(url);
-          error='Invite link copied.';
-        } catch {
-          window.prompt('Copy this invite link:',url);
-        }
+        inviteLink=inviteURL(token);inviteCopied=false;focusPopup=true;
       }
-      else if (action==='revoke') await backend.revoke(active);
+      else if (action==='invite-copy') {
+        try { await navigator.clipboard.writeText(inviteLink); inviteCopied=true; }
+        catch { window.prompt('Copy this invite link:',inviteLink); }
+      }
+      else if (action==='invite-close') {inviteLink='';inviteCopied=false;}
+      else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;
         await backend.removeMember(active,action==='leave'?store().uid:id);
