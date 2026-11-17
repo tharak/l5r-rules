@@ -244,5 +244,14 @@
     return `<div class="creator-journal">${head}${editor}${list || (draft || !emptyText ? '' : `<div class="creator-empty">${escape(emptyText)}</div>`)}</div>`;
   }
   const field_ = (...args) => field(...args);
-  window.UI = {escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  // One character tile everywhere (start page PCs, campaign PCs and NPCs): a round avatar
+  // (picture, else clan mon, else initial), the name, and a small line under it.
+  function characterAvatar({portrait,clan,name} = {}) {
+    if (isPortrait(portrait)) return `<img class="character-avatar" src="${portrait}" alt="">`;
+    const mon = window.CharacterCatalog?.clanMon(clan || '');
+    if (mon) return `<img class="character-avatar character-avatar-mon" src="${escape(mon)}" alt="">`;
+    return `<span class="character-avatar" aria-hidden="true">${escape(String(name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
+  }
+  const characterTileBody = ({portrait,clan,name,meta}) => `${characterAvatar({portrait,clan,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
+  window.UI = {characterAvatar,characterTileBody,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

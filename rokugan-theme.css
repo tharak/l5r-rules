@@ -337,3 +337,13 @@
   .home-row[aria-labelledby="home-characters"] .home-tile, .home-row[aria-labelledby="home-books"] .home-tile { width: auto; max-width: 100%; padding-right: 18px; }
   .home-row[aria-labelledby="home-characters"] .home-tile strong, .home-row[aria-labelledby="home-characters"] .home-tile small { white-space: nowrap; }
 }
+/* One character tile (start page and campaign PCs/NPCs): round avatar, name, small line. */
+@media screen {
+  .character-tile-text { display: grid; min-width: 0; }
+  .character-tile-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .character-tile-text small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  :is([data-campaign-row="npcs"],[data-campaign-row="pcs"]) .campaign-entry { background: #fffdf8; border-radius: 4px; }
+  :is([data-campaign-row="npcs"],[data-campaign-row="pcs"]) .campaign-entry > summary { gap: 10px; padding: 10px 18px 10px 12px; min-height: 0; flex-wrap: nowrap; align-items: center; }
+  :is(.home-tile, [data-campaign-row="npcs"] .campaign-entry, [data-campaign-row="pcs"] .campaign-entry) .character-avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; object-fit: cover; font-size: 20px; }
+  .campaign-entry-panel-head .character-tile-text strong { font: 22px var(--serif); }
+}
