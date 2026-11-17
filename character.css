@@ -490,3 +490,22 @@
 button.creator-roll-ability { cursor: pointer; font: inherit; font-size: 13px; }
 .creator-roll-ability:hover { border-color: currentColor; }
 .creator-ring > .creator-ring-abilities { margin-top: 0; padding: 8px 10px 10px; }
+
+/* Greyed-out ability buttons fold behind a quiet "N unavailable" / "Show all (N)" toggle. */
+.creator-ability-more { margin: 2px 0 6px; }
+.creator-ability-more > summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 0; }
+.creator-ability-more[open] > summary { margin-bottom: 4px; }
+/* The fold toggles are quiet text, not boxed panels; a level with nothing to buy is one line. */
+.creator-ability-list details.creator-ability-more, details.creator-ability-more { border: 0; padding: 0; margin: 0 0 4px; background: transparent; box-shadow: none; }
+details.creator-ability-more > summary { list-style: none; display: inline-flex; gap: 4px; align-items: baseline; }
+details.creator-ability-more > summary::-webkit-details-marker { display: none; }
+details.creator-ability-more > summary::before { content: '▸'; font-size: 10px; }
+details.creator-ability-more[open] > summary::before { content: '▾'; }
+details.creator-ability-more > summary .creator-ability-locked { margin: 0; }
+.creator-ability-level-folded { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
+.creator-ability-level-folded > h5 { margin: 4px 0 2px; }
+.creator-ability-level-folded > details[open] { flex-basis: 100%; }
+details.creator-ability-more > summary { padding: 0; min-height: 0; }
+.creator-ability-level { margin-top: 2px; }
+.creator-ability-level-folded { margin: 0; padding: 1px 0; }
+.creator-ability-level-folded > h5, .creator-ability-level-folded > details.creator-ability-more { margin-top: 0; margin-bottom: 0; }

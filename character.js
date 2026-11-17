@@ -693,7 +693,9 @@
       }).sort((x,y) => rank(x)-rank(y));
       const addable = entries.some(entry => !entry.bought && !entry.offer.blocked);
       // The first entry not already known explains a list with nothing to buy (lowest mastery first).
-      const reasons = closed || addable ? [] : (entries.find(entry => !entry.bought)?.offer.reasons || []);
+      // Prefer a regular entry's reason over a maho one (maho needs its own permission).
+      const explaining = entries.find(entry => !entry.bought && entry.a.slug !== 'maho') || entries.find(entry => !entry.bought);
+      const reasons = closed || addable ? [] : (explaining?.offer.reasons || []);
       return {...unit,group,entries,addable,reasons};
     }));
     const closedUnits = units.filter(unit => !unit.addable && unit.reasons.length);
@@ -705,12 +707,20 @@
         disabled:granted || (!bought && offer.blocked),
         title:granted ? 'School grant' : bought ? 'Bought · click to remove' : offer.blocked ? offer.reason : snippet(a.description)}});
     const renderUnit = unit => {
-      const body = `${locked(unit.reasons.filter(reason => !shared.includes(reason)).join(' '))}<div class="creator-ability-options">${unit.entries.map(buttonFor).join('')}</div>`;
-      return unit.level == null ? body : `<div class="creator-ability-level" data-ability-level="${unit.level}"><h5>${unit.title}</h5>${body}</div>`;
+      // Bought and available buttons stay in view; greyed-out ones fold behind "N unavailable".
+      // A closed type is folded as a whole below, so its rows show every button.
+      const shown = closed ? unit.entries : unit.entries.filter(entry => entry.bought || !entry.offer.blocked);
+      const greyed = closed ? [] : unit.entries.filter(entry => !entry.bought && entry.offer.blocked);
+      // With nothing to buy, the reason rides in the toggle so the whole row is one line.
+      const reason = unit.reasons.filter(reason => !shared.includes(reason)).join(' ');
+      const folded = !shown.length && greyed.length;
+      const more = greyed.length ? UI.disclosure({attrs:{class:'creator-ability-more',id:`ability-more-${kind}-${unit.key}`},titleHtml:`${greyed.length} unavailable${folded && reason?` · <span class="creator-ability-locked">${escapeHtml(reason)}</span>`:''}`,bodyHtml:`<div class="creator-ability-options">${greyed.map(buttonFor).join('')}</div>`}) : '';
+      const body = `${folded?'':locked(reason)}${shown.length?`<div class="creator-ability-options">${shown.map(buttonFor).join('')}</div>`:''}${more}`;
+      return unit.level == null ? body : `<div class="creator-ability-level${folded?' creator-ability-level-folded':''}" data-ability-level="${unit.level}"><h5>${unit.title}</h5>${body}</div>`;
     };
     const blocks = catalogGroups.map(group => `<div class="creator-ability-group"${group.ring?` data-ring="${group.ring}"`:''} data-ability-group="${escapeHtml(group.key)}">${group.title?`<h4>${escapeHtml(group.title)}</h4>`:''}${units.filter(unit => unit.group === group).map(renderUnit).join('')}</div>`).join('');
     const heading = `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${shared.length?`<span class="creator-ability-locked">${escapeHtml(shared.join(' '))}</span>`:''}${rulesLink(rulesPage,'',`${title} rules`)}</div>${abilityPermission(kind,d)}`;
-    return `<div class="creator-purchases creator-ability-kind${closed?' creator-ability-closed':''}" data-ability-kind="${kind}">${heading}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}</div></div>`;
+    return `<div class="creator-purchases creator-ability-kind${closed?' creator-ability-closed':''}" data-ability-kind="${kind}">${heading}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}${closed ? UI.disclosure({attrs:{class:'creator-ability-more',id:`ability-more-${kind}`},titleHtml:`Show all (${units.reduce((sum,unit) => sum+unit.entries.length,0)})`,bodyHtml:`<div class="creator-ability-list">${blocks}</div>`}) : `<div class="creator-ability-list">${blocks}</div>`}</div>`;
   }
   function renderAbilities(d) {
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});

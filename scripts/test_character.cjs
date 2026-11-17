@@ -1153,7 +1153,12 @@ test('abilities are button lists: bought, then available, then unavailable; clic
   sell(c,'spell',id('spell','Blessed Wind'));assert.equal((await c.data()).character.abilities.length,0);
   // No Details list under the buttons.
   buy(c,'spell',id('spell','Blessed Wind'));
-  assert.doesNotMatch(section(c,'spell'),/ability-details|<details/);
+  assert.doesNotMatch(section(c,'spell'),/ability-details/);
+  // Greyed-out buttons fold behind "N unavailable"; a closed type folds behind "Show all (N)".
+  assert.match(section(c,'spell'),/<details[^>]*class="ui-disclosure creator-ability-more"[^>]*id="ability-more-spell-Air-3"[^>]*><summary>\d+ unavailable · <span class="creator-ability-locked">Air Mastery 3 exceeds/,'a level with nothing to buy folds into one line with its reason');
+  const inView=section(c,'spell').split('id="ability-more-spell-Air-1"')[0].split('data-ability-group="Air"')[1];
+  assert.ok(buttons(inView).every(b=>b.bought || !b.disabled),'only bought and available buttons stay in view');
+  assert.match(section(c,'kata'),/id="ability-more-kata"[^>]*><summary>Show all \(\d+\)<\/summary>/);
   // Kata are closed for a shugenja: all disabled under "Bushi only.".
   html=section(c,'kata');
   assert.match(html,/<h3>Kata<\/h3><span class="creator-ability-locked">Bushi only\.<\/span>/);
