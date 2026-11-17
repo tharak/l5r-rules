@@ -413,3 +413,18 @@ test('session, plot and NPC descriptions become their first journal entry; entri
  assert.match(html,/<h4 class="creator-journal-title">Arrival<\/h4>/);
  assert.match(html,/<h4 class="creator-journal-title">We met at the inn.<\/h4>/,'untitled entries use their first line');
 });
+test('start page rows: campaign cards (or Sign in) and every campaign NPC with its own link',()=>{
+ const d=campaignCards();
+ const routes={window:{}};vm.runInNewContext(fs.readFileSync('routes.js','utf8'),routes);d.window.Routes=routes.window.Routes;
+ d.data.set('campaigns/camp1234',{title:'Emerald Dawn',gmUid:'gm'});
+ d.data.set('campaigns/camp1234/npcs/npc98765',{name:'Mario',notes:'',updatedAt:'2026-11-02'});
+ d.data.set('campaigns/other999',{title:'Winter Court',gmUid:'gm'});
+ d.data.set('campaigns/other999/npcs/npc55555',{name:'Lady Doji',notes:'',updatedAt:'2026-11-05'});
+ const home=d.window.CampaignUI.homeCampaigns();
+ assert.equal(home.signedIn,true);assert.match(home.html,/href="#\/campaigns\/emerald-dawn-camp"/);assert.match(home.create,/data-campaign="create"/);
+ const npcs=d.window.CampaignUI.homeNPCs();
+ assert.deepEqual(npcs.map(n=>`${n.name}|${n.campaign}|${n.href}`).sort(),['Lady Doji|Winter Court|#/campaigns/winter-court-othe/npcs/lady-doji-npc5','Mario|Emerald Dawn|#/campaigns/emerald-dawn-camp/npcs/mario-npc9']);
+ d.store.uid='';
+ assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
+ assert.equal(d.window.CampaignUI.homeNPCs().length,0);
+});

@@ -271,3 +271,31 @@
 .public-pc-stats span { font-size: 11px; color: var(--muted); }
 .public-pc-stats strong { font: 20px var(--serif); }
 .creator-public-link { align-self: center; text-decoration: underline; }
+
+/* Top strip: no header bar any more, just "← Start" on the left and Search / Account on the right. */
+@media screen {
+  .topbar.topbar-slim { background: transparent; color: var(--ink); border-bottom: 0; min-height: 0; padding: 10px clamp(16px,4vw,60px) 0; justify-content: space-between; flex-wrap: nowrap; }
+  .topbar-slim .site-brand { font: 600 13px var(--sans); color: var(--muted); }
+  .topbar-slim .site-brand:hover { color: var(--red); }
+  .topbar-slim .site-brand[hidden] { display: block; visibility: hidden; }
+  .topbar-slim .account-menu summary { color: var(--ink); border-color: var(--line); padding: 6px 10px; }
+  .topbar-slim .account-menu summary:hover { background: var(--wash, #00000008); border-color: var(--red); }
+
+  /* Start page: one horizontal row each for campaigns, characters and books. */
+  .home { display: grid; gap: 28px; padding-top: 12px; }
+  .home-row-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .home-row-head h2 { margin: 0; font: 24px var(--serif); }
+  .home-row-head h2 a:hover { color: var(--red); }
+  .home-row-items { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 10px; scroll-snap-type: x proximity; }
+  .home-row-items > * { flex: 0 0 auto; scroll-snap-align: start; margin: 0; }
+  .home-row-items > .campaign-card { width: 260px; }
+  .home-tile { display: flex; align-items: center; gap: 10px; width: 230px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: #fffdf8; color: var(--ink); }
+  .home-tile:hover { border-color: var(--red); }
+  .home-tile .character-avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; object-fit: cover; background: var(--line); }
+  .home-tile span { display: grid; min-width: 0; }
+  .home-tile strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-tile small { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-book { width: 180px; }
+  .home-book .book-mark { width: 40px; height: 40px; flex: none; margin: 0; }
+}
+@media screen { .topbar-slim #search-button { color: var(--ink); border-color: var(--line); background: #fffdf8cc; } .topbar-slim .account-menu summary { background: #fffdf8cc; } }

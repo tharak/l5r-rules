@@ -694,5 +694,20 @@
     if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
   });
   window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
-  window.CampaignUI={render,refresh,mountEditor,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
+  // Start page rows: the campaign cards (or Sign in), and every campaign's NPCs with links.
+  function homeCampaigns() {
+    if (!store().uid) return {signedIn:false,html:button('sign-in','Sign in with Google')};
+    const campaigns = store().list('campaigns/');
+    watchCardSheets(campaigns);
+    return {signedIn:true,html:campaigns.map(campaignCard).join(''),create:button('create','+ Campaign')};
+  }
+  function homeNPCs() {
+    if (!store().uid) return [];
+    return store().list('campaigns/').flatMap(campaign => {
+      const npcs = store().list(`campaigns/${campaign.id}/npcs/`), ids = npcs.map(npc => npc.id);
+      return npcs.map(npc => ({id:npc.id,name:npc.name || 'Unnamed NPC',portrait:UI.isPortrait(npc.portrait)?npc.portrait:'',updatedAt:npc.updatedAt || '',campaign:campaign.title || 'Campaign',
+        href:`#/campaigns/${encodeURIComponent(campaignSegment(campaign.id))}/npcs/${encodeURIComponent(window.Routes ? window.Routes.segment(npc.name || 'npc',npc.id,ids) : npc.id)}`}));
+    });
+  }
+  window.CampaignUI={render,refresh,mountEditor,homeCampaigns,homeNPCs,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
 })();
