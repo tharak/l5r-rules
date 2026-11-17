@@ -509,3 +509,5 @@ details.creator-ability-more > summary { padding: 0; min-height: 0; }
 .creator-ability-level { margin-top: 2px; }
 .creator-ability-level-folded { margin: 0; padding: 1px 0; }
 .creator-ability-level-folded > h5, .creator-ability-level-folded > details.creator-ability-more { margin-top: 0; margin-bottom: 0; }
+/* The "Table permits ..." switch sits on the subsection heading line. */
+.creator-option-heading > .creator-ability-permission { margin: 0; }
