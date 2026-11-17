@@ -1187,3 +1187,20 @@ test('bought abilities appear in Rolls: spells roll from their ring card, kata a
   bushi.click({action:'buy-ability',abilityKind:'kata',id:id('kata','Striking as Earth')});
   assert.match(sectionHtml(bushi,'rolls').split('ring-watermark" data-ring="Earth"')[1].split('creator-ring ring-watermark')[0],/<a class="creator-roll-ability" data-rule-reference href="#\/katas#[^"]*"[^>]*><span>Striking as Earth<\/span><small>Kata<\/small>/);
 });
+
+test('rings are ordered by value in Rolls and ability blocks; section 02 keeps its layout',async()=>{
+  const c=await character();c.school('Crane','Asahina Shugenja');
+  // Raise Water (Strength and Perception) to 3 and Fire (Agility and Intelligence) to 3, Fire more.
+  for(const trait of ['Strength','Perception','Agility','Intelligence','Agility','Intelligence'])c.click({action:'trait',trait,delta:'1'});
+  const rings=(await c.data()).derived.rings;
+  assert.ok(rings.Fire>rings.Water && rings.Water>rings.Earth,JSON.stringify(rings));
+  const cards=html=>[...html.matchAll(/class="creator-ring ring-watermark" data-ring="([^"]+)"/g)].map(m=>m[1]);
+  const order=cards(sectionHtml(c,'rolls'));
+  assert.deepEqual(order.slice(0,2),['Fire','Water']);
+  for(let i=1;i<order.length;i++)assert.ok(rings[order[i-1]]>=rings[order[i]],order.join());
+  const traitCards=[...sectionHtml(c,'traits').matchAll(/class="creator-ring[^"]*" data-ring="([^"]+)"/g)].map(m=>m[1]);
+  assert.equal(traitCards.join(),c.window.CharacterCatalog.TRAIT_GROUPS.map(group=>group.ring).join(),'02 keeps its fixed order');
+  const spellBlocks=[...sectionHtml(c,'abilities').split('data-ability-kind="spell"><div class="creator-option-heading">')[1].split('creator-purchases creator-ability-kind')[0].matchAll(/data-ability-group="([^"]+)"><h4>/g)].map(m=>m[1]);
+  assert.equal(spellBlocks[0],'All','Universal first');
+  assert.deepEqual(spellBlocks.slice(1,3),['Fire','Water']);
+});

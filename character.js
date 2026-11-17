@@ -157,6 +157,8 @@
     save(); render();
   }
   const option = (value, label, selected) => UI.option({value,label,selected});
+  // Rings by value, highest first; equal Rings keep the given order.
+  const byRingValue = (order,rings) => order.map((ring,index) => [ring,index]).sort((a,b) => (rings?.[b[0]] || 0)-(rings?.[a[0]] || 0) || a[1]-b[1]).map(([ring]) => ring);
 
   function renderIdentity(data) {
     const clan = selectedClan();
@@ -178,7 +180,9 @@
   }
 
   function renderTraits(data,rolling = false) {
-    const groups = rolling ? ['Void','Earth','Water','Air','Fire'].map(ring=>TRAIT_GROUPS.find(group=>group.ring===ring)) : TRAIT_GROUPS;
+    // Rolls show the highest Rings first (ties keep this order); section 02 keeps its fixed layout
+    // so cards do not move while ranks are being raised.
+    const groups = rolling ? byRingValue(['Void','Earth','Water','Air','Fire'],data.rings).map(ring=>TRAIT_GROUPS.find(group=>group.ring===ring)) : TRAIT_GROUPS;
     const skills = rolling ? (skillFilters.rolls.zero ? data.skills : R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills) : {};
     const skillNames = Object.keys(skills).filter(name=>isSkillVisible(name,skills,skillFilters.rolls)).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
@@ -628,10 +632,12 @@
   // their source list; tattoos are one list.
   const ELEMENT_GROUPS = [['All','Universal'],['Air','Air'],['Earth','Earth'],['Fire','Fire'],['Water','Water'],['Void','Void']];
   const SHADOWLANDS_GROUPS = [['mutations','Mutations'],['minor-shadowlands-powers','Minor powers'],['major-shadowlands-powers','Major powers'],['akutenshi-powers','Akutenshi powers']];
-  function abilityGroups(kind,items) {
+  function abilityGroups(kind,items,rings) {
     if (kind === 'tattoo') return [{key:'tattoos',title:'',items}];
+    // Element blocks follow the character's Rings, highest first (Universal spells stay first).
+    const elements = rings ? [ELEMENT_GROUPS[0],...byRingValue(ELEMENT_GROUPS.slice(1).map(([key]) => key),rings).map(key => ELEMENT_GROUPS.find(([ring]) => ring === key))] : ELEMENT_GROUPS;
     const groups = kind === 'shadowlands' ? SHADOWLANDS_GROUPS.map(([key,title]) => ({key,title,items:items.filter(a=>a.slug===key)}))
-      : ELEMENT_GROUPS.map(([key,title]) => ({key,title,ring:key==='All'?'':key,items:items.filter(a=>a.ring===key)}));
+      : elements.map(([key,title]) => ({key,title,ring:key==='All'?'':key,items:items.filter(a=>a.ring===key)}));
     // Anything that fits no group still shows, after the known ones.
     const rest = items.filter(a => !groups.some(group => group.items.includes(a)));
     return [...groups,...(rest.length?[{key:'other',title:'Other',items:rest}]:[])].filter(group => group.items.length);
@@ -672,7 +678,7 @@
     const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
     const closed = !d.school ? 'Choose a school first.' : !R.abilityAccess(kind,sheet,d) ? ACCESS_REASONS[kind] : '';
     const free = R.freeAbilityLeft(kind,d);
-    const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
+    const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery),d.rings);
     const levels = items => [...new Set(items.map(a => a.mastery || 0))].sort((x,y) => x-y);
     const unitsOf = group => kind === 'spell'
       ? levels(group.items).map(level => ({key:`${group.key}-${level}`,title:`Mastery ${level}`,items:group.items.filter(a => (a.mastery || 0) === level),level}))
