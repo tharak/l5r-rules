@@ -236,3 +236,37 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  d.data.set('campaigns/c/notes/n',{creatorUid:'gm',targetKind:'sessions',targetId:'s',text:'More',createdAt:'2026-11-02',updatedAt:'2026-11-02T10:00:00Z'});
  assert.match(render(),/Sessions !/);assert.match(render(),/Not read yet/);
 });
+
+test('timeline: the GM adds ordered events and pins PCs, NPCs and plots on the map; players only view',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'a-pc'});
+ d.data.set('campaigns/c/npcs/n',{name:'Court messenger',notes:''});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();await d.click('section','timeline');
+ assert.match(render(),/No events yet/);
+ await d.click('timeline-new');
+ for(const [field,value] of [['date','Spring 1123'],['title','Arrival'],['text','We arrived.']])d.documentListeners.input({target:{dataset:{timelineField:field},value}});
+ await d.click('timeline-save');
+ const id=[...d.data.keys()].find(k=>k.startsWith('campaigns/c/timeline/')).split('/').pop();
+ const event=()=>d.data.get(`campaigns/c/timeline/${id}`);
+ assert.equal(event().title,'Arrival');assert.equal(event().order,1);
+ assert.match(render(),/data-timeline-map/);assert.match(render(),/Court messenger/);
+ // Choose the NPC, then click the middle of the map.
+ await d.documentListeners.change({target:{dataset:{timelinePick:''},value:'npcs:n'}});
+ const map={dataset:{timelineMap:id},getBoundingClientRect:()=>({left:0,top:0,width:200,height:400})};
+ d.documentListeners.click({target:{closest:selector=>selector==='[data-campaign]'?null:selector==='[data-timeline-map]'?map:null},clientX:100,clientY:100});
+ assert.equal(JSON.stringify(event().pins),JSON.stringify([{kind:'npcs',id:'n',x:50,y:25}]));
+ assert.match(render(),/timeline-pin" style="left:50%;top:25%"[\s\S]*Court messenger/);
+ await d.click('timeline-new');
+ d.documentListeners.input({target:{dataset:{timelineField:'title'},value:'Second'}});
+ await d.click('timeline-save');
+ const second=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).map(k=>k.split('/').pop()).find(k=>k!==id);
+ await d.click('timeline-up',second);
+ assert.ok(d.data.get(`campaigns/c/timeline/${second}`).order<event().order,'moved up');
+ await d.click('timeline-open',id);await d.click('timeline-unpin','npcs:n');
+ assert.equal(JSON.stringify(event().pins),'[]');
+ d.store.uid='alice';
+ const html=render();
+ assert.doesNotMatch(html,/timeline-new|timeline-edit|data-timeline-pick|timeline-unpin/);
+});

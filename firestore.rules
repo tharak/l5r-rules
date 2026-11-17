@@ -129,6 +129,17 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
+      // Timeline events: every member reads them; the GM writes them, with map pins.
+      match /timeline/{id} {
+        allow read: if joined(c);
+        allow create, update: if gm(c) && request.resource.data.keys().hasOnly(['date','title','text','order','pins','createdAt','updatedAt'])
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
+          && request.resource.data.date is string && request.resource.data.date.size() <= 100
+          && request.resource.data.text is string && request.resource.data.text.size() <= 20000
+          && request.resource.data.order is number && request.resource.data.pins is list && request.resource.data.pins.size() <= 100
+          && request.resource.data.createdAt is string && request.resource.data.updatedAt is string;
+        allow delete: if gm(c);
+      }
       // Read marks: every member sees who has read what; each member writes only their own.
       match /reads/{u} {
         allow read: if joined(c);

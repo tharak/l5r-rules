@@ -95,7 +95,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
           watch(`campaigns/${id}`);
           // NPCs are public to every member; only the invitation stays with the GM.
-          const collections = ['members','sessions','pcs','npcs','reads'];
+          const collections = ['members','sessions','pcs','npcs','reads','timeline'];
           // The immutable GM identifier is available on the private membership index.
           if (isGM) watch(`campaigns/${id}/private/invitation`);
           collections.push('plots','notes');
@@ -194,7 +194,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
         const items=await records(`campaigns/${c}/${kind}`);
         for(let offset=0;offset<items.length;offset+=200)await commit(items.slice(offset,offset+200).flatMap(d=>[[`campaigns/${c}/${kind}/${d.id}/content/body`,null],[`campaigns/${c}/${kind}/${d.id}`,null]]));
       }
-      for (const collection of ['sessions','npcs','pcs','reads']) {
+      for (const collection of ['sessions','npcs','pcs','reads','timeline']) {
         const items = await records(`campaigns/${c}/${collection}`);
         for (let offset=0;offset<items.length;offset+=400) await commit(items.slice(offset,offset+400).map(d=>[`campaigns/${c}/${collection}/${d.id}`,null]));
       }
