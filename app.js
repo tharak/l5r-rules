@@ -147,12 +147,7 @@ function iconFor(title) {
 
 // The saved picture, else the clan's mon, else the name's first letter. The name
 // and clan follow in the tile, so the image itself is decorative.
-function characterAvatar(character) {
-  if (UI.isPortrait(character.portrait)) return `<img class="character-avatar" src="${character.portrait}" alt="">`;
-  const mon = window.CharacterCatalog?.clanMon(character.clan);
-  if (mon) return `<img class="character-avatar character-avatar-mon" src="${mon}" alt="">`;
-  return `<span class="character-avatar" aria-hidden="true">${esc((character.name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
-}
+function characterAvatar(character) { return UI.characterAvatar(character); }
 
 // Debug page (#/clan-mons): every catalog clan with the mon assigned to it, its source,
 // and the mandala mons that were not matched, so assignments can be checked by eye.
@@ -239,7 +234,7 @@ function renderHome() {
   const row = (title,href,items,action = '') => `<section class="home-row" aria-labelledby="home-${title.toLowerCase()}"><div class="home-row-head"><h2 id="home-${title.toLowerCase()}"><a href="${href}">${title}</a></h2>${action}</div><div class="home-row-items">${items}</div></section>`;
   const campaigns = window.CampaignUI.homeCampaigns();
   const byUpdated = (a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
-  const pcs = window.CharacterBuilder.list().sort(byUpdated).map(c => `<a class="home-tile" href="${esc(window.CharacterBuilder.href(c.id))}"${UI.clanTileStyle(c.clan)}>${UI.characterTileBody({portrait:c.portrait,name:c.name || 'Unnamed PC',meta:c.family})}</a>`);
+  const pcs = window.CharacterBuilder.list().sort(byUpdated).map(c => `<a class="home-tile" href="${esc(window.CharacterBuilder.href(c.id))}"${UI.clanTileStyle(c.clan)}>${UI.characterTileBody({portrait:c.portrait,clan:c.clan,name:c.name || 'Unnamed PC',meta:c.family})}</a>`);
   // Book tiles carry just their ring ("Air"); the mark already says it is a book.
   const ringName = slug => { const ring = BOOK_RINGS[slug]; return ring ? ring[0].toUpperCase()+ring.slice(1) : ''; };
   const books = bookSections().map(book => `<a class="home-tile home-book" href="${pageHref(book.slug)}" aria-label="${esc(book.title)}">${bookMark(book.slug)}<span><strong>${esc(ringName(book.slug) || book.title)}</strong></span></a>`);

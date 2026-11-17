@@ -90,3 +90,13 @@ test('the square cropper fills the frame, stays inside the image, and zooms arou
   near((50-start.y)/start.scale,(50-zoomed.y)/zoomed.scale);
   near(zoomed.source.size,100);
 });
+
+test('character avatars fall back from the picture to the clan mon to the Five Rings mark',()=>{
+  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
+  context.window.CharacterCatalog={clanMon:clan=>clan==='Crab'?'public/assets/clans/mandala/crab.webp':''};
+  assert.match(UI.characterAvatar({portrait:picture,clan:'Crab',name:'Kenta'}),/src="data:image\/png/);
+  assert.match(UI.characterAvatar({clan:'Crab',name:'Kenta'}),/class="character-avatar character-avatar-mon" src="public\/assets\/clans\/mandala\/crab\.webp"/);
+  assert.match(UI.characterAvatar({clan:'Ronin',name:'Kenta'}),/character-avatar-rings" src="public\/assets\/l5r-mark\.webp"/);
+  assert.match(UI.characterAvatar({name:'Mario'}),/l5r-mark\.webp/);
+  delete context.window.CharacterCatalog;
+});

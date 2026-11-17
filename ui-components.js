@@ -250,11 +250,12 @@
     if (isPortrait(portrait)) return `<img class="character-avatar" src="${portrait}" alt="">`;
     const mon = window.CharacterCatalog?.clanMon(clan || '');
     if (mon) return `<img class="character-avatar character-avatar-mon" src="${escape(mon)}" alt="">`;
-    return `<span class="character-avatar" aria-hidden="true">${escape(String(name || '').trim().charAt(0).toUpperCase() || '?')}</span>`;
+    // No picture and no clan: the Five Rings mark.
+    return `<img class="character-avatar character-avatar-mon character-avatar-rings" src="public/assets/l5r-mark.webp" alt="">`;
   }
-  // The tile shows the name with the family under it; the clan mon sits behind as a faint,
-  // centred, cropped background (see clanTileStyle); the avatar is the picture or the initial.
-  const characterTileBody = ({portrait,name,meta}) => `${characterAvatar({portrait,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
+  // The tile shows the name with the family under it; the clan mon also sits behind as a faint,
+  // centred, cropped background (see clanTileStyle). The avatar: picture, else clan mon, else rings.
+  const characterTileBody = ({portrait,clan,name,meta}) => `${characterAvatar({portrait,clan,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
   function clanTileStyle(clan) {
     const mon = window.CharacterCatalog?.clanMon(clan || '');
     return mon ? ` style="--tile-mon:url('${escape(mon)}')" data-tile-mon` : '';
