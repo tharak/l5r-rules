@@ -82,6 +82,13 @@
     activeId = id; storeRoster(records);
     return id;
   }
+  // A sheet handed over by another player becomes a new character in this account.
+  function adopt(sheetData) {
+    const id = makeId(), records = roster();
+    records.push({id,sheet:R.normalize(sheetData || {}),updatedAt:new Date().toISOString()});
+    storeRoster(records);
+    return id;
+  }
   function open(id) {
     if (!roster().some(record => record.id === id)) return false;
     try { localStorage.setItem(activeKey(),id); } catch {}
@@ -1280,7 +1287,7 @@
     finally { sheet = previous; }
   }
   const readRecord = id => {const record=roster().find(r=>r.id===id);return record?structuredClone(record.sheet):null;};
-  window.CharacterBuilder = { mount, list, create, open, href, currentId, remove, setPortrait, addJournalEntries, read:readRecord, profile, normalize:R.normalize };
+  window.CharacterBuilder = { mount, list, create, adopt, open, href, currentId, remove, setPortrait, addJournalEntries, read:readRecord, profile, normalize:R.normalize };
   const sheetFingerprint = value => JSON.stringify(value,(_key,item) => item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])) : item);
   function refreshRemoteSheet() {

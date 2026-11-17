@@ -7,10 +7,14 @@
   let timelineSession='', pickTarget='', pickNote='', notePopup='', focusPopup=false;
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
+  // Handovers: live PC offers to and from this account, and which handover popup is open
+  // ('campaign' for the GM handover, or 'pc:<pcId>' for a PC offer).
+  let transfers=[], transferPopup='', stopTransfers=null, transfersBackend=null;
+  const cleaning=new Set();
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -124,7 +128,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
-    timelineSession='';pickTarget='';pickNote='';notePopup='';inviteLink='';inviteCopied=false;
+    timelineSession='';pickTarget='';pickNote='';notePopup='';inviteLink='';inviteCopied=false;transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -284,6 +288,7 @@
   const closeEntry = details => { if (details?.open) details.open = false; };
   document.addEventListener('keydown',event => {
     if (event.key !== 'Escape') return;
+    if (transferPopup) { transferPopup = ''; changed(); return; }
     if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
@@ -357,6 +362,40 @@
     if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${gm() ? inviteSection() : ''}`,'new-close');
     return '';
   }
+  // Offers made to you in this campaign: accept saves the PC to your account and links it.
+  function renderOffers() {
+    const mine = transfers.filter(t => t.toUid === store().uid && t.status === 'offered' && t.campaignId === active);
+    return mine.length ? `<div class="campaign-offers">${mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`).join('')}</div>` : '';
+  }
+  // Pick a member: the new GM, or who receives a PC.
+  function renderTransferPopup(pcs) {
+    if (!transferPopup) return '';
+    const others = store().list(path('members','')).filter(m => m.id !== store().uid);
+    const list = others.length ? `<div class="campaign-transfer-list">${others.map(m => button(transferPopup === 'campaign' ? 'handover-to' : 'pc-transfer-to',m.displayName || 'Player',m.id)).join('')}</div>` : '<p class="campaign-invite-note">Invite another player first.</p>';
+    if (transferPopup === 'campaign') return gm() ? popup('transfer-popup-title','Hand over the campaign',`<p class="campaign-invite-note">The member you pick becomes GM at once. You stay in the campaign as a player.</p>${list}`,'transfer-close') : '';
+    const pc = pcs.find(item => `pc:${item.id}` === transferPopup);
+    return pc && own(pc) ? popup('transfer-popup-title',`Transfer ${label(pc)}`,`<p class="campaign-invite-note">They accept it into their account; then it leaves yours.</p>${list}`,'transfer-close') : '';
+  }
+  // Keep the live offers, and finish handovers you made once they are accepted.
+  function watchTransfers() {
+    const backend = store().backend;
+    if (backend === transfersBackend) return;
+    stopTransfers?.(); transfersBackend = backend; transfers = [];
+    stopTransfers = backend?.watchTransfers?.(list => {
+      transfers = list;
+      for (const t of list) if (t.fromUid === store().uid && t.status === 'accepted' && !cleaning.has(t.id)) {
+        cleaning.add(t.id);
+        (async () => {
+          try {
+            await backend.write(`campaigns/${t.campaignId}/pcs/${t.pcId}`,null).catch(() => {});
+            window.CharacterBuilder?.remove(t.characterId);
+            await backend.dropTransfer(t.id);
+          } catch (err) { cleaning.delete(t.id); }
+        })();
+      }
+      changed();
+    }) || null;
+  }
   // Invite settings (in the + PC popup): the link, Copy link, Replace link and Revoke.
   function inviteSection() {
     if (!inviteLink) return `<div class="campaign-invite"><h4>Invite players</h4><p class="campaign-invite-note">${busy ? 'Preparing the invite link…' : 'No active invite link.'}</p>${busy ? '' : button('invite','New link')}</div>`;
@@ -393,7 +432,9 @@
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
-      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${pickerToggle('pcs',pc.id)}`;
+      const pending = transfers.find(t => t.pcId === pc.id && t.fromUid === store().uid && t.status === 'offered');
+      const handover = own(pc) ? (pending ? `<span class="campaign-transfer-pending">Offered to ${e(memberName(active,pending.toUid))}</span>${button('transfer-cancel','Cancel offer',pending.id)}` : button('pc-transfer','Transfer',pc.id)) : '';
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${pickerToggle('pcs',pc.id)}`;
       // Your own PC falls back to its local sheet until its public profile arrives.
       const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
       return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan,name:label(pc),meta:profile?.family || mine?.family || ''}),
@@ -406,6 +447,7 @@
     renderAgain ||= () => {};
     if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
     if (slug !== 'campaigns') clearCardSheets();
+    if (store().uid) watchTransfers();
     if (!store().uid) { reset(''); return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
@@ -459,14 +501,14 @@
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
     if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
-      <div class="campaign-rows">
+    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('handover','Hand over')+button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
+      ${renderOffers()}<div class="campaign-rows">
       <section class="home-row campaign-row" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="plots">${renderPlots(plots)}</section>
       <section class="home-row campaign-row" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
       <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -648,6 +690,28 @@
         catch { window.prompt('Copy this invite link:',inviteLink); }
       }
       else if (action==='invite-close') {inviteLink='';inviteCopied=false;}
+      else if (action==='handover') {transferPopup='campaign';focusPopup=true;}
+      else if (action==='pc-transfer') {transferPopup=`pc:${id}`;focusPopup=true;}
+      else if (action==='transfer-close') transferPopup='';
+      else if (action==='handover-to') {
+        if (!gm() || !window.confirm(`Make ${memberName(active,id)} the GM? You stay in the campaign as a player.`)) return;
+        await backend.handOver(active,id);transferPopup='';
+      }
+      else if (action==='pc-transfer-to') {
+        const pc=store().get(path('pcs',transferPopup.slice(3)));
+        if (!pc || !own(pc)) return;
+        const record=window.CharacterStorage.records().find(r=>r.id===pc.characterId);
+        if (!record) throw new Error('This PC is not in this browser yet.');
+        await backend.offerPC(active,transferPopup.slice(3),id,record.sheet,label({...pc,id:transferPopup.slice(3)}));transferPopup='';
+      }
+      else if (action==='transfer-cancel'||action==='transfer-decline') await backend.dropTransfer(id);
+      else if (action==='transfer-accept') {
+        const t=transfers.find(item=>item.id===id && item.toUid===store().uid && item.status==='offered');
+        if (!t) return;
+        const characterId=window.CharacterBuilder.adopt(JSON.parse(t.sheetJson));
+        const pcId=await backend.link(t.campaignId,characterId);
+        await backend.acceptPC(t.id,pcId);
+      }
       else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {

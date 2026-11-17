@@ -90,6 +90,10 @@ service cloud.firestore {
         && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
         && request.resource.data.membershipId == getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(u)).data.membershipId;
       allow delete: if (owner(u) || gm(c)) && !existsAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(u));
+      // After a GM handover each member brings their own copy of the GM in line with the campaign.
+      allow update: if owner(u) && request.resource.data.keys().hasOnly(['gmUid','membershipId'])
+        && request.resource.data.membershipId == resource.data.membershipId
+        && request.resource.data.gmUid == campaign(c).gmUid;
     }
     match /campaigns/{c} {
       allow read: if joined(c);
@@ -101,6 +105,10 @@ service cloud.firestore {
       allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden'])
         && (!('timelineHidden' in request.resource.data) || (request.resource.data.timelineHidden is list && request.resource.data.timelineHidden.size() <= 1000))
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
+      // GM handover: the GM passes the campaign to another current member, at once.
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gmUid'])
+        && request.resource.data.gmUid is string && request.resource.data.gmUid != request.auth.uid
+        && member(c,request.resource.data.gmUid);
       allow delete: if gm(c);
       match /members/{u} {
         function validName() {
@@ -249,6 +257,24 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.token)).data.campaignId == c;
         allow delete: if gm(c);
       }
+    }
+    // PC handover offers between members of one campaign. The owner offers a copy of the sheet
+    // (with the GM's notes folded into its journal); the recipient accepts by saving it to their
+    // own account and linking it; the owner's client then removes the original.
+    match /transfers/{id} {
+      function offer() { return request.resource.data; }
+      allow get, list: if signed() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow create: if signed() && offer().keys().hasOnly(['fromUid','toUid','campaignId','pcId','characterId','name','sheetJson','status','createdAt'])
+        && offer().fromUid == request.auth.uid && offer().toUid is string && offer().toUid != request.auth.uid
+        && offer().status == 'offered' && offer().name is string && offer().name.size() <= 200
+        && offer().sheetJson is string && offer().sheetJson.size() <= 400000
+        && offer().createdAt is string && offer().createdAt.size() <= 40
+        && validPC(offer().campaignId,offer().pcId,request.auth.uid,offer().characterId)
+        && member(offer().campaignId,offer().toUid);
+      allow update: if signed() && resource.data.toUid == request.auth.uid && resource.data.status == 'offered'
+        && offer().diff(resource.data).affectedKeys().hasOnly(['status','acceptedAt','newPcId'])
+        && offer().status == 'accepted' && offer().acceptedAt is string && offer().newPcId is string;
+      allow delete: if signed() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
     }
     match /invites/{token} {
       allow get: if signed() && resource.data.expiresAt > request.time;

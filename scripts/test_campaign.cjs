@@ -483,3 +483,56 @@ test('NPCs have a name, role, description and a notes list (journal entries)',as
  await d.click('npc-save');
  assert.equal(d.data.get(id).role,'Former magistrate');
 });
+test('GM handover: the GM picks a member, confirms, and the service makes them GM',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Tharak'});d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
+ const calls=[];Object.assign(d.store.backend,{handOver:async(c,to)=>calls.push([c,to]),watchTransfers:()=>()=>{}});
+ d.window.confirm=()=>true;
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ assert.match(render(),/data-campaign="handover"[^>]*>Hand over</);
+ await d.click('handover');
+ const html=render();
+ assert.match(html,/Hand over the campaign[^]*data-campaign="handover-to" data-id="alice"[^>]*>Alice</);
+ assert.doesNotMatch(html,/data-campaign="handover-to" data-id="gm"/,'not to yourself');
+ await d.click('handover-to','alice');
+ assert.deepEqual(calls,[['c','alice']]);
+ d.store.uid='alice';assert.doesNotMatch(render(),/data-campaign="handover"/,'players have no Hand over');
+});
+test('PC handover: the owner offers to a member; the member accepts into their account; the owner\'s copy is then removed',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Tharak'});d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
+ d.data.set('campaigns/c/pcs/p1',{ownerUid:'gm',characterId:'isamu',membershipId:'m'});
+ d.setCharacters([{id:'isamu',name:'Hoshi Isamu'}]);
+ let push=null;const calls=[];
+ Object.assign(d.store.backend,{
+  watchTransfers:receive=>{push=receive;return()=>{};},
+  offerPC:async(...args)=>calls.push(['offer',...args.slice(0,3)]),
+  dropTransfer:async id=>calls.push(['drop',id]),
+  link:async(c,id)=>{calls.push(['link',c,id]);return 'newpc';},
+  acceptPC:async(id,pcId)=>calls.push(['accept',id,pcId]),
+  write:async(p,v)=>calls.push(['write',p,v]),
+ });
+ Object.assign(d.window.CharacterBuilder,{adopt:sheet=>{calls.push(['adopt',sheet.name]);return 'copy';},remove:id=>calls.push(['remove',id])});
+ d.window.CharacterStorage={records:()=>[{id:'isamu',sheet:{name:'Hoshi Isamu'}}]};
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ assert.match(render(),/data-campaign="pc-transfer" data-id="p1"[^>]*>Transfer</);
+ await d.click('pc-transfer','p1');
+ assert.match(render(),/Transfer Hoshi Isamu[^]*data-campaign="pc-transfer-to" data-id="alice"/);
+ await d.click('pc-transfer-to','alice');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ assert.deepEqual(calls[0],['offer','c','p1','alice']);
+ // While offered, the owner sees it pending with Cancel.
+ push([{id:'t1',fromUid:'gm',toUid:'alice',campaignId:'c',pcId:'p1',characterId:'isamu',name:'Hoshi Isamu',sheetJson:JSON.stringify({name:'Hoshi Isamu'}),status:'offered'}]);
+ assert.match(render(),/Offered to Alice[^]*data-campaign="transfer-cancel" data-id="t1"/);
+ // The recipient sees the offer and accepts it.
+ d.store.uid='alice';
+ assert.match(render(),/<strong>Tharak<\/strong> offers you <strong>Hoshi Isamu<\/strong>[^]*data-campaign="transfer-accept" data-id="t1"/);
+ await d.click('transfer-accept','t1');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ assert.deepEqual(calls.slice(1),[['adopt','Hoshi Isamu'],['link','c','copy'],['accept','t1','newpc']]);
+ // Back on the owner's side, an accepted offer removes the original link and character.
+ d.store.uid='gm';calls.length=0;
+ push([{id:'t1',fromUid:'gm',toUid:'alice',campaignId:'c',pcId:'p1',characterId:'isamu',name:'Hoshi Isamu',status:'accepted',newPcId:'newpc'}]);
+ for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ assert.deepEqual(calls,[['write','campaigns/c/pcs/p1',null],['remove','isamu'],['drop','t1']]);
+});

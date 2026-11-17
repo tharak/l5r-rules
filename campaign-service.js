@@ -60,7 +60,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           const stops = []; subscriptions.set(id,stops);
           const catalogs = {sessions:new Map(),pcs:new Map(),npcs:new Map(),plots:new Map(),notes:new Map()};
           const contentStops = new Map();
-          const isGM = snapshot.docs.find(d=>d.id===id).data().gmUid === uid;
+          const indexed = snapshot.docs.find(d=>d.id===id).data();
           stops.push(()=>{for(const item of contentStops.values())item.stop();contentStops.clear();});
           // Privacy is paused: every campaign member reads every plot and note.
           const canRead = () => true;
@@ -94,11 +94,20 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           let profileSynced=false;
           const fail = error => { if (error.code === 'permission-denied') cancel(id); else events.error(error); };
           const watch = path => stops.push(sdk.onSnapshot(ref(path),s=>events.receive(path,s.exists()?s.data():null),fail));
-          watch(`campaigns/${id}`);
-          // NPCs are public to every member; only the invitation stays with the GM.
+          // The campaign record says who the GM is (it can be handed over). Only the GM watches the
+          // private invitation; a member's own index copy of the GM is brought in line here.
+          let invitationStop = null;
+          stops.push(()=>invitationStop?.());
+          stops.push(sdk.onSnapshot(ref(`campaigns/${id}`),s=>{
+            const data = s.exists() ? s.data() : null;
+            events.receive(`campaigns/${id}`,data);
+            if (!data) return;
+            if (data.gmUid === uid && !invitationStop) invitationStop = sdk.onSnapshot(ref(`campaigns/${id}/private/invitation`),i=>events.receive(`campaigns/${id}/private/invitation`,i.exists()?i.data():null),()=>{});
+            if (data.gmUid !== uid && invitationStop) { invitationStop(); invitationStop = null; events.receive(`campaigns/${id}/private/invitation`,null); }
+            if (indexed.gmUid !== data.gmUid) { indexed.gmUid = data.gmUid; sdk.updateDoc(ref(indexPath(id)),{gmUid:data.gmUid}).catch(()=>{}); }
+          },fail));
+          // NPCs are public to every member.
           const collections = ['members','sessions','pcs','npcs','reads','timeline'];
-          // The immutable GM identifier is available on the private membership index.
-          if (isGM) watch(`campaigns/${id}/private/invitation`);
           collections.push('plots','notes');
           for (const collection of collections) {
             const path = `campaigns/${id}/${collection}`;
@@ -204,6 +213,36 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       // Delete players before the GM; GM rights stay active until the final batch.
       for (const member of members.filter(m=>m.id!==uid)) await this.removeMember(c,member.id);
       await commit([[memberPath(c),null],[indexPath(c),null],[`campaigns/${c}`,null]]);
+    },
+    // GM handover: another current member becomes GM at once; this account stays a member.
+    async handOver(c,to) {
+      if (!(await get(memberPath(c,to)))) throw new Error('That player is no longer in the campaign.');
+      await sdk.updateDoc(ref(`campaigns/${c}`),{gmUid:to});
+      await sdk.updateDoc(ref(indexPath(c)),{gmUid:to}).catch(()=>{});
+    },
+    // PC handover. The owner offers a copy of the sheet to another member; the GM's notes on the
+    // character (readable by the owner) travel inside the sheet's own journal.
+    async offerPC(c,pcId,to,sheet,name) {
+      const pc = await get(`campaigns/${c}/pcs/${pcId}`);
+      if (!pc || pc.ownerUid !== uid) throw new Error('Only the owner can hand over this PC.');
+      const gmNotes = (await records(`users/${uid}/characters/${pc.characterId}/journal`)).map(entry => ({
+        id:`gm-${entry.id}`,title:entry.title || '',text:`${entry.authorName ? `${entry.authorName}: ` : ''}${entry.text}`,public:!!entry.public,createdAt:entry.createdAt,updatedAt:entry.updatedAt}));
+      const copy = {...sheet,journal:[...(Array.isArray(sheet.journal) ? sheet.journal : []),...gmNotes]};
+      const id = crypto.randomUUID();
+      await sdk.setDoc(ref(`transfers/${id}`),{fromUid:uid,toUid:to,campaignId:c,pcId,characterId:pc.characterId,name:String(name || 'PC').slice(0,200),sheetJson:JSON.stringify(copy),status:'offered',createdAt:new Date().toISOString()});
+      return id;
+    },
+    async acceptPC(id,newPcId) { await sdk.updateDoc(ref(`transfers/${id}`),{status:'accepted',acceptedAt:new Date().toISOString(),newPcId}); },
+    async dropTransfer(id) { await sdk.deleteDoc(ref(`transfers/${id}`)); },
+    // Offers to and from this account, live.
+    watchTransfers(receive,fail = () => {}) {
+      const offers = new Map();
+      const listen = field => sdk.onSnapshot(sdk.query(sdk.collection(db,'transfers'),sdk.where(field,'==',uid)),s=>{
+        for (const change of s.docChanges()) { if (change.type === 'removed') offers.delete(change.doc.id); else offers.set(change.doc.id,{id:change.doc.id,...change.doc.data()}); }
+        receive([...offers.values()]);
+      },fail);
+      const stops = [listen('toUid'),listen('fromUid')];
+      return () => stops.forEach(stop => stop());
     },
     async watchSheet(c,pcId,full,receive,fail) {
       const pc = await get(`campaigns/${c}/pcs/${pcId}`);

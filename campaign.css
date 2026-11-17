@@ -159,3 +159,9 @@ body:has(.campaign-entry[open]){overflow:hidden}
 /* NPC panel: role and description above its notes (journal entries). */
 .campaign-npc-role{margin:0 0 6px;font:600 14px var(--sans);color:var(--muted)}
 .campaign-npc-description{margin:0 0 12px;white-space:pre-wrap}
+/* Handovers: offers to you (Accept / Decline), the member list to pick from, a pending offer. */
+.campaign-offers{display:grid;gap:8px;margin:12px 0 0}
+.campaign-offer{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--red);border-radius:4px;background:#fffdf8}
+.campaign-offer>span{flex:1;min-width:200px}
+.campaign-transfer-list{display:flex;flex-wrap:wrap;gap:8px}
+.campaign-transfer-pending{align-self:center;font-size:13px;color:var(--muted)}

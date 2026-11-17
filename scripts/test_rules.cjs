@@ -215,3 +215,30 @@ test('timeline events: members read them, only the GM writes them',async()=>{
  for(const bad of [{...event,kind:'sessions'},{...event,x:120},{...event,extra:1}])await assertFails(setDoc(r(db('gm'),'campaigns/c/timeline/t'),bad));
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/timeline/t')));
 });
+test('GM handover: only the GM, only to a current member; members then align their own index copy',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/h',{title:'Handover',gmUid:'gm'}],...['gm','alice'].flatMap(u=>[[`campaigns/h/members/${u}`,{gmUid:'gm',membershipId:u+'-m',inviteToken:''}],[`users/${u}/campaigns/h`,{gmUid:'gm',membershipId:u+'-m'}]])]);});
+ await assertFails(updateDoc(r(db('alice'),'campaigns/h'),{gmUid:'alice'}),'a player cannot take the campaign');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'bob'}),'not to a non-member');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'alice',title:'Renamed'}),'the handover changes nothing else');
+ await assertFails(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice'}),'index follows the campaign, not the reverse');
+ await assertSucceeds(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'alice'}));
+ await assertSucceeds(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice'}));
+ await assertFails(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice',membershipId:'forged'}));
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{title:'Old GM edit'}),'the old GM is a player now');
+ await assertSucceeds(updateDoc(r(db('alice'),'campaigns/h'),{title:'New GM edit'}));
+});
+test('PC handover offers: the owner offers to a member; only the recipient reads and accepts; either side withdraws',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/t',{title:'Transfers',gmUid:'gm'}],...['gm','alice','bob'].flatMap(u=>[[`campaigns/t/members/${u}`,{gmUid:'gm',membershipId:u+'-m',inviteToken:''}],[`users/${u}/campaigns/t`,{gmUid:'gm',membershipId:u+'-m'}]]),['users/alice/characters/sold',full],['users/alice/publicCharacters/sold',projection],['campaigns/t/pcs/p',{ownerUid:'alice',characterId:'sold',membershipId:'alice-m'}]]);});
+ const offer={fromUid:'alice',toUid:'bob',campaignId:'t',pcId:'p',characterId:'sold',name:'PC',sheetJson:'{}',status:'offered',createdAt:'now'};
+ await assertFails(setDoc(r(db('bob'),'transfers/x'),{...offer,fromUid:'bob'}),'not someone else\'s PC');
+ await assertFails(setDoc(r(db('alice'),'transfers/x'),{...offer,toUid:'stranger'}),'only to a member');
+ await assertFails(setDoc(r(db('alice'),'transfers/x'),{...offer,status:'accepted'}));
+ await assertSucceeds(setDoc(r(db('alice'),'transfers/x'),offer));
+ await assertFails(getDoc(r(db('gm'),'transfers/x')),'outsiders cannot read the sheet copy');
+ await assertSucceeds(getDoc(r(db('bob'),'transfers/x')));
+ await assertFails(updateDoc(r(db('alice'),'transfers/x'),{status:'accepted',acceptedAt:'now',newPcId:'n'}),'the owner cannot accept for them');
+ await assertFails(updateDoc(r(db('bob'),'transfers/x'),{toUid:'gm'}));
+ await assertSucceeds(updateDoc(r(db('bob'),'transfers/x'),{status:'accepted',acceptedAt:'now',newPcId:'n'}));
+ await assertFails(updateDoc(r(db('bob'),'transfers/x'),{status:'accepted',acceptedAt:'later',newPcId:'n2'}),'accepted once');
+ await assertSucceeds(deleteDoc(r(db('alice'),'transfers/x')));
+});
