@@ -237,7 +237,7 @@ function renderHome() {
   const pcs = window.CharacterBuilder.list().sort(byUpdated).map(c => `<a class="home-tile" href="${esc(window.CharacterBuilder.href(c.id))}"${UI.clanTileStyle(c.clan)}>${UI.characterTileBody({portrait:c.portrait,clan:c.clan,name:c.name || 'Unnamed PC',meta:c.family})}</a>`);
   // Book tiles carry just their ring ("Air"); the mark already says it is a book.
   const ringName = slug => { const ring = BOOK_RINGS[slug]; return ring ? ring[0].toUpperCase()+ring.slice(1) : ''; };
-  const books = bookSections().map(book => `<a class="home-tile home-book" href="${pageHref(book.slug)}" aria-label="${esc(book.title)}">${bookMark(book.slug)}<span><strong>${esc(ringName(book.slug) || book.title)}</strong></span></a>`);
+  const books = bookSections().map(book => `<a class="home-tile home-book" href="${pageHref(book.slug)}" aria-label="${esc(book.title)}"${UI.tileArtStyle(BOOK_RINGS[book.slug] ? `public/assets/rings/${BOOK_RINGS[book.slug]}.webp` : '')}>${bookMark(book.slug)}<span><strong>${esc(ringName(book.slug) || book.title)}</strong></span></a>`);
   return `<div class="workspace home"><h1 class="visually-hidden">l5r-rules</h1>${
     row('Campaigns','#/campaigns',campaigns.html,campaigns.create || '')}${
     row('Characters','#/characters',pcs.join(''),UI.button({text:'+ PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${

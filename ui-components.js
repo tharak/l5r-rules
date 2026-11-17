@@ -256,9 +256,8 @@
   // The tile shows the name with the family under it; the clan mon also sits behind as a faint,
   // centred, cropped background (see clanTileStyle). The avatar: picture, else clan mon, else rings.
   const characterTileBody = ({portrait,clan,name,meta}) => `${characterAvatar({portrait,clan,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
-  function clanTileStyle(clan) {
-    const mon = window.CharacterCatalog?.clanMon(clan || '');
-    return mon ? ` style="--tile-mon:url('${escape(mon)}')" data-tile-mon` : '';
-  }
-  window.UI = {characterAvatar,characterTileBody,clanTileStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  // Any image behind a tile: faint, centred, cropped (see .home-tile[data-tile-mon]).
+  const tileArtStyle = src => src ? ` style="--tile-mon:url('${escape(src)}')" data-tile-mon` : '';
+  function clanTileStyle(clan) { return tileArtStyle(window.CharacterCatalog?.clanMon(clan || '')); }
+  window.UI = {characterAvatar,characterTileBody,clanTileStyle,tileArtStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

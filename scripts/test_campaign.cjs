@@ -373,7 +373,7 @@ test('campaign links open a section and item by name + short ID, and clicks move
  // The name part is decoration: an old name still opens the NPC.
  let html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp/npcs/old-name-npc9');
  assert.match(html,/data-entry="npcs:npc98765" open/,'the NPC opens as a panel');
- assert.match(html,/data-entry="npcs:npc98765" open><summary>[^]*?<div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">[^]*?data-campaign="entry-close" data-id="npcs:npc98765"/);
+ assert.match(html,/data-entry="npcs:npc98765" open[^>]*><summary>[^]*?<div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">[^]*?data-campaign="entry-close" data-id="npcs:npc98765"/);
  // Closing the panel returns the address to the campaign.
  d.location.hash='#/campaigns/emerald-dawn-camp/npcs/mario-npc9';
  await d.click('entry-close','npcs:npc98765');
