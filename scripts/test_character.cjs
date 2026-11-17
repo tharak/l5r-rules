@@ -1165,3 +1165,21 @@ test('free school skill choices use the picker: Add fills the slot, × clears it
   const list=html.match(new RegExp(`<select[^>]*id="school-choice-${index}"[^>]*>([\\s\\S]*?)</select>`))[1];
   assert.match(list,/value="Construction"/);assert.match(list,/value="Siege"/);
 });
+
+test('optional ability permissions sit in the subsection they open; closed reasons share the heading line',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  let html=sectionHtml(c,'abilities');
+  assert.doesNotMatch(html,/Optional ability training/);
+  const part=kind=>html.split(`data-ability-kind="${kind}"><div class="creator-option-heading">`)[1].split('creator-purchases creator-ability-kind')[0];
+  assert.match(part('kata'),/^<h3>Kata<\/h3><a /,'open: no reason on the heading');
+  assert.match(part('spell'),/^<h3>Spells<\/h3><span class="creator-ability-locked">Shugenja only\.<\/span>/);
+  assert.match(part('spell'),/data-school-decision="maho"/);
+  assert.match(part('shadowlands'),/data-school-decision="shadowlands"/);
+  assert.doesNotMatch(part('kiho'),/data-school-decision/,'a bushi cannot use the non-Brotherhood Kiho rules');
+  // Ticking the Shadowlands permission opens that subsection.
+  c.change({schoolDecision:'shadowlands'},true);
+  html=sectionHtml(c,'abilities');
+  assert.match(html,/creator-purchases creator-ability-kind" data-ability-kind="shadowlands"/);
+  const shugenja=await character();shugenja.school('Crab','Kuni Shugenja');
+  assert.match(sectionHtml(shugenja,'abilities').split('data-ability-kind="kiho"><div class="creator-option-heading">')[1],/^[\s\S]*?data-school-decision="nonBrotherhoodKiho"/);
+});

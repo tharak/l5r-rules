@@ -462,3 +462,9 @@
 .creator-ability-picker > .creator-add-row > input.ui-field[type="search"] { flex: 1 1 10em; min-width: 8em; width: auto; }
 .creator-ability-picker > .creator-add-row > select.ui-field { flex: 2 1 16em; min-width: 10em; width: auto; }
 @media (max-width: 650px) { .creator-ability-picker > .creator-add-row, .creator-choice .creator-add-row { flex-wrap: wrap; } .creator-ability-picker > .creator-add-row > :is(input,select).ui-field { flex: 1 1 100%; } }
+
+/* Ability subsection heading: title, the reason it is closed (if any), Rules link; permission below. */
+.creator-ability-kind .creator-option-heading { justify-content: flex-start; flex-wrap: wrap; }
+.creator-ability-kind .creator-option-heading > .creator-ability-locked { margin: 0; }
+.creator-ability-kind .creator-option-heading > .creator-source { margin-left: auto; }
+.creator-ability-permission { display: inline-flex; margin: 0 0 8px; font-size: 13px; color: var(--muted); }

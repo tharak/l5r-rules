@@ -586,8 +586,8 @@
       if(/Seven Thunders/.test(school.name))fields+=select('kihoElement','Starting Kiho element',allElements);
     }
     const choices=fields?`<div class="creator-purchases creator-school-choices"><h3>School choices</h3><div class="creator-fields">${fields}</div></div>`:'';
-    const optional=section==='abilities'?UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Optional ability training`,bodyHtml:UI.actionRow({attrs:{class:'creator-optional-ability-options'},bodyHtml:[['nonBrotherhoodKiho','Table permits optional non-Brotherhood Kiho'],['maho','Table permits forbidden maho training'],['shadowlands','Table permits recorded Shadowlands powers']].map(([key,label])=>UI.checkbox({label,attrs:{'type':'checkbox','data-school-decision':key,'checked':sheet.schoolDecisions[key]},labelAttrs:{'class':'creator-check'}})).join('')})}):'';
-    return choices+optional;
+    // Optional ability permissions (maho, non-Brotherhood Kiho, Shadowlands) live in their own Abilities subsection.
+    return choices;
   }
   function renderEmphases(name,skill) {
     const available=catalog.skills.find(s=>s.name===name.split(':')[0])?.emphases || [];
@@ -634,6 +634,17 @@
     const price = ['kata','kiho'].includes(a.kind) ? (free ? ' · Free' : ` · ${offer.cost} XP`) : '';
     return `${a.name}${a.mastery?` · ${a.mastery}`:''}${a.slug==='maho'?' · Maho':''}${price}`;
   }
+  // Table permissions that open optional rules, shown in the subsection they affect. They stay
+  // visible while the type is closed, since ticking one is what opens it.
+  function abilityPermission(kind,d) {
+    const school = d.school;
+    if (!school) return '';
+    const toggle = (key,text) => UI.checkbox({label:text,attrs:{'type':'checkbox','data-school-decision':key,'checked':sheet.schoolDecisions[key]},labelAttrs:{'class':'creator-check creator-ability-permission'}});
+    if (kind === 'spell') return toggle('maho','Table permits maho');
+    if (kind === 'shadowlands') return toggle('shadowlands','Table permits Shadowlands powers');
+    if (kind === 'kiho' && !school.brotherhood && !/Hoshi Tsurui/i.test(school.name || '') && ['Monk','Shugenja','Ninja'].includes(school.discipline)) return toggle('nonBrotherhoodKiho','Table permits non-Brotherhood Kiho');
+    return '';
+  }
   // Why a whole type is closed to this character (shown instead of hiding the section).
   const ACCESS_REASONS = {spell:'Shugenja only.',kata:'Bushi only.',kiho:'Monks, shugenja and ninja only.',tattoo:'Only schools that grant tattoos.',shadowlands:'Requires Taint.'};
   const locked = text => text ? `<p class="creator-ability-locked">${escapeHtml(text)}</p>` : '';
@@ -643,10 +654,11 @@
   function renderAbilityKind([kind,title,label,rulesPage],d) {
     const owned = d.abilities.filter(a=>a.kind===kind).sort(byMastery);
     const closed = !d.school ? 'Choose a school first.' : !R.abilityAccess(kind,sheet,d) ? ACCESS_REASONS[kind] : '';
-    const heading = `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${rulesLink(rulesPage,'',`${title} rules`)}</div>`;
+    // The reason a type is closed (or one every block shares) sits on the heading line.
+    const heading = note => `<div class="creator-option-heading"><h3>${title}${owned.length?` <small>${owned.length}</small>`:''}</h3>${note?`<span class="creator-ability-locked">${escapeHtml(note)}</span>`:''}${rulesLink(rulesPage,'',`${title} rules`)}</div>${abilityPermission(kind,d)}`;
     if (closed) {
       const picker = UI.actionRow({attrs:{class:'creator-add-row creator-ability-picker'},bodyHtml:UI.field({kind:'select',attrs:{'aria-label':title,disabled:true},optionsHtml:option('',`Choose a ${label}`,true)})+UI.button({text:'Add',attrs:{'aria-label':`Add ${label}`,disabled:true}})});
-      return `<div class="creator-purchases creator-ability-kind creator-ability-closed" data-ability-kind="${kind}">${heading}${locked(closed)}${picker}${owned.length?`<div class="creator-ability-list">${owned.map(a=>renderAbility(a,d)).join('')}</div>`:''}</div>`;
+      return `<div class="creator-purchases creator-ability-kind creator-ability-closed" data-ability-kind="${kind}">${heading(closed)}${picker}${owned.length?`<div class="creator-ability-list">${owned.map(a=>renderAbility(a,d)).join('')}</div>`:''}</div>`;
     }
     const free = R.freeAbilityLeft(kind,d);
     const catalogGroups = abilityGroups(kind,catalog.abilities.filter(a=>a.kind===kind).sort(byMastery));
@@ -671,7 +683,7 @@
     }).join('');
     // Owned entries outside every catalog group (e.g. a renamed catalog entry) still show.
     const stray = owned.filter(a => !catalogGroups.some(group => group.key === abilityGroups(kind,[a])[0]?.key));
-    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}">${heading}${locked(shared.join(' '))}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}${stray.map(a=>renderAbility(a,d)).join('')}</div></div>`;
+    return `<div class="creator-purchases creator-ability-kind" data-ability-kind="${kind}">${heading(shared.join(' '))}${UI.field({attrs:{'data-option-search':kind,'data-search-scope':kind,'type':'search','placeholder':`Search ${title.toLowerCase()}`,'aria-label':`Search ${title.toLowerCase()}`}})}<div class="creator-ability-list">${blocks}${stray.map(a=>renderAbility(a,d)).join('')}</div></div>`;
   }
   function renderAbilities(d) {
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-abilities'},bodyHtml:`${UI.sectionHeading({step:'05',title:'Abilities'})}${renderSchoolDecisions(d,'abilities')}<div class="creator-ability-pickers">${abilityKinds.map(kind=>renderAbilityKind(kind,d)).join('')}</div>${(()=>{const custom=d.abilities.filter(a=>!abilityKinds.some(([kind])=>kind===a.kind));return custom.length?`<div class="creator-ability-list">${custom.map(a=>renderAbility(a,d)).join('')}</div>`:'';})()}${UI.disclosure({attrs:{'class':'creator-purchases'},titleHtml:`Custom ability`,bodyHtml:`<div class="creator-fields">${UI.field({label:'Name',attrs:{'id':'custom-ability-name'}})}${UI.field({label:'XP cost',attrs:{'id':'custom-ability-cost','type':'number','min':'0','step':'1','value':'0'}})}${UI.field({label:'Description',labelAttrs:{'class':'creator-wide'},attrs:{'id':'custom-ability-description','rows':'3'},kind:'textarea',value:''})}</div>${UI.button({text:'Add',attrs:{'data-action':'add-custom-ability'}})}`})}`});
