@@ -212,8 +212,9 @@ body:has(.campaign-entry[open]){overflow:hidden}
 @media(max-width:700px){.map-tray{width:auto}}
 /* While dragging: a hex grid over the map, the target hex outlined, and the token under the pointer. */
 .map-hexes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
-.map-hexes pattern path{fill:none;stroke:#fffbf2b3;stroke-width:1;filter:drop-shadow(0 0 1px #000a)}
+.map-hexes pattern path{fill:none;stroke:#1d1712;stroke-opacity:.5;stroke-width:1.2}
 .map-hexes rect{fill-opacity:1}
+.map-hexes{background:#fffbf21f}
 .map-hex-target{fill:#c8322a40;stroke:#c8322a;stroke-width:2.5}
 .timeline-map-dragging{cursor:grabbing}
 .map-drag-ghost{position:fixed;z-index:60;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 6px 8px #0007)}
