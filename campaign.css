@@ -249,6 +249,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .map-tray-toggle{margin-left:auto}
 .map-tray-hidden{width:auto}
 /* A note pin's label: the PC, NPC or place, then the entry's title. */
-.timeline-pin-name{display:grid;justify-items:center;line-height:1.25}
-.timeline-pin-name>span,.timeline-pin-entry{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.timeline-pin-name{display:grid;justify-items:center;width:max-content;max-width:160px;line-height:1.25}
+.timeline-pin-name>span,.timeline-pin-entry{max-width:148px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .timeline-pin-entry{font-size:10px;font-weight:400;color:var(--muted)}
