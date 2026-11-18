@@ -106,42 +106,74 @@
   // A link: checked to be an https address that loads as a picture, then saved as-is.
   async function addLink(value) {
     const url = String(value || '').trim();
-    if (busy) return;
+    let id = '';
+    if (busy) return id;
     if (!/^https:\/\/[^\s"<>]+$/.test(url) || url.length > 2000) { message = 'Use an https:// image address.'; changed(); return; }
     busy = true; message = ''; changed();
     try {
       await new Promise((resolve,reject) => { const img = new Image(); img.onload = resolve; img.onerror = () => reject(new Error('That link does not load as a picture.')); img.src = url; });
       const title = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop() || 'Picture').replace(/\.[^.]+$/,'').replace(/[-_]+/g,' ').trim().slice(0,200) || 'Picture';
-      await store().backend.addLibraryLink({title,url});
+      id = await store().backend.addLibraryLink({title,url});
+      fullCache.set(id,url);
       message = `Added "${title}".`;
     } catch (error) { message = error.message || 'The link could not be added.'; }
     busy = false; changed();
+    return id;
   }
+  // Both resolve with the new picture's id ('' when it was not added).
   async function upload(file) {
-    if (busy) return;
+    let id = '';
+    if (busy) return id;
     busy = true; message = ''; changed();
     try {
       const full = await shrink(file,1600,950000), thumb = await shrink(file,320,110000);
       const title = String(file.name || 'Picture').replace(/\.[^.]+$/,'').replace(/[-_]+/g,' ').trim() || 'Picture';
-      await store().backend.addLibrary({title,thumb:thumb.src,image:full.src,width:full.width,height:full.height});
+      id = await store().backend.addLibrary({title,thumb:thumb.src,image:full.src,width:full.width,height:full.height});
+      fullCache.set(id,full.src);
       message = `Added "${title}".`;
     } catch (error) { message = error.message || 'The picture could not be uploaded.'; }
     busy = false; changed();
+    return id;
   }
 
-  // Pick a picture in a dialog. Resolves with its id, or null when closed.
+  // Pick a picture in a dialog. Resolves with its id, or null when closed. Signed-in players can
+  // also upload a picture or add a link there; what they add is picked at once.
   function pickId(title = 'Choose a picture') {
     return new Promise(resolve => {
       const host = document.createElement('div');
-      host.innerHTML = UI.dialog({titleId:'library-pick-title',attrs:{class:'library-dialog'},headerHtml:`<h2 id="library-pick-title">${e(title)}</h2>${UI.field({attrs:{type:'search','data-library-search':true,placeholder:'Search pictures','aria-label':'Search pictures'}})}${UI.button({text:'Close',variant:'secondary',attrs:{'data-library-close':true}})}`,bodyHtml:`<div class="library-dialog-body">${grid(groups(),{pick:true}) || '<p>Loading pictures…</p>'}</div>`});
+      const controls = () => store()?.uid ? `${uploadControl()}${message ? `<p class="library-dialog-status" role="status">${e(message)}</p>` : ''}` : '';
+      const body = () => grid(groups(),{pick:true}) || '<p>Loading pictures…</p>';
+      message = '';
+      host.innerHTML = UI.dialog({titleId:'library-pick-title',attrs:{class:'library-dialog'},headerHtml:`<h2 id="library-pick-title">${e(title)}</h2>${UI.field({attrs:{type:'search','data-library-search':true,placeholder:'Search pictures','aria-label':'Search pictures'}})}${UI.button({text:'Close',variant:'secondary',attrs:{'data-library-close':true}})}<div class="library-dialog-add" data-library-controls>${controls()}</div>`,bodyHtml:`<div class="library-dialog-body">${body()}</div>`});
       const dialog = host.firstElementChild;
       document.body.append(dialog);
       let done = false;
-      const finish = value => { if (done) return; done = true; dialog.close(); dialog.remove(); resolve(value); };
+      // New uploads, links and the bundled catalog arriving refresh the dialog in place.
+      const refresh = () => {
+        const add = dialog.querySelector('[data-library-controls]'), url = add?.querySelector('input[name="url"]')?.value || '';
+        if (add) { add.innerHTML = controls(); const input = add.querySelector('input[name="url"]'); if (input && !busy) input.value = url; }
+        dialog.querySelector('.library-dialog-body').innerHTML = body();
+        filter(dialog,dialog.querySelector('[data-library-search]')?.value);
+      };
+      window.addEventListener('library-changed',refresh);
+      const finish = value => { if (done) return; done = true; window.removeEventListener('library-changed',refresh); dialog.close(); dialog.remove(); resolve(value); };
       dialog.addEventListener('click',event => {
         if (event.target.closest('[data-library-close]') || event.target === dialog) return finish(null);
         const choice = event.target.closest('[data-library-choose]');
         if (choice) finish(choice.dataset.libraryChoose);
+      });
+      dialog.addEventListener('change',async event => {
+        if (event.target.dataset.libraryUpload === undefined) return;
+        const file = event.target.files?.[0]; event.target.value = '';
+        const id = file && await upload(file);
+        if (id) finish(id);
+      });
+      dialog.addEventListener('submit',async event => {
+        const form = event.target.closest('[data-library-link]');
+        if (!form) return;
+        event.preventDefault();
+        const id = await addLink(form.elements.url.value);
+        if (id) finish(id);
       });
       dialog.addEventListener('input',event => { if (event.target.dataset.librarySearch !== undefined) filter(dialog,event.target.value); });
       dialog.addEventListener('close',() => finish(null));

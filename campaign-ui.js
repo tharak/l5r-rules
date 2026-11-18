@@ -168,7 +168,8 @@
   function gallery(images,{kind = '',editable = false} = {}) {
     const list = (images || []).filter(UI.isPortrait);
     const thumbs = list.map((src,index) => `<figure class="campaign-image"><img src="${src}" alt="Image ${index+1}">${editable ? button('image-remove','Remove',`${kind}:${index}`) : ''}</figure>`).join('');
-    const add = editable && list.length < MAX_IMAGES ? `<label class="campaign-image-add ui-button ui-button--secondary ui-button--compact">Add image<input type="file" accept="image/*" class="ui-portrait-input" data-entry-image="${kind}" aria-label="Add image"></label>${window.MediaLibrary ? button('image-library','Library',kind) : ''}` : '';
+    // Pictures come from the library, where an image can also be uploaded or linked.
+    const add = editable && list.length < MAX_IMAGES ? button('image-library','Add image',kind) : '';
     return thumbs || add ? `<div class="campaign-images">${thumbs}${add}</div>` : '';
   }
   function entryEditor(kind,draft) {
@@ -176,7 +177,7 @@
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
       {label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
-    ],extraHtml:gallery(draft.images,{kind:'plot',editable:true}),actionsHtml:button(kind+'-save','Save plot','',!draft.title.trim())+button(kind+'-cancel','Cancel')});
+    ],extraHtml:gallery(draft.images,{kind:'plot',editable:true}),actionsHtml:button(kind+'-save','Save plot','',!draft.title.trim())+button(kind+'-cancel','Cancel')+(plot&&plotId?button('plot-delete','Delete plot',plotId):'')});
   }
   function sessionEditor(session,isGM) {
     return UI.recordEditor({fields:[
@@ -250,10 +251,11 @@
     return false;
   }
   // Sessions, plots and NPCs use the same journal as characters (UI.journal): titled entries.
-  function notesFor(kind,id) {
+  // addInRow: "+ Entry" sits in the panel's own button row (entryActions) instead of the journal head.
+  function notesFor(kind,id,{addInRow = false} = {}) {
     const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id);
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
-    const canAdd=canAddEntry(kind,id);
+    const canAdd=canAddEntry(kind,id)&&!addInRow;
     if(!notes.length&&!canAdd&&!drafting)return '';
     const numbers=numberedNotes();
     const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,toolsHtml:kind==='npcs'||kind==='pcs'?unpinButton(noteKey(kind,id,n.id),true):'',title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
@@ -261,12 +263,18 @@
     const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
     return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
   }
+  // A session's or plot's panel: Edit and "+ Entry" in one row (Delete shows while editing).
+  function entryActions(kind,id,editHtml) {
+    const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
+    const add=canAddEntry(kind,id)&&!drafting?UI.button({text:'+ Entry',attrs:{'data-campaign':'note-new','data-id':`${kind}:${id}`,disabled:busy}}):'';
+    return editHtml||add?UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:editHtml+add}):'';
+  }
   function renderPlots(plots) {
     // A new plot is drafted above the list; an existing one is edited inside its entry.
     const fresh = '';
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
-        : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
+        : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryActions('plots',plot.id,entryOwner(plot) ? button('plot-edit','Edit plot',plot.id) : '')}${notesFor('plots',plot.id,{addInRow:true})}</article>`)).join('');
     return `${sectionBar('Plots')}${fresh}<div class="campaign-entries">${addTile(button('plot-new','+ Plot'))}${list || ''}</div>`;
   }
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
@@ -500,7 +508,7 @@
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
-        : `${gallery(session.images)}${readStatus('sessions',session)}${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('session-open','Edit',session.id)+button('session-delete','Delete',session.id)}) : ''}${notesFor('sessions',session.id)}`)).join('');
+        : `${gallery(session.images)}${readStatus('sessions',session)}${entryActions('sessions',session.id,isGM ? button('session-open','Edit',session.id) : '')}${notesFor('sessions',session.id,{addInRow:true})}`)).join('');
     return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','+ Session'):'')}${list}</div>`;
   }
   function renderNPCs(npcs,isGM) {
@@ -949,17 +957,6 @@
       if (npcDraft) npcDraft.place=place;
       else {const data=store().get(path('npcs',npcId));if(data)store().queue(path('npcs',npcId),{...data,place,updatedAt:new Date().toISOString()});}
       return;
-    }
-    const imageKind=event.target.dataset?.entryImage;
-    if (imageKind) {
-      const file=event.target.files?.[0]; event.target.value='';
-      if (!file) return;
-      try {
-        const picture=await UI.readPortrait(file);
-        if (!picture) return;
-        addEntryImage(imageKind,picture);
-      } catch (err) { error=err.message || 'This image could not be read.'; }
-      changed(); return;
     }
     if (event.target.dataset?.npcPortrait === undefined) return;
     const file=event.target.files?.[0], editing=npcDraft || npcId;

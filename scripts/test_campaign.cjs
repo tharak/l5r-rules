@@ -203,23 +203,28 @@ test('the public view shows the profile, escapes text, and handles missing or ol
  assert.match(P.page({sections:{identity:{name:'Old Format'}}}),/Old Format[\s\S]*saves it again/);
 });
 
-test('the GM adds and removes session images; plot drafts carry their images to the save',async()=>{
+test('the GM adds and removes session images from the library; plot drafts carry their images to the save',async()=>{
  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/sessions/s',{title:'Session one',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-01'});
  d.window.UI.readPortrait=async()=>picture;
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();await d.click('section','sessions');
+ let view=render();await d.click('section','sessions');view=render();
+ assert.match(view,/class="[^"]*campaign-actions[^"]*"[^>]*>[^]*?data-campaign="session-open"[^]*?data-campaign="note-new" data-id="sessions:s"[^>]*>\+ Entry</,'Edit and + Entry share one row');
+ assert.doesNotMatch(view,/data-campaign="session-delete"/,'Delete only while editing');assert.doesNotMatch(view,/creator-journal-head/,'no second + Entry in the journal');
  await d.click('session-open','s');
- assert.match(render(),/data-entry-image="session"/);
- await d.documentListeners.change({target:{dataset:{entryImage:'session'},files:[{type:'image/png'}],value:'x'}});
+ assert.match(render(),/data-campaign="session-delete"/);
+ d.window.MediaLibrary={pickFile:async()=>({type:'image/png'})};
+ let html=render();
+ assert.match(html,/data-campaign="image-library" data-id="session"[^>]*>Add image</,'pictures come from the library');assert.doesNotMatch(html,/type="file"/,'no file chooser');
+ d.click('image-library','session');await new Promise(r=>setTimeout(r));
  assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),JSON.stringify([picture]));
  assert.match(render(),/campaign-image"><img src="data:image\/png/);
  await d.click('image-remove','session:0');
  assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),'[]');
  render();d.click('section','plots');await d.click('plot-new');
- await d.documentListeners.change({target:{dataset:{entryImage:'plot'},files:[{type:'image/png'}],value:'x'}});
+ d.click('image-library','plot');await new Promise(r=>setTimeout(r));
  assert.match(render(),/data-campaign="image-remove" data-id="plot:0"/);
 });
 

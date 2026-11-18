@@ -256,3 +256,15 @@ body:has(.campaign-entry[open]){overflow:hidden}
 /* Private journal entries (P1, P2…): seen on the map only by their player and the GM. */
 .map-tray-note.map-tray-private{border-style:dashed;background:#2f2b26;color:#fff}
 .timeline-pin-number.timeline-pin-private{background:#2f2b26;border-style:dashed}
+/* Session and plot panels do not scroll themselves: the header, pictures and buttons keep their
+   height and the journal fills the rest, so each entry scrolls on its own. (A panel whose fixed
+   parts are taller than the screen still scrolls, as a fallback.) */
+.campaign-entry[open]:is([data-entry^="sessions:"],[data-entry^="plots:"])>.campaign-entry-body{display:flex;flex-direction:column}
+.campaign-entry[open]:is([data-entry^="sessions:"],[data-entry^="plots:"])>.campaign-entry-body>*{flex:none}
+.campaign-entry[open]:is([data-entry^="sessions:"],[data-entry^="plots:"])>.campaign-entry-body>:is(.campaign-plot,.campaign-notes),
+.campaign-entry[open] .campaign-plot>.campaign-notes{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.campaign-entry[open] .campaign-plot>*:not(.campaign-notes){flex:none}
+.campaign-entry[open] .campaign-notes>.creator-journal{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.campaign-entry[open] .creator-journal>*{flex:none}
+.campaign-entry[open] .creator-journal>.creator-journal-strip{flex:0 1 auto;min-height:0;overflow-y:hidden;align-items:stretch}
+.campaign-entry[open] .creator-journal-strip>.creator-journal-entry{max-height:none;margin:0}
