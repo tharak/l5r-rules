@@ -101,12 +101,22 @@
   // rendered, so a stored value can never become a script or remote URL.
   const PORTRAIT_PATTERN = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
   const PORTRAIT_MAX_LENGTH = 120000;
-  const isPortrait = value => typeof value === 'string' && value.length <= PORTRAIT_MAX_LENGTH && PORTRAIT_PATTERN.test(value);
+  // Checked once per picture: a page asks about the same portrait many times (pins, tray, tiles).
+  const portraitChecks = new Map();
+  const isPortrait = value => {
+    if (typeof value !== 'string' || value.length > PORTRAIT_MAX_LENGTH) return false;
+    let valid = portraitChecks.get(value);
+    if (valid === undefined) {
+      if (portraitChecks.size >= 1000) portraitChecks.clear();
+      valid = PORTRAIT_PATTERN.test(value); portraitChecks.set(value,valid);
+    }
+    return valid;
+  };
   // The picker renders the current picture (or a placeholder), a file input and,
   // when there is a picture, a Remove button. Controllers handle both events.
   function portrait({label='Picture',src='',name='',attrs={},inputAttrs={},removeAttrs={},actionsHtml=''} = {}) {
     const image = isPortrait(src)
-      ? `<img class="ui-portrait-image" src="${src}" alt="${escape(name ? `Picture of ${name}` : label)}">`
+      ? `<img class="ui-portrait-image" src="${imageLink(src)}" alt="${escape(name ? `Picture of ${name}` : label)}">`
       : element('span',{class:'ui-portrait-image ui-portrait-empty','aria-hidden':true},'');
     const pick = element('label',{class:'ui-portrait-pick ui-button ui-button--secondary ui-button--compact'},`${escape(src ? 'Change picture' : 'Add picture')}${element('input',{type:'file',accept:'image/*',...inputAttrs,class:classes('ui-portrait-input',inputAttrs.class),'aria-label':`${src ? 'Change' : 'Add'} ${label.toLowerCase()}`})}`);
     const remove = src ? button({text:'Remove picture',variant:'quiet',size:'compact',attrs:removeAttrs}) : '';
@@ -252,8 +262,24 @@
   const field_ = (...args) => field(...args);
   // One character tile everywhere (start page PCs, campaign PCs and NPCs): a round avatar
   // (picture, else clan mon, else initial), the name, and a small line under it.
+  // Pictures are stored as data URLs (a portrait ~20 KB, a library map up to ~1 MB), and one
+  // picture can show many times on a page (map pins, tray, tiles). imageLink turns each distinct
+  // one into a short blob: link, made once and reused, so pages do not carry megabytes of text.
+  // The stored value is unchanged; other addresses pass through.
+  const imageLinks = new Map();
+  function imageLink(src) {
+    if (typeof src !== 'string' || !src.startsWith('data:image/') || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function' || typeof Blob === 'undefined' || typeof atob === 'undefined') return src;
+    let link = imageLinks.get(src);
+    if (!link) {
+      const comma = src.indexOf(',');
+      if (comma < 0 || !src.slice(0,comma).endsWith(';base64')) return src;
+      try { link = URL.createObjectURL(new Blob([Uint8Array.from(atob(src.slice(comma + 1)),c => c.charCodeAt(0))],{type:src.slice(5,src.indexOf(';'))})); } catch { return src; }
+      imageLinks.set(src,link);
+    }
+    return link;
+  }
   function characterAvatar({portrait,clan,name} = {}) {
-    if (isPortrait(portrait)) return `<img class="character-avatar" src="${portrait}" alt="">`;
+    if (isPortrait(portrait)) return `<img class="character-avatar" src="${imageLink(portrait)}" alt="">`;
     const mon = window.CharacterCatalog?.clanMon(clan || '');
     if (mon) return `<img class="character-avatar character-avatar-mon" src="${escape(mon)}" alt="">`;
     // No picture and no clan: the Five Rings mark.
@@ -263,7 +289,7 @@
   // centred, cropped background (see clanTileStyle). The avatar: picture, else clan mon, else rings.
   const characterTileBody = ({portrait,clan,name,meta}) => `${characterAvatar({portrait,clan,name})}<span class="character-tile-text"><strong>${escape(name)}</strong>${meta ? `<small>${escape(meta)}</small>` : ''}</span>`;
   // Any image behind a tile: faint, centred, cropped (see .home-tile[data-tile-mon]).
-  const tileArtStyle = src => src ? ` style="--tile-mon:url('${escape(src)}')" data-tile-mon` : '';
+  const tileArtStyle = src => src ? ` style="--tile-mon:url('${escape(imageLink(src))}')" data-tile-mon` : '';
   function clanTileStyle(clan) { return tileArtStyle(window.CharacterCatalog?.clanMon(clan || '')); }
   // Journal strip buttons scroll their entry into view.
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click',event => {
@@ -273,5 +299,5 @@
     const target = [...(strip?.children || [])].find(item => item.dataset.journalId === jump.dataset.journalJump);
     if (target) strip.scrollTo({left:target.offsetLeft - strip.offsetLeft,behavior:'smooth'});
   });
-  window.UI = {characterAvatar,characterTileBody,clanTileStyle,tileArtStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
+  window.UI = {imageLink,characterAvatar,characterTileBody,clanTileStyle,tileArtStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

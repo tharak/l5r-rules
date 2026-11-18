@@ -168,7 +168,7 @@
   const MAX_IMAGES = 4;
   function gallery(images,{kind = '',editable = false} = {}) {
     const list = (images || []).filter(UI.isPortrait);
-    const thumbs = list.map((src,index) => `<figure class="campaign-image"><img src="${src}" alt="Image ${index+1}">${editable ? button('image-remove','Remove',`${kind}:${index}`) : ''}</figure>`).join('');
+    const thumbs = list.map((src,index) => `<figure class="campaign-image"><img src="${UI.imageLink(src)}" alt="Image ${index+1}">${editable ? button('image-remove','Remove',`${kind}:${index}`) : ''}</figure>`).join('');
     // Pictures come from the library, where an image can also be uploaded or linked.
     const add = editable && list.length < MAX_IMAGES ? button('image-library','Add image',kind) : '';
     return thumbs || add ? `<div class="campaign-images">${thumbs}${add}</div>` : '';
@@ -365,7 +365,7 @@
     }).filter(Boolean).sort((a,b) => (a.note?.order || a.note?.number || 0) - (b.note?.order || b.note?.number || 0));
   }
   const tokenClass = (kind,target) => target?.place ? 'place' : kind;
-  const tokenFace = target => target.image ? `<img src="${target.image}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
+  const tokenFace = target => target.image ? `<img src="${UI.imageLink(target.image)}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
   const numberBadge = note => note ? `<b class="timeline-pin-number${note.private ? ' timeline-pin-private' : ''}"${note.private ? ' title="Private: only its player and the GM see it"' : ''}>${note.number}</b>` : '';
   function renderTimeline(isGM,pcs,npcs) {
     const numbers = numberedNotes(), pins = mapPins(numbers);
@@ -387,14 +387,14 @@
     // Folding the groups reaches pins under the tray; a pin dropped on the tray is taken off the map.
     const tray = !groups ? '' : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map">${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}${groups}</div>`;
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
-    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
+    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(UI.imageLink(mapSrc()))}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}`;
   }
   // A numbered note in a popup: from a pin, or from its number in the tray.
   function renderNotePopup(numbers) {
     const note = notePopup && numbers.get(notePopup), target = note && pinTarget(note.kind,note.targetId), pin = note && mapPins(numbers).find(p => p.key === notePopup);
     if (!note || !target) return '';
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${UI.imageLink(target.image)}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
   }
   // The campaign map: a media library picture the GM chose, else the map of Rokugan.
   const loadingMaps = new Set();
@@ -524,7 +524,7 @@
     const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${UI.imageLink(npc.portrait)}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
   // "Remove from map" for a character's token or one of its notes, when it is pinned and this
