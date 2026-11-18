@@ -518,6 +518,22 @@ test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close b
   assert.doesNotMatch(render(),/campaign-popup/,`${title} closes`);
  }
 });
+test('+ Plot asks for a title and a first entry; saving makes the plot, then that entry as its first note',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.store.uid='alice';
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();await d.click('plot-new');
+ assert.match(render(),/data-entry-field="firstEntry"/,'the new plot form has a First entry box');
+ const input=(name,value)=>d.documentListeners.input({target:{dataset:{entryField:name,entryKind:'plot'},value}});
+ input('title','The missing ferry');input('firstEntry','  The ferryman vanished at dawn.  ');
+ await d.click('plot-save');
+ const plots=[...d.data].filter(([k])=>k.startsWith('campaigns/c/plots/')),notes=[...d.data].filter(([k])=>k.startsWith('campaigns/c/notes/'));
+ assert.equal(plots.length,1);assert.ok(!('firstEntry' in plots[0][1]),'the plot does not keep the draft field');
+ const plotId=plots[0][0].split('/').pop();
+ assert.equal(notes.length,1);assert.deepEqual([notes[0][1].text,notes[0][1].targetKind,notes[0][1].targetId,notes[0][1].targetCreatorUid],['The ferryman vanished at dawn.','plots',plotId,'alice']);
+ await d.click('plot-edit',plotId);
+ assert.doesNotMatch(render(),/data-entry-field="firstEntry"/,'editing a plot keeps its journal for entries');
+});
 test('NPCs have a name, role, description and a notes list (journal entries)',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

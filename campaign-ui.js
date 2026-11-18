@@ -177,6 +177,8 @@
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
       {label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
+      // A new plot can start its journal at once; later entries come from "+ Entry".
+      ...(plot&&!plotId?[{label:'First entry',kind:'textarea',value:draft.firstEntry||'',attrs:{...attrs('firstEntry'),rows:6,maxlength:20000,placeholder:'What is this plot about?'}}]:[]),
     ],extraHtml:gallery(draft.images,{kind:'plot',editable:true}),actionsHtml:button(kind+'-save','Save plot','',!draft.title.trim())+button(kind+'-cancel','Cancel')+(plot&&plotId?button('plot-delete','Delete plot',plotId):'')});
   }
   function sessionEditor(session,isGM) {
@@ -719,8 +721,10 @@
           Object.assign(data,{targetKind:noteTarget.kind,targetId:noteTarget.id});
           if(noteTarget.kind==='plots')data.targetCreatorUid=store().get(path('plots',noteTarget.id))?.creatorUid;
         }
-        delete data.id;
+        delete data.id;const firstEntry=plot&&!plotId?String(data.firstEntry||'').trim():'';delete data.firstEntry;
         store().queue(path(plot?'plots':'notes',entryId),data);
+        // The new plot's first entry is saved after the plot, as its first journal note.
+        if(firstEntry)store().queue(path('notes',crypto.randomUUID()),{title:'',text:firstEntry,public:true,creatorUid:store().uid,createdAt:now,updatedAt:now,revision:crypto.randomUUID(),targetKind:'plots',targetId:entryId,targetCreatorUid:store().uid});
         // Your own changes count as read by you.
         if(plot)markRead('plots',entryId);else if(READ_KINDS.includes(noteTarget.kind))markRead(noteTarget.kind,noteTarget.id);
         if(plot){plotId=entryId;plotDraft=null;openEntries.add(`plots:${entryId}`);}else{noteId='';noteDraft=noteTarget=null;}
