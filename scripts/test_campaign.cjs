@@ -663,6 +663,7 @@ test('board: starts in bands — PCs, then each session and plot with its places
  assert.deepEqual(bands,['Player characters','Sessão 1','Quem matou?','Others'],'sessions, then plots');
  const top=key=>Number(new RegExp(`data-id="${key}" data-x="[\\d.]+" style="left:[\\d.]+%;top:(\\d+)px`).exec(html)[1]);
  assert.ok(top('pcs:p')<top('npcs:c')&&top('npcs:c')<top('npcs:a')&&top('npcs:a')<top('npcs:b')&&top('npcs:b')<top('npcs:d'));
+ assert.match(html,/data-campaign="board-arrange"[^]*data-board-search/,'Arrange and the search box are in the header');
  assert.match(html,/class="board-card board-card-place[^"]*" data-campaign="board-card" data-id="npcs:c"/,'a place is told apart');
  d.data.set('campaigns/c/board/npcs:d',{x:500,y:30,updatedAt:'1'});
  d.window.CampaignUI.render('campaigns/c');d.window.confirm=()=>true;
