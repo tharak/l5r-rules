@@ -359,6 +359,8 @@ function setPageArt(src,wash = '') {
   if (wash) document.body.style.setProperty('--page-wash',wash); else document.body.style.removeProperty('--page-wash');
 }
 window.setPageArt = setPageArt;
+// A page that showed "Opening page…" until the full text arrived.
+function needsText() { const slug = currentSlug(); return !!$('#app .loading') && (slug === 'design-guideline' || !!state.data.pages[slug]); }
 function render() {
   if (!state.data) return;
   const slug = currentSlug();
@@ -403,6 +405,8 @@ function render() {
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
   window.DesignGuideline.unmount();
+  // Rule pages and the design guide wait for the full text (the index only has headings).
+  if (state.data.partial && (designGuide || (page && !campaignRoute && slug !== 'start'))) { $('#app').innerHTML = '<div class="loading">Opening page…</div>'; renderNavigation(); return; }
   $('#app').innerHTML = designGuide ? window.DesignGuideline.render(state.data) : slug === 'start' ? renderHome() : slug === 'library' ? window.MediaLibrary.render() : campaignRoute ? window.CampaignUI.render(slug) : slug === 'characters' ? renderCharacters() : slug === 'books' ? renderBooks() : slug === 'all-pages' ? renderDirectory() : characterEditor ? '<div class="loading">Opening character…</div>' : characterMissing ? '<div class="workspace"><h1>Character not found</h1><a href="#/characters">Characters</a></div>' : portraitCreator ? '' : clanMons ? '<p class="workspace">Loading clan mons…</p>' : officialImages ? '<p class="workspace">Loading official images…</p>' : publicPC ? '' : page ? renderArticle(page) : '<div class="not-found"><h1>Page unavailable</h1><a href="#/books">Books</a></div>';
   if (designGuide) window.DesignGuideline.mount($('#app'));
   if (slug === 'library') window.MediaLibrary.mount($('#app'));
@@ -498,4 +502,15 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Enter') { location.hash = pageHref(state.searchMatches[state.activeMatch].slug); closeSearch(); }
 });
 
-fetch('public/wiki.json').then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); }).then(data => { state.data = data; addDeepNavigation(); buildBookPaths(); render(); }).catch(error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); });
+// The small index (built by scripts/build_site.cjs) draws the page at once; the full text follows.
+// Serving the repository root has no index, so it loads wiki.json straight away.
+const loadJson = url => fetch(url).then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); });
+const archiveUnavailable = error => { $('#app').innerHTML = `<div class="not-found"><h1>Archive unavailable</h1><p>The content could not be loaded. Please refresh the page.</p></div>`; console.error(error); };
+let fullWiki = null;
+const loadFull = () => fullWiki ||= loadJson('public/wiki.json');
+loadJson('public/wiki-index.json').catch(loadFull).then(data => {
+  state.data = data; addDeepNavigation(); buildBookPaths(); render();
+  if (!data.partial) return;
+  // The menus are already built from the index; only the page text changes.
+  loadFull().then(full => { state.data = {...full,navigation:state.data.navigation}; if (needsText()) render(); if ($('#search-input')?.value.trim()) renderSearchResults(); }).catch(archiveUnavailable);
+}).catch(archiveUnavailable);

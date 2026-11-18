@@ -9,7 +9,11 @@ for (const file of ['ui-components.js','ui-components.css','routes.js','characte
   fs.copyFileSync(path.join(root,file), path.join(output,file));
 }
 fs.mkdirSync(path.join(output,'public'), {recursive:true});
-fs.writeFileSync(path.join(output,'public','wiki.json'),JSON.stringify(require('./sanitize_content.cjs')(JSON.parse(fs.readFileSync(path.join(root,'public','wiki.json'),'utf8')))));
+const wiki = require('./sanitize_content.cjs')(JSON.parse(fs.readFileSync(path.join(root,'public','wiki.json'),'utf8')));
+fs.writeFileSync(path.join(output,'public','wiki.json'),JSON.stringify(wiki));
+// The first load reads a small index: each page keeps only its headings and page links (enough for
+// the book menus); app.js swaps in the full wiki.json when it arrives.
+fs.writeFileSync(path.join(output,'public','wiki-index.json'),JSON.stringify(require('./wiki_index.cjs')(wiki)));
 fs.copyFileSync(path.join(root,'public','character-data.json'),path.join(output,'public','character-data.json'));
 fs.cpSync(path.join(root,'public','assets'),path.join(output,'public','assets'),{recursive:true});
 console.log('Built Firebase Hosting assets in dist/');

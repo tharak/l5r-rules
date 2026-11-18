@@ -12,7 +12,7 @@ const groups = [
   {source:'Families',items:from('clans/families')},
   {source:'Lore',items:from('lore').filter(i => !/shadowlands-map/.test(i.src))},
   {source:'Rings',items:from('rings')},
-  {source:'Site',items:from('').filter(i => !/rokugan-map|parchment/.test(i.src))},
+  {source:'Site',items:from('').filter(i => !/rokugan-map/.test(i.src))},
 ];
 fs.writeFileSync(path.join(assets,'library.json'),JSON.stringify({groups},null,1)+'\n');
 console.log(groups.map(g => `${g.source}: ${g.items.length}`).join(', '));
