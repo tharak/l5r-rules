@@ -5,6 +5,14 @@ const esc = UI.escape;
 // Rule pages that sit in a book live at their place in it: #/books/water/maho.
 // Built from the book tree once the wiki loads; other slugs stay flat (#/equipment).
 const bookPaths = new Map(), BOOK_RINGS = {'book-of-air':'air','book-of-earth':'earth','book-of-fire':'fire','book-of-water':'water','book-of-the-void':'void'};
+// What each of the five books covers, shown under its title.
+const BOOK_LEADS = {
+  'book-of-air':'The setting: the history of Rokugan, its religion, the code of Bushido and the people who live by it.',
+  'book-of-earth':'The core mechanics: how rolls work and how combat is fought.',
+  'book-of-fire':'Making a samurai: character creation, families, schools, advantages and disadvantages, ancestors, skills and equipment.',
+  'book-of-water':'Advanced rules: the Shadowlands Taint, katas, maho and mass battle.',
+  'book-of-the-void':'Magic and its secrets: how spells work, the spells of each element, kiho, and the lore of the Nothing, the nezumi and the naga.',
+};
 const pageHref = slug => `#/${(bookPaths.get(slug) || slug).split('/').map(encodeURIComponent).join('/')}`;
 
 // A route path (books/water/maho) or a flat slug, to the page slug it shows.
@@ -124,9 +132,13 @@ function renderNavigation() {
     if (selected) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   });
 }
+// A book's sections as a nested list; deeper sections fold under their parent. The Books page
+// and each book's own page show the same tree.
+function bookTree(items, open = false) {
+  return `<ul>${items.map(item => `<li>${UI.link({href:navHref(item),text:item.title})}${item.children?.length ? `<details class="book-sections"${open ? ' open' : ''}><summary aria-label="${esc(item.title)} sections"></summary>${bookTree(item.children)}</details>` : ''}</li>`).join('')}</ul>`;
+}
 function renderBooks() {
-  const entries = items => `<ul>${items.map(item => `<li>${UI.link({href:navHref(item),text:item.title})}${item.children?.length ? `<details class="book-sections"><summary aria-label="${esc(item.title)} sections"></summary>${entries(item.children)}</details>` : ''}</li>`).join('')}</ul>`;
-  return `<div class="workspace"><h1>Books</h1><div class="books-grid">${bookSections().map(book => UI.panel({attrs:{'class':'panel'},bodyHtml:`<h2>${bookMark(book.slug)}<a href="${pageHref(book.slug)}">${esc(book.title)}</a></h2>${entries(book.children)}`})).join('')}</div><a href="#/all-pages">All pages</a></div>`;
+  return `<div class="workspace"><h1>Books</h1><div class="books-grid">${bookSections().map(book => UI.panel({attrs:{'class':'panel'},bodyHtml:`<h2>${bookMark(book.slug)}<a href="${pageHref(book.slug)}">${esc(book.title)}</a></h2>${bookTree(book.children)}`})).join('')}</div><a href="#/all-pages">All pages</a></div>`;
 }
 
 function bookMark(slug) {
@@ -267,7 +279,21 @@ function renderArticle(page) {
     }
     return null;
   };
-  const relatedSection = findParent(state.data.navigation);
+  // A book page is its own table of contents: a short lead and a card per section. The wiki's
+  // book pages are only an image and a bare list of links (Air has no links at all), so the
+  // link lists and empty image boxes are dropped in favour of the cards.
+  const book = bookSections().find(entry => entry.slug === page.slug);
+  if (book) {
+    for (const block of wrapper.querySelectorAll('p, ul, ol')) {
+      const links = [...block.querySelectorAll('a')].map(a => a.textContent).join('').replace(/\s+/g,'');
+      if (links && links === block.textContent.replace(/\s+/g,'')) block.remove();
+    }
+    for (const box of wrapper.querySelectorAll('.image-container')) if (!box.querySelector('img')) box.remove();
+  }
+  const bookLead = book && BOOK_LEADS[book.slug] ? `<p class="book-lead">${esc(BOOK_LEADS[book.slug])}</p>` : '';
+  // The full tree, as on the Books page, with each top section's subsections unfolded.
+  const bookContents = book?.children?.length ? `<section class="book-contents"><h2>In this book</h2>${bookTree(book.children, true)}</section>` : '';
+  const relatedSection = book ? null : findParent(state.data.navigation);
   const related = relatedSection?.children.filter(x => x.slug !== page.slug).slice(0, 3) || [];
   for (const link of wrapper.querySelectorAll('a[href]')) {
     if (/^https?:/.test(link.getAttribute('href'))) {
@@ -277,7 +303,7 @@ function renderArticle(page) {
       else link.replaceWith(document.createTextNode(link.textContent));
     }
   }
-  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1>${esc(page.title)}</h1></div>${toc.length ? UI.disclosure({attrs:{'class':'inline-contents'},titleHtml:`Contents`,bodyHtml:`<nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>`}) : ''}<div class="article-content">${wrapper.innerHTML}</div>${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
+  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1>${book ? bookMark(book.slug) : ''}${esc(page.title)}</h1>${bookLead}</div>${toc.length ? UI.disclosure({attrs:{'class':'inline-contents'},titleHtml:`Contents`,bodyHtml:`<nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>`}) : ''}<div class="article-content">${wrapper.innerHTML}</div>${bookContents}${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
 
 }
 
