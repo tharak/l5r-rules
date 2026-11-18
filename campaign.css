@@ -245,3 +245,7 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .map-tray-note:hover{border-color:var(--red);color:var(--red)}
 .map-tray-note-pcs{border-bottom:2px solid #3d6f9b}.map-tray-note-npcs{border-bottom:2px solid #7a5296}.map-tray-note-place{border-bottom:2px solid #3b7d3a}
 .map-head-session{border-left:3px solid #3d6f9b!important}
+.map-tray-head{display:flex;gap:6px;align-items:center}
+.map-tray-head .ui-field{flex:1;min-width:0}
+.map-tray-toggle{margin-left:auto}
+.map-tray-hidden{width:auto}

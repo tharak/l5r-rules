@@ -4,7 +4,7 @@
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
-  let timelineSession='', notePopup='', focusPopup=false;
+  let timelineSession='', notePopup='', focusPopup=false, trayHidden=false;
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
@@ -350,16 +350,19 @@
       return `<div class="map-tray-row" data-tray-row>${chip}${notes}</div>`; };
     const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(row).join('')}</div>` : '';
     const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
-    const tray = groups ? `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : ''}${groups}</div>` : '';
+    // The tray can be hidden to reach pins under it; a pin dropped on the tray is taken off the map.
+    const toggle = UI.button({text:trayHidden ? 'PCs & NPCs' : 'Hide',variant:'secondary',size:'compact',attrs:{class:'map-tray-toggle','data-campaign':'tray-toggle','aria-expanded':!trayHidden}});
+    const tray = !groups ? '' : trayHidden ? `<div class="timeline-pin-controls map-tray map-tray-hidden">${toggle}</div>`
+      : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map"><div class="map-tray-head">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : '<span></span>'}${toggle}</div>${groups}</div>`;
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
     const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}`;
   }
   // A numbered note in a popup: from a pin, or from its number in the tray.
   function renderNotePopup(numbers) {
-    const note = notePopup && numbers.get(notePopup), target = note && pinTarget(note.kind,note.targetId);
+    const note = notePopup && numbers.get(notePopup), target = note && pinTarget(note.kind,note.targetId), pin = note && mapPins(numbers).find(p => p.key === notePopup);
     if (!note || !target) return '';
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+button('note-popup-close','Close')})}</div>`;
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
   }
   // The campaign map: a media library picture the GM chose, else the map of Rokugan.
   const loadingMaps = new Set();
@@ -765,6 +768,8 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
       else if (action==='note-popup-close') notePopup='';
+      else if (action==='tray-toggle') trayHidden=!trayHidden;
+      else if (action==='pin-remove') {const item=store().get(path('timeline',id));if(canMovePin(item)){store().queue(path('timeline',id),null);notePopup='';}}
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
       else if (action==='entry-open') {
@@ -860,7 +865,9 @@
     }
     drag.ghost.style.left=`${event.clientX}px`;drag.ghost.style.top=`${event.clientY}px`;
     const svg=showHexes(map),rect=map.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top;
-    const inside=px>=0&&py>=0&&px<=rect.width&&py<=rect.height;
+    // Over the tray counts as off the map (dropping there takes a pin off), so nothing hides under it.
+    const tray=document.querySelector('.map-tray')?.getBoundingClientRect?.(),overTray=!!tray&&event.clientX>=tray.left&&event.clientX<=tray.right&&event.clientY>=tray.top&&event.clientY<=tray.bottom;
+    const inside=!overTray&&px>=0&&py>=0&&px<=rect.width&&py<=rect.height;
     const hex=inside&&snapHex(px,py,rect.width);
     drag.at=hex?{x:Math.min(100,Math.max(0,Math.round(hex.x/rect.width*1000)/10)),y:Math.min(100,Math.max(0,Math.round(hex.y/rect.height*1000)/10))}:null;
     svg?.querySelector('.map-hex-target')?.setAttribute('d',hex?hexPath(hex.x,hex.y,rect.width*HEX):'');

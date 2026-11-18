@@ -291,7 +291,17 @@ test('map: notes are numbered oldest first; characters and their note numbers dr
  assert.ok(d.data.get(key).x>50);
  await d.click('note-popup','npcs:n:d');
  assert.match(render(),/role="dialog"[^]*#4<\/span> Flees north[^]*Flees north text[^]*data-campaign="entry-open" data-id="npcs:n"/,'a numbered pin opens its note');
+ assert.match(render(),/data-campaign="pin-remove" data-id="[^"]+"/,'the popup offers Remove pin');
  await d.click('note-popup-close');
+ // Hiding the tray reaches pins under it; a drop over the tray takes the pin off the map.
+ await d.click('tray-toggle');
+ assert.match(render(),/map-tray map-tray-hidden[^]*data-campaign="tray-toggle"[^>]*>PCs &amp; NPCs</);assert.doesNotMatch(render(),/data-tray-token/);
+ await d.click('tray-toggle');
+ const pinsBefore=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length;
+ const query=d.doc.querySelector;d.doc.querySelector=selector=>selector==='.map-tray'?{getBoundingClientRect:()=>({left:0,top:0,right:200,bottom:300})}:query(selector);
+ drag(trayToken('npcs:k:c'),[10,500],[100,100]);
+ assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,pinsBefore,'nothing is dropped under the tray');
+ d.doc.querySelector=query;
  drag(mapToken(key.split('/').pop()),[400,300],[700,500]);
  assert.equal(d.data.has(key),false,'off the map, it is removed');
 });
