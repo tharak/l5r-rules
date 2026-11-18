@@ -253,50 +253,53 @@ function dragOnMap(d,sessionId){
 }
 const trayToken=key=>({dataset:{trayToken:key},className:`map-tray-token map-tray-${key.split(':')[0]}`,querySelector:()=>null,classList:{add(){},remove(){}}});
 const mapToken=id=>({dataset:{pinId:id},className:'timeline-pin timeline-pin-npcs',querySelector:()=>null,classList:{add(){},remove(){}}});
-test('map: newest sessions first; PCs, people and places dragged from the tray snap to a hex; dragged off the map they go',async()=>{
+test('map: notes are numbered oldest first; characters and their note numbers drag onto the map, snap to a hex, and leave it when dragged off',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  let html=render();
  assert.match(html,/timeline-map/);
  assert.match(html,/<h2 class="visually-hidden">Timeline<\/h2>/,'the map row has no visible title');
- assert.match(html,/Add a session to place PCs and NPCs/);
- d.data.set('campaigns/c/sessions/s1',{title:'First session',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-20'});
- d.data.set('campaigns/c/sessions/s2',{title:'Second session',text:'',createdAt:'2026-11-08',updatedAt:'2026-11-08'});
+ d.data.set('campaigns/c/sessions/s1',{title:'First session',text:'',createdAt:'2026-11-01'});
+ d.data.set('campaigns/c/sessions/s2',{title:'Second session',text:'',createdAt:'2026-11-08'});
  d.data.set('campaigns/c/npcs/n',{name:'Court messenger',notes:''});
  d.data.set('campaigns/c/npcs/k',{name:'Shiro Kitsuki',role:'O Castelo da Pergunta',notes:''});
+ const note=(id,kind,target,title,at)=>d.data.set(`campaigns/c/notes/${id}`,{creatorUid:'gm',public:true,targetKind:kind,targetId:target,title,text:`${title} text`,createdAt:at,updatedAt:at,revision:'r'});
+ note('a','sessions','s1','We arrive','2026-11-01');note('b','npcs','n','Carries a letter','2026-11-02');note('c','npcs','k','The gate is shut','2026-11-03');note('d','npcs','n','Flees north','2026-11-04');
  html=render();
- assert.ok(html.indexOf('Second session')<html.indexOf('First session'),'newest first');
- assert.match(html,/data-timeline-map="s2"/,'newest session selected');
+ assert.ok(html.indexOf('Second session')<html.indexOf('First session'),'sessions newest first on the map head');
  assert.match(html,/map-head[^]*data-campaign="npc-new"[^]*data-campaign="pc-picker"/,'+ NPC and + PC sit on the map');
- assert.match(html,/aria-label="People"[^]*data-tray-token="npcs:n"[^]*aria-label="Places"[^]*class="map-tray-token map-tray-place" data-tray-token="npcs:k"/,'people and places in the tray');
- assert.doesNotMatch(html,/board|timeline-target|timeline-entry/,'no board and no note picker');
- const drag=dragOnMap(d,'s2');
- drag(trayToken('npcs:n'),[10,500],[100,100]);
- let [key]=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/'));
- const token=d.data.get(key);
- assert.equal(`${token.sessionId} ${token.kind}:${token.targetId} ${token.creatorUid}`,'s2 npcs:n gm');
- assert.equal(token.x,14.9,'snapped to the hex centre, not the pointer');assert.ok(Math.abs(token.y-26.25)<0.1);
+ assert.doesNotMatch(html,/timeline-session|timeline-list/,'no session picker for pins');
+ assert.match(html,/data-tray-token="npcs:n"[^]*?data-tray-token="npcs:n:b"[^>]*>2<[^]*?data-tray-token="npcs:n:d"[^>]*>4</,'each character is followed by its note numbers');
+ assert.match(html,/aria-label="Places"[^]*data-tray-token="npcs:k:c"[^>]*>3</);
+ await d.click('entry-open','npcs:n');
+ assert.match(render(),/creator-journal-number" title="Note number">#2<\/span>[^]*Carries a letter/,'the numbers show in the journals too');
+ await d.click('entry-close','npcs:n');
+ const drag=dragOnMap(d,'');
+ drag(trayToken('npcs:n:d'),[10,500],[100,100]);
+ const [key]=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/'));
+ const pin=d.data.get(key);
+ assert.equal(`${pin.kind}:${pin.targetId}:${pin.noteId} ${pin.creatorUid} ${'sessionId' in pin}`,'npcs:n:d gm false');
+ assert.equal(pin.x,14.9,'snapped to the hex centre, not the pointer');assert.ok(Math.abs(pin.y-26.25)<0.1);
  html=render();
- assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-movable" data-pin-id="[^"]+" style="left:14.9%;[^]*data-campaign="token-open" data-id="npcs:n"[^>]*>[^]*Court messenger/);
- assert.match(html,/map-tray-placed" data-tray-token="npcs:n"/,'marked as on the map in the tray');
- // Dragging it from the tray again moves the same token.
+ assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-note timeline-pin-movable" data-pin-id="[^"]+" style="left:14.9%;[^]*data-campaign="note-popup" data-id="npcs:n:d"[^]*timeline-pin-number">4</);
+ assert.match(html,/map-tray-placed" data-tray-token="npcs:n:d"/,'marked as on the map in the tray');
  drag(trayToken('npcs:n'),[10,500],[300,200]);
- assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,1);
- assert.ok(d.data.get(key).x>40);
- // Off the map, it is removed.
- drag(mapToken(key.split('/').pop()),[300,200],[700,500]);
- assert.equal(d.data.has(key),false);
- // A click opens its NPC.
- await d.click('token-open','npcs:n');
- assert.match(render(),/class="campaign-entry" data-entry="npcs:n" open/);
+ assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,2,'the character itself is a separate token');
+ drag(trayToken('npcs:n:d'),[10,500],[400,300]);
+ assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,2,'dragging the note again moves its pin');
+ assert.ok(d.data.get(key).x>50);
+ await d.click('note-popup','npcs:n:d');
+ assert.match(render(),/role="dialog"[^]*#4<\/span> Flees north[^]*Flees north text[^]*data-campaign="entry-open" data-id="npcs:n"/,'a numbered pin opens its note');
+ await d.click('note-popup-close');
+ drag(mapToken(key.split('/').pop()),[400,300],[700,500]);
+ assert.equal(d.data.has(key),false,'off the map, it is removed');
 });
 test('map: players place tokens too; they move only their own, the GM moves any',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
  d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
- d.data.set('campaigns/c/timeline/mine',{sessionId:'s',kind:'npcs',targetId:'n',x:10,y:10,createdAt:'1',updatedAt:'1',creatorUid:'alice'});
+ d.data.set('campaigns/c/timeline/mine',{kind:'npcs',targetId:'n',x:10,y:10,createdAt:'1',updatedAt:'1',creatorUid:'alice'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  const drag=dragOnMap(d,'s');
  d.store.uid='bob';assert.doesNotMatch(render(),/timeline-pin-movable/);
@@ -366,7 +369,7 @@ test('the map comes first by default',async()=>{
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  let html=render();
  assert.ok(html.indexOf('>Sessions</h2>')<html.indexOf('>Timeline</h2>'),'the map comes after the rows');
- assert.match(html,/data-timeline-map="s"/,'Timeline open by default');
+ assert.match(html,/data-timeline-map>/,'the map is open by default');
  assert.doesNotMatch(html.slice(html.indexOf('timeline-detail')),/<h3>New session 1<\/h3>/,'no session heading above the map');
  assert.match(html,/data-id="npcs:n"/);
 });
@@ -389,10 +392,9 @@ test('campaign links open a section and item by name + short ID, and clicks move
  d.location.hash='#/campaigns/emerald-dawn-camp1234'; // what history.replaceState does in a browser
  assert.doesNotMatch(d.window.CampaignUI.render('campaigns/emerald-dawn-camp1234'),/data-entry="npcs:npc98765" open/);
  html=d.window.CampaignUI.render('campaigns/camp1234/timeline/session-1-ses4');
- assert.match(html,/data-campaign="timeline-session" data-id="ses45678"[^>]*aria-current="true"/);
- // Clicks change the address so it can be shared and Back works.
- await d.click('timeline-session','ses00000');
- assert.equal(d.location.hash,'#/campaigns/emerald-dawn-camp1234/timeline/session-2-ses0');
+ assert.match(html,/data-entry="sessions:ses45678" open/,'a session link opens that session');
+ assert.match(html,/class="[^"]*map-head-session"[^>]*data-campaign="entry-open" data-id="sessions:ses00000"/,'every session is on the map head');
+ await d.click('entry-close','sessions:ses45678');
  // An unknown item opens nothing and does not fail.
  html=d.window.CampaignUI.render('campaigns/emerald-dawn-camp1234/plots/nobody-zzzz');
  assert.doesNotMatch(html,/class="campaign-entry" data-entry="[^"]+" open/);
@@ -581,17 +583,12 @@ test('the GM sees join requests and approves or declines them',async()=>{
  await d.click('request-approve','alice');for(let i=0;i<3;i++)await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls,[['publish','c','Campaign'],['c','alice',true]]);
 });
-test('the map shows every session\'s pins; pins from other sessions are greyed out',()=>{
+test('older session pins all show on the map; repeats of one character collapse into the latest',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/sessions/s1',{title:'One',text:'',createdAt:'2026-11-01'});
- d.data.set('campaigns/c/sessions/s2',{title:'Two',text:'',createdAt:'2026-11-08'});
  d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
- for(const id of ['a','b'])d.data.set(`campaigns/c/notes/${id}`,{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'n',title:`Note ${id}`,text:'x',createdAt:'2026-11-01',updatedAt:'2026-11-01',revision:'r'});
- d.data.set('campaigns/c/timeline/p1',{sessionId:'s1',kind:'npcs',targetId:'n',noteId:'a',x:10,y:10,createdAt:'1'});
- d.data.set('campaigns/c/timeline/p2',{sessionId:'s2',kind:'npcs',targetId:'n',noteId:'b',x:20,y:20,createdAt:'2'});
- const html=d.window.CampaignUI.render('campaigns/c'); // newest session (Two) is selected
- assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-other" data-pin-id="p1"/);
- assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-movable" data-pin-id="p2"/);
- assert.ok(html.indexOf('data-pin-id="p1"')<html.indexOf('data-pin-id="p2"'),'the selected session\'s pins are drawn on top');
+ d.data.set('campaigns/c/timeline/p1',{sessionId:'s1',kind:'npcs',targetId:'n',x:10,y:10,createdAt:'1',updatedAt:'1'});
+ d.data.set('campaigns/c/timeline/p2',{sessionId:'s2',kind:'npcs',targetId:'n',x:20,y:20,createdAt:'2',updatedAt:'2'});
+ const html=d.window.CampaignUI.render('campaigns/c');
+ assert.match(html,/data-pin-id="p2"/);assert.doesNotMatch(html,/data-pin-id="p1"/);assert.doesNotMatch(html,/timeline-pin-other/);
 });

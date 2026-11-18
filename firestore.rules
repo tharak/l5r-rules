@@ -158,8 +158,8 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
-      // Map tokens: members drag PCs and NPCs onto a session's map; a token is moved or removed
-      // by whoever placed it, or by the GM. Older pins also carry a noteId.
+      // Map pins: members drag PCs, NPCs and their numbered notes onto the map; a pin is moved or
+      // removed by whoever placed it, or by the GM. Older pins also carry a sessionId.
       // Pins from before players could place them have no creatorUid and count as the GM's.
       match /timeline/{id} {
         function placedBy(d) { return 'creatorUid' in d ? d.creatorUid : ''; }
@@ -168,7 +168,7 @@ service cloud.firestore {
           && (gm(c) || (placedBy(request.resource.data) == request.auth.uid && (resource == null || placedBy(resource.data) == request.auth.uid)))
           && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt','creatorUid'])
           && request.resource.data.kind in ['pcs','npcs']
-          && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80
+          && (!('sessionId' in request.resource.data) || (request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80))
           && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80
           && (!('noteId' in request.resource.data) || (request.resource.data.noteId is string && request.resource.data.noteId.size() <= 80))
           && request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 100

@@ -8,7 +8,7 @@
   const options = (title,items) => items?.length ? `<section class="public-pc-block"><h2>${title}</h2><ul>${items.map(item => `<li>${esc(item.name)}${item.selection ? ` <small>(${esc(item.selection)})</small>` : ''}</li>`).join('')}</ul></section>` : '';
   // Journal entries from the player (in the profile) and the GM (added later), newest first.
   function journal(entries) {
-    const list = entries.map(entry => ({id:entry.id,title:entry.title,text:entry.text,date:entry.createdAt,author:entry.authorName || ''}));
+    const list = entries.map(entry => ({id:entry.id,number:entry.number,title:entry.title,text:entry.text,date:entry.createdAt,author:entry.authorName || ''}));
     return `<section class="public-pc-block public-pc-journal"><h2>Journal</h2>${UI.journal({entries:list,emptyText:'No public journal entries yet.'})}</section>`;
   }
   // `compact` renders the profile without the page wrapper and title, for campaign lists.

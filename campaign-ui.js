@@ -4,7 +4,7 @@
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
-  let timelineSession='', focusPopup=false;
+  let timelineSession='', notePopup='', focusPopup=false;
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
@@ -129,7 +129,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
-    timelineSession='';inviteLink='';inviteCopied=false;transferPopup='';
+    timelineSession='';notePopup='';inviteLink='';inviteCopied=false;transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -249,7 +249,8 @@
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
     const canAdd=canAddEntry(kind,id);
     if(!notes.length&&!canAdd&&!drafting)return '';
-    const entries=notes.map(n=>({id:n.id,title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
+    const numbers=numberedNotes();
+    const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
     const control=(name,entryId)=>({'data-campaign':`note-${name}`,'data-id':name==='new'?`${kind}:${id}`:entryId,disabled:busy});
     const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
     return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
@@ -287,6 +288,7 @@
     if (event.key !== 'Escape') return;
     if (transferPopup) { transferPopup = ''; changed(); return; }
     if (drag) { endDrag(); return; }
+    if (notePopup) { notePopup = ''; changed(); return; }
     if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
@@ -296,52 +298,68 @@
   const entry = (key,summaryHtml,bodyHtml,tileAttrs = '') => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}${tileAttrs}><summary>${summaryHtml}</summary><div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">${summaryHtml}${button('entry-close','✕',key)}</div>${bodyHtml}</div></details>`;
   const entryTitle = (title,meta) => `<span class="campaign-entry-title">${e(title)}</span>${meta?`<small class="campaign-entry-meta">${meta}</small>`:''}`;
   const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
-  // The map: each session's map holds PC and NPC tokens. Members drag them from the tray onto
-  // the selected session's map, where a hex grid shows while dragging and the token snaps to
-  // the hex under it; dragging a token off the map takes it off. Positions are stored in percent.
+  // Note numbers: every note in the campaign is numbered, oldest first — session, plot, NPC
+  // and PC notes and the public entries of PC journals — so the notes read in order without
+  // picking a session or plot. Keys are "<kind>:<targetId>:<noteId>".
+  const noteKey = (kind,targetId,noteId) => `${kind}:${targetId}:${noteId}`;
+  const splitKey = key => { const [kind,targetId,...rest] = key.split(':'); return {kind,targetId,noteId:rest.join(':')}; };
+  function numberedNotes() {
+    const exists = (kind,id) => ['sessions','plots','npcs','pcs'].includes(kind) && !!store().get(path(kind,id));
+    const notes = store().list(path('notes','')).filter(n => exists(n.targetKind,n.targetId)).map(n => ({kind:n.targetKind,targetId:n.targetId,id:n.id,title:UI.entryTitle(n),text:n.text || '',author:entryAuthor(n),date:n.createdAt || n.updatedAt || ''}));
+    const journals = store().list(path('pcs','')).flatMap(pc => (sheets.get(pc.id+':public')?.data?.profile?.journal || []).map(j => ({kind:'pcs',targetId:pc.id,id:`journal:${j.id}`,title:UI.entryTitle(j),text:j.text || '',author:j.authorName || playerName(pc),date:j.createdAt || ''})));
+    const list = [...notes,...journals].sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)).map((n,i) => ({...n,number:i + 1}));
+    return new Map(list.map(n => [noteKey(n.kind,n.targetId,n.id),n]));
+  }
+  // The map: PC and NPC tokens, each either the character itself or one of its numbered notes.
+  // Members drag them from the tray; a hex grid shows while dragging and the token snaps to the
+  // hex under it; dragging a token off the map takes it off. Positions are stored in percent.
   const pinTarget = (kind,id) => {
     if (kind === 'pcs') { const pc = store().get(path('pcs',id)); if (!pc) return null; const profile = sheets.get(id+':public')?.data?.profile; return {name:label(pc),image:UI.isPortrait(profile?.portrait) ? profile.portrait : window.CharacterCatalog?.clanMon(profile?.clan || '') || ''}; }
     if (kind === 'npcs') { const npc = store().get(path('npcs',id)); return npc ? {name:npc.name || 'Unnamed NPC',image:UI.isPortrait(npc.portrait) ? npc.portrait : '',place:isPlace(npc)} : null; }
     return null;
   };
   const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
-  // Tokens still pointing at an existing PC or NPC; one per character and session (older
-  // note pins for the same character collapse into the latest one; plot pins are not shown).
-  function mapTokens() {
+  // Pins still pointing at an existing PC or NPC (and note); one per character or note. Older
+  // pins from the session maps collapse into the latest one.
+  function mapPins(numbers) {
     const seen = new Set();
     return store().list(path('timeline','')).sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map(item => {
-      const key = `${item.sessionId}|${item.kind}:${item.targetId}`, target = (item.kind === 'pcs' || item.kind === 'npcs') && !seen.has(key) && pinTarget(item.kind,item.targetId);
-      if (!target) return null;
+      const target = (item.kind === 'pcs' || item.kind === 'npcs') && pinTarget(item.kind,item.targetId);
+      const key = item.noteId ? noteKey(item.kind,item.targetId,item.noteId) : `${item.kind}:${item.targetId}`, note = item.noteId ? numbers.get(key) : null;
+      if (!target || (item.noteId && !note) || seen.has(key)) return null;
       seen.add(key);
-      return {...item,target};
-    }).filter(Boolean).sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      return {...item,target,note,key};
+    }).filter(Boolean).sort((a,b) => (a.note?.number || 0) - (b.note?.number || 0));
   }
   const tokenClass = (kind,target) => target?.place ? 'place' : kind;
   const tokenFace = target => target.image ? `<img src="${target.image}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
+  const numberBadge = note => note ? `<b class="timeline-pin-number">${note.number}</b>` : '';
   function renderTimeline(isGM,pcs,npcs) {
-    const sessions = store().list(path('sessions','')).sort(newestFirst);
-    if (timelineSession && !sessions.some(item => item.id === timelineSession)) timelineSession = '';
-    const selected = sessions.find(item => item.id === timelineSession) || sessions[0] || null;
-    const tokens = mapTokens();
-    const list = sessions.map(session => { const count = tokens.filter(t => t.sessionId === session.id).length; return `<li>${UI.button({html:`<small>${e(day(session.createdAt || session.updatedAt))}</small><span>${e(session.title || 'Untitled session')}</span>${count ? `<b class="timeline-count" title="On the map" aria-label="${count} on the map">${count}</b>` : ''}`,variant:'quiet',attrs:{class:'timeline-event','data-campaign':'timeline-session','data-id':session.id,'aria-current':selected?.id === session.id ? 'true' : false}})}</li>`; }).join('');
-    // Every session's tokens are on the map; the selected session's are in colour and on top,
-    // the others greyed out behind them.
-    const ordered = [...tokens].sort((a,b) => (a.sessionId === selected?.id) - (b.sessionId === selected?.id));
-    const tokenHtml = ordered.map(item => { const mine = item.sessionId === selected?.id, movable = mine && canMovePin(item);
-      return `<span class="timeline-pin timeline-pin-${tokenClass(item.kind,item.target)}${mine ? '' : ' timeline-pin-other'}${movable ? ' timeline-pin-movable' : ''}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${tokenFace(item.target)}<span class="timeline-pin-name">${e(item.target.name)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'token-open','data-id':`${item.kind}:${item.targetId}`,'aria-label':item.target.name,title:movable ? `${item.target.name} · drag to move, or off the map to remove` : item.target.name}})}</span>`; }).join('');
-    // The tray: PCs, people and places, to drag onto the map. Those already on it are marked.
-    let tray = '';
-    if (selected) {
-      const onMap = new Set(tokens.filter(t => t.sessionId === selected.id).map(t => `${t.kind}:${t.targetId}`));
-      const items = [...pcs.map(pc => ['pcs',pc.id]),...npcs.map(n => ['npcs',n.id])].map(([kind,id]) => ({kind,id,target:pinTarget(kind,id)})).filter(item => item.target).sort((a,b) => a.target.name.localeCompare(b.target.name));
-      const chip = item => `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${onMap.has(`${item.kind}:${item.id}`) ? ' map-tray-placed' : ''}" data-tray-token="${item.kind}:${e(item.id)}" data-campaign="token-open" data-id="${item.kind}:${e(item.id)}" title="${e(item.target.name)} · drag onto the map">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
-      const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(chip).join('')}</div>` : '';
-      const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
-      tray = groups ? `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs and NPCs onto the map">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : ''}${groups}</div>` : '';
-    }
+    const numbers = numberedNotes(), pins = mapPins(numbers);
+    const pinHtml = pins.map(item => { const movable = canMovePin(item), label = item.note ? `#${item.note.number} ${item.target.name}: ${item.note.title}` : item.target.name;
+      return `<span class="timeline-pin timeline-pin-${tokenClass(item.kind,item.target)}${item.note ? ' timeline-pin-note' : ''}${movable ? ' timeline-pin-movable' : ''}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${tokenFace(item.target)}${numberBadge(item.note)}<span class="timeline-pin-name">${e(item.target.name)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':item.note ? 'note-popup' : 'entry-open','data-id':item.note ? item.key : `${item.kind}:${item.targetId}`,'aria-label':label,title:movable ? `${label} · drag to move, or off the map to remove` : label}})}</span>`; }).join('');
+    // The tray: each PC, person and place, followed by its note numbers; any of them can be
+    // dragged onto the map. Those already on it are marked.
+    const placed = new Set(pins.map(p => p.key));
+    const items = [...pcs.map(pc => ['pcs',pc.id]),...npcs.map(n => ['npcs',n.id])].map(([kind,id]) => ({kind,id,target:pinTarget(kind,id)})).filter(item => item.target).sort((a,b) => a.target.name.localeCompare(b.target.name));
+    const notesOf = item => [...numbers.values()].filter(n => n.kind === item.kind && n.targetId === item.id);
+    const row = item => { const key = `${item.kind}:${item.id}`;
+      const chip = `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${placed.has(key) ? ' map-tray-placed' : ''}" data-tray-token="${e(key)}" data-campaign="entry-open" data-id="${e(key)}" title="${e(item.target.name)} · drag onto the map">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
+      const notes = notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
+        return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)} · drag onto the map">${n.number}</button>`; }).join('');
+      return `<div class="map-tray-row" data-tray-row>${chip}${notes}</div>`; };
+    const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(row).join('')}</div>` : '';
+    const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
+    const tray = groups ? `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : ''}${groups}</div>` : '';
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
-    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${tokenHtml}</div></div>`;
-    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${selected ? '' : `<p class="campaign-invite-note">${isGM ? 'Add a session' : 'Once the GM adds a session, you can'} to place PCs and NPCs on the map.</p>`}${map}<div class="timeline-arrows"></div></article></div>`;
+    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
+    return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}`;
+  }
+  // A numbered note in a popup: from a pin, or from its number in the tray.
+  function renderNotePopup(numbers) {
+    const note = notePopup && numbers.get(notePopup), target = note && pinTarget(note.kind,note.targetId);
+    if (!note || !target) return '';
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+button('note-popup-close','Close')})}</div>`;
   }
   // The campaign map: a media library picture the GM chose, else the map of Rokugan.
   const loadingMaps = new Set();
@@ -437,10 +455,12 @@
   const PLACE_WORDS = /(^|[^\p{L}])(shiro|kyuden|mura|toshi|koku|toi|jinja|dojo|village|vila|aldeia|cidade|city|castle|castelo|pal[aá]cio|palace|posto|templo|temple|santu[aá]rio|shrine|ponte|bridge|prov[ií]ncia|province|estrada|road|porto|port|floresta|forest|monte|mountain|rio|river|casa de ch[aá]|tea ?house)(?=$|[^\p{L}])/iu;
   const isPlace = npc => typeof npc.place === 'boolean' ? npc.place : PLACE_WORDS.test(npc.name || '') || /^(onde\b|(o|a|the) )/i.test(npc.role || '') && PLACE_WORDS.test(npc.role) || /^onde\b/i.test(npc.role || '');
   // The map is the sessions and plots view: their + buttons, the selected session, and every plot.
+  // The map head: the + buttons, then every session (newest first) and plot; each opens its panel.
   function renderMapHead(isGM,sessions,plots) {
-    const selected = sessions.find(item => item.id === timelineSession) || [...sessions].sort(newestFirst)[0];
-    const plotChips = [...plots].sort(byNewest).map(plot => UI.button({text:plot.title || 'Untitled plot',variant:'quiet',size:'compact',attrs:{class:'map-head-plot','data-campaign':'plot-open','data-id':plot.id}})).join('');
-    return `<div class="map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${isGM ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${selected ? button('session-open','Open session',selected.id) : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
+    const chip = (kind,item,title) => UI.button({text:title,variant:'quiet',size:'compact',attrs:{class:`map-head-${kind === 'plots' ? 'plot' : 'session'}`,'data-campaign':'entry-open','data-id':`${kind}:${item.id}`}});
+    const sessionChips = [...sessions].sort(newestFirst).map(item => chip('sessions',item,item.title || 'Untitled session')).join('');
+    const plotChips = [...plots].sort(byNewest).map(item => chip('plots',item,item.title || 'Untitled plot')).join('');
+    return `<div class="map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${isGM ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${sessionChips ? `<span class="map-head-plots" aria-label="Sessions">${sessionChips}</span>` : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
   }
   // A pin is moved or removed by whoever placed it, or by the GM (older pins count as the GM's).
   const canMovePin = item => !!item && (gm() || (!!item.creatorUid && item.creatorUid === store().uid));
@@ -462,6 +482,13 @@
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
+  // A PC's public journal entries carry their campaign note numbers.
+  function withNumbers(pc,data) {
+    const journal = data?.profile?.journal;
+    if (!journal?.length) return data;
+    const numbers = numberedNotes();
+    return {...data,profile:{...data.profile,journal:journal.map(j => ({...j,number:numbers.get(noteKey('pcs',pc.id,`journal:${j.id}`))?.number}))}};
+  }
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
@@ -471,7 +498,7 @@
       // Your own PC falls back to its local sheet until its public profile arrives.
       const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
       return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan,name:label(pc),meta:profile?.family || mine?.family || ''}),
-        `${window.PublicCharacter ? window.PublicCharacter.page(data,[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`,UI.clanTileStyle(profile?.clan || mine?.clan));
+        `${window.PublicCharacter ? window.PublicCharacter.page(withNumbers(pc,data),[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`,UI.clanTileStyle(profile?.clan || mine?.clan));
     }).join('');
     const picker = '';
     return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(button('pc-picker','+ PC'))}${list}</div>${picker}`;
@@ -508,8 +535,8 @@
     if (pendingItem && window.Routes) {
       const found = window.Routes.resolve(pendingItem.segment,store().list(path(pendingItem.kind,'')));
       if (found) {
-        if (section === 'timeline') { timelineSession = found.id; }
-        else { openEntries.add(`${pendingItem.kind}:${found.id}`); scrollEntry = `${pendingItem.kind}:${found.id}`; }
+        // A session link (timeline/<session>) opens that session's panel over the map.
+        { openEntries.add(`${pendingItem.kind}:${found.id}`); scrollEntry = `${pendingItem.kind}:${found.id}`; }
         pendingItem = null;
       }
     }
@@ -736,11 +763,13 @@
         await backend.acceptPC(t.id,pcId);
       }
       else if (action==='request-invite') await backend.requestInvite(id);
+      else if (action==='note-popup') {notePopup=id;focusPopup=true;}
+      else if (action==='note-popup-close') notePopup='';
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
-      else if (action==='token-open') {
-        // Open the PC or NPC behind a token as its panel.
-        const [kind,targetId]=id.split(':');
+      else if (action==='entry-open') {
+        // Open a PC, NPC, session or plot as its panel (from a token, a popup or the map head).
+        const [kind,targetId]=id.split(':');notePopup='';
         openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);
       }
       else if (action==='npc-portrait-library') {
@@ -806,12 +835,11 @@
   document.addEventListener('pointerdown',event=>{
     const source=event.target.closest?.('[data-tray-token],.timeline-pin[data-pin-id]'), map=mapElement();
     if(!source||!map||event.button!==0)return;
-    const sessionId=map.dataset.timelineMap;
     let item=null,key=source.dataset.trayToken;
-    if(!key){item=store().get(path('timeline',source.dataset.pinId));if(!item||item.sessionId!==sessionId)return;item={...item,id:source.dataset.pinId};key=`${item.kind}:${item.targetId}`;}
-    else item=mapTokens().find(t=>t.sessionId===sessionId&&`${t.kind}:${t.targetId}`===key)||null;
+    if(!key){item=store().get(path('timeline',source.dataset.pinId));if(!item)return;item={...item,id:source.dataset.pinId};key=item.noteId?noteKey(item.kind,item.targetId,item.noteId):`${item.kind}:${item.targetId}`;}
+    else item=mapPins(numberedNotes()).find(p=>p.key===key)||null;
     if(item&&!canMovePin(item))return;
-    drag={source,key,sessionId,item,x0:event.clientX,y0:event.clientY,moved:false,ghost:null,at:null};
+    drag={source,key,item,x0:event.clientX,y0:event.clientY,moved:false,ghost:null,at:null};
   });
   document.addEventListener('pointermove',event=>{
     if(!drag)return;
@@ -823,7 +851,10 @@
       drag.moved=true;
       drag.ghost=document.createElement('div');
       drag.ghost.className=`map-drag-ghost ${drag.source.className.match(/(map-tray|timeline-pin)-(pcs|npcs|place)/)?.[0].replace(/^map-tray/,'timeline-pin')||''}`;
-      drag.ghost.innerHTML=drag.source.querySelector('img')?.outerHTML||'<span class="timeline-pin-dot"></span>';
+      // The ghost is the character's face, with the note's number when it is a note.
+      const {kind,targetId,noteId}=splitKey(drag.key),target=pinTarget(kind,targetId),note=noteId&&numberedNotes().get(drag.key);
+      drag.ghost.className=`map-drag-ghost timeline-pin-${tokenClass(kind,target)}`;
+      drag.ghost.innerHTML=(target?tokenFace(target):'<span class="timeline-pin-dot"></span>')+numberBadge(note);
       document.body.append(drag.ghost);
       if(drag.source.dataset.pinId)drag.source.classList.add('timeline-pin-dragging');
     }
@@ -841,10 +872,10 @@
     const done=drag;endDrag();
     if(!done.moved)return;
     swallowClick=true;setTimeout(()=>{swallowClick=false;},400);
-    const [kind,targetId]=done.key.split(':'),now=new Date().toISOString();
+    const {kind,targetId,noteId}=splitKey(done.key),now=new Date().toISOString();
     if(done.at){
-      const {id,target:_,...previous}=done.item||{};
-      store().queue(path('timeline',id||crypto.randomUUID()),{...previous,sessionId:done.sessionId,kind,targetId,x:done.at.x,y:done.at.y,createdAt:previous.createdAt||now,updatedAt:now,creatorUid:previous.creatorUid||store().uid});
+      const {id,target:_t,note:_n,key:_k,sessionId:_s,noteId:_o,...previous}=done.item||{};
+      store().queue(path('timeline',id||crypto.randomUUID()),{...previous,kind,targetId,...(noteId?{noteId}:{}),x:done.at.x,y:done.at.y,createdAt:previous.createdAt||now,updatedAt:now,creatorUid:previous.creatorUid||store().uid});
     } else if(done.item?.id) store().queue(path('timeline',done.item.id),null);
     changed();
   });
@@ -870,7 +901,7 @@
   document.addEventListener('input',event=>{
     if(event.target.dataset?.traySearch===undefined)return;
     const query=event.target.value.trim().toLowerCase();
-    for(const token of event.target.closest('.map-tray')?.querySelectorAll('[data-tray-token]')||[])token.hidden=!!query&&!token.textContent.toLowerCase().includes(query);
+    for(const row of event.target.closest('.map-tray')?.querySelectorAll('[data-tray-row]')||[])row.hidden=!!query&&!row.querySelector('.map-tray-token').textContent.toLowerCase().includes(query);
   });
   document.addEventListener('change',async event=>{
     if (event.target.dataset?.npcPlace !== undefined && gm()) {
