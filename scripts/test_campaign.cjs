@@ -331,10 +331,13 @@ test('map: notes are numbered oldest first; characters and their note numbers dr
  await d.click('entry-close','npcs:n');
  await d.click('note-popup','npcs:n:d');
  await d.click('note-popup-close');
- // Hiding the tray reaches pins under it; a drop over the tray takes the pin off the map.
- await d.click('tray-toggle');
- assert.match(render(),/map-tray map-tray-hidden[^]*data-campaign="tray-toggle"[^>]*>PCs &amp; NPCs</);assert.doesNotMatch(render(),/data-tray-token/);
- await d.click('tray-toggle');
+ // No Hide button: each tray group folds instead, and stays folded across redraws.
+ assert.doesNotMatch(render(),/tray-toggle/);
+ assert.match(render(),/<details class="map-tray-group" data-tray-group="People" open>/);
+ d.documentListeners.toggle({target:{dataset:{trayGroup:'People'},open:false}});
+ assert.match(render(),/<details class="map-tray-group" data-tray-group="People">/);
+ d.documentListeners.toggle({target:{dataset:{trayGroup:'People'},open:true}});
+ // A drop over the tray takes the pin off the map.
  const pinsBefore=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length;
  const query=d.doc.querySelector;d.doc.querySelector=selector=>selector==='.map-tray'?{getBoundingClientRect:()=>({left:0,top:0,right:200,bottom:300})}:query(selector);
  drag(trayToken('npcs:k:c'),[10,500],[100,100]);

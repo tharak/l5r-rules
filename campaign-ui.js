@@ -4,7 +4,8 @@
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, sessionDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
-  let timelineSession='', notePopup='', focusPopup=false, trayHidden=false;
+  let timelineSession='', notePopup='', focusPopup=false;
+  const trayClosed=new Set();
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
@@ -380,12 +381,11 @@
       const notes = notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
         return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
       return `<div class="map-tray-row" data-tray-row>${chip}${notes}</div>`; };
-    const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(row).join('')}</div>` : '';
+    // Each group (PCs, People, Places) folds; the choice is kept while the page redraws.
+    const group = (title,list) => list.length ? `<details class="map-tray-group" data-tray-group="${title}"${trayClosed.has(title) ? '' : ' open'}><summary class="map-tray-title">${title} <small>${list.length}</small></summary><div class="map-tray-group-body" role="group" aria-label="${title}">${list.map(row).join('')}</div></details>` : '';
     const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
-    // The tray can be hidden to reach pins under it; a pin dropped on the tray is taken off the map.
-    const toggle = UI.button({text:trayHidden ? 'PCs & NPCs' : 'Hide',variant:'secondary',size:'compact',attrs:{class:'map-tray-toggle','data-campaign':'tray-toggle','aria-expanded':!trayHidden}});
-    const tray = !groups ? '' : trayHidden ? `<div class="timeline-pin-controls map-tray map-tray-hidden">${toggle}</div>`
-      : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map"><div class="map-tray-head">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : '<span></span>'}${toggle}</div>${groups}</div>`;
+    // Folding the groups reaches pins under the tray; a pin dropped on the tray is taken off the map.
+    const tray = !groups ? '' : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map">${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}${groups}</div>`;
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
     const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}`;
@@ -823,7 +823,6 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
       else if (action==='note-popup-close') notePopup='';
-      else if (action==='tray-toggle') trayHidden=!trayHidden;
       else if (action==='pin-remove') {const item=store().get(path('timeline',id));if(canMovePin(item)){store().queue(path('timeline',id),null);notePopup='';}}
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
@@ -965,6 +964,8 @@
     const query=event.target.value.trim().toLowerCase();
     for(const row of event.target.closest('.map-tray')?.querySelectorAll('[data-tray-row]')||[])row.hidden=!!query&&!row.querySelector('.map-tray-token').textContent.toLowerCase().includes(query);
   });
+  // Tray groups fold (toggle does not bubble, so listen in the capture phase).
+  document.addEventListener('toggle',event=>{const name=event.target?.dataset?.trayGroup;if(name){if(event.target.open)trayClosed.delete(name);else trayClosed.add(name);}},true);
   document.addEventListener('change',async event=>{
     if (event.target.dataset?.npcPlace !== undefined && gm()) {
       const place=event.target.checked;
