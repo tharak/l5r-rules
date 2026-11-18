@@ -253,3 +253,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .timeline-pin-name{display:grid;justify-items:center;width:max-content;max-width:none;overflow:visible;line-height:1.25}
 .timeline-pin-name>span,.timeline-pin-entry{white-space:nowrap}
 .timeline-pin-entry{font-size:10px;font-weight:400;color:var(--muted)}
+/* Private journal entries (P1, P2…): seen on the map only by their player and the GM. */
+.map-tray-note.map-tray-private{border-style:dashed;background:#2f2b26;color:#fff}
+.timeline-pin-number.timeline-pin-private{background:#2f2b26;border-style:dashed}

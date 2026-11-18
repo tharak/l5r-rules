@@ -110,12 +110,13 @@ test('only a PC\'s creator edits it; the GM views the full sheet and players ope
  d.click('pc-open','bob');assert.match(render(),/id="campaign-editor"/);
  assert.ok(d.watches.some(w=>w.pcId==='bob'&&w.full),'the GM watches the full sheet');
  d.click('close-sheet');
+ const gmWatches=d.watches.length;
  d.store.uid='alice';render();d.click('section','pcs');
  assert.deepEqual(buttons(),['alice:Edit','bob:Open']);
  d.click('pc-open','bob');
  assert.doesNotMatch(render(),/id="campaign-editor"/);
  assert.equal(d.location.hash,'#/pc/bob/bob-pc');
- assert.ok(!d.watches.some(w=>w.full&&w.pcId==='bob'&&w!==d.watches.find(x=>x.full)),'players never watch a full sheet');
+ assert.ok(!d.watches.slice(gmWatches).some(w=>w.full),'players never watch a full sheet');
 });
 test('campaign cards display PC - player, escape names, and handle empty and private identities',async()=>{
  const d=campaignCards();
@@ -253,6 +254,29 @@ function dragOnMap(d,sessionId){
 }
 const trayToken=key=>({dataset:{trayToken:key},className:`map-tray-token map-tray-${key.split(':')[0]}`,querySelector:()=>null,classList:{add(){},remove(){}}});
 const mapToken=id=>({dataset:{pinId:id},className:'timeline-pin timeline-pin-npcs',querySelector:()=>null,classList:{add(){},remove(){}}});
+test('map: a player\'s private journal entries (P1…) go on the map for that player and the GM only',async()=>{
+ const sheet={journal:[{id:'x',title:'Secret plan',text:'Hidden',public:false,createdAt:'2026-11-01'},{id:'y',title:'Open',text:'Shared',public:true,createdAt:'2026-11-02'}]};
+ const setup=uid=>{const d=campaignCards();d.store.uid=uid;
+  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/c/pcs/bob',{ownerUid:'bob',characterId:'bob-pc'});
+  d.data.set('campaigns/c/timeline/t',{kind:'pcs',targetId:'bob',noteId:'journal:x',x:20,y:20,creatorUid:'bob',createdAt:'now',updatedAt:'now'});
+  d.window.CharacterBuilder.read=id=>id==='bob-pc'&&uid==='bob'?structuredClone(sheet):null;return d;};
+ const render=d=>d.window.CampaignUI.render('campaigns/c');
+ // The GM reads the full sheet.
+ const gm=setup('gm');render(gm);await new Promise(r=>setTimeout(r));
+ const full=gm.watches.find(w=>w.pcId==='bob'&&w.full);assert.ok(full,'the GM watches every PC\'s full sheet');
+ full.receive({sheetJson:JSON.stringify(sheet),revision:'r1'},{ownerUid:'bob',characterId:'bob-pc'});
+ let html=render(gm);
+ assert.match(html,/data-tray-token="pcs:bob:journal:x"[^>]*>P1</,'the GM sees P1 in the tray');
+ assert.match(html,/timeline-pin-private[^]*Secret plan/,'and its pin on the map');
+ // The player reads their own sheet.
+ const bob=setup('bob');html=render(bob);
+ assert.match(html,/map-tray-private[^>]*data-tray-token="pcs:bob:journal:x"[^>]*>P1</);assert.match(html,/Secret plan/);
+ // Another player sees neither the entry nor its pin.
+ const alice=setup('alice');html=render(alice);
+ assert.doesNotMatch(html,/Secret plan|journal:x|>P1</);
+ assert.ok(!alice.watches.some(w=>w.full),'players never watch a full sheet');
+});
+
 test('map: notes are numbered oldest first; characters and their note numbers drag onto the map, snap to a hex, and leave it when dragged off',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

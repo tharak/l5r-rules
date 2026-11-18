@@ -314,7 +314,26 @@
     const notes = store().list(path('notes','')).filter(n => exists(n.targetKind,n.targetId)).map(n => ({kind:n.targetKind,targetId:n.targetId,id:n.id,title:UI.entryTitle(n),text:n.text || '',author:entryAuthor(n),date:n.createdAt || n.updatedAt || ''}));
     const journals = store().list(path('pcs','')).flatMap(pc => (sheets.get(pc.id+':public')?.data?.profile?.journal || []).map(j => ({kind:'pcs',targetId:pc.id,id:`journal:${j.id}`,title:UI.entryTitle(j),text:j.text || '',author:j.authorName || playerName(pc),date:j.createdAt || ''})));
     const list = [...notes,...journals].sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)).map((n,i) => ({...n,number:i + 1}));
-    return new Map(list.map(n => [noteKey(n.kind,n.targetId,n.id),n]));
+    // A PC's private journal entries, for its player and the GM only: numbered P1, P2… per PC,
+    // so the shared numbers stay the same for everyone.
+    const privates = store().list(path('pcs','')).flatMap(pc => privateJournal(pc).sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || '') || a.id.localeCompare(b.id))
+      .map((j,i) => ({kind:'pcs',targetId:pc.id,id:`journal:${j.id}`,title:UI.entryTitle(j),text:j.text || '',author:playerName(pc),date:j.createdAt || '',number:`P${i + 1}`,private:true,order:list.length + 1 + i})));
+    return new Map([...list,...privates].map(n => [noteKey(n.kind,n.targetId,n.id),n]));
+  }
+  // The entries a PC's sheet keeps private: the player reads their own sheet, the GM the full sheet.
+  const parsedSheets = new Map();
+  function privateJournal(pc) {
+    let journal = null;
+    if (own(pc)) journal = window.CharacterBuilder?.read?.(pc.characterId)?.journal;
+    else if (gm()) {
+      const data = sheets.get(pc.id+':full')?.data;
+      if (data?.sheetJson) {
+        const cached = parsedSheets.get(pc.id);
+        if (cached?.revision !== data.revision) { try { parsedSheets.set(pc.id,{revision:data.revision,journal:JSON.parse(data.sheetJson).journal}); } catch { parsedSheets.set(pc.id,{revision:data.revision,journal:[]}); } }
+        journal = parsedSheets.get(pc.id).journal;
+      }
+    }
+    return (Array.isArray(journal) ? journal : []).filter(j => j && j.id && !j.public && String(j.text || j.title || '').trim());
   }
   // The map: PC and NPC tokens, each either the character itself or one of its numbered notes.
   // Members drag them from the tray; a hex grid shows while dragging and the token snaps to the
@@ -335,11 +354,11 @@
       if (!target || (item.noteId && !note) || seen.has(key)) return null;
       seen.add(key);
       return {...item,target,note,key};
-    }).filter(Boolean).sort((a,b) => (a.note?.number || 0) - (b.note?.number || 0));
+    }).filter(Boolean).sort((a,b) => (a.note?.order || a.note?.number || 0) - (b.note?.order || b.note?.number || 0));
   }
   const tokenClass = (kind,target) => target?.place ? 'place' : kind;
   const tokenFace = target => target.image ? `<img src="${target.image}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
-  const numberBadge = note => note ? `<b class="timeline-pin-number">${note.number}</b>` : '';
+  const numberBadge = note => note ? `<b class="timeline-pin-number${note.private ? ' timeline-pin-private' : ''}"${note.private ? ' title="Private: only its player and the GM see it"' : ''}>${note.number}</b>` : '';
   function renderTimeline(isGM,pcs,npcs) {
     const numbers = numberedNotes(), pins = mapPins(numbers);
     const pinHtml = pins.map(item => { const movable = canMovePin(item), label = item.note ? `#${item.note.number} ${item.target.name}: ${item.note.title}` : item.target.name;
@@ -352,7 +371,7 @@
     const row = item => { const key = `${item.kind}:${item.id}`;
       const chip = `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${placed.has(key) ? ' map-tray-placed' : ''}" data-tray-token="${e(key)}" data-campaign="entry-open" data-id="${e(key)}" title="${e(item.target.name)} · drag onto the map">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
       const notes = notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
-        return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)} · drag onto the map">${n.number}</button>`; }).join('');
+        return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
       return `<div class="map-tray-row" data-tray-row>${chip}${notes}</div>`; };
     const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(row).join('')}</div>` : '';
     const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
@@ -577,7 +596,8 @@
     for (const pc of pcs) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
     const selectedPC = pcs.find(pc=>pc.id===sheetId);
-    if (selectedPC && isGM && !own(selectedPC)) watch(selectedPC,true);
+    // The GM reads every PC's full sheet for its private notes on the map.
+    if (isGM) for (const pc of pcs) if (!own(pc)) watch(pc,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
     return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('handover','Hand over')+button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       ${renderOffers()}<div class="campaign-rows">
