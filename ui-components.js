@@ -233,14 +233,19 @@
   //   field(name) → attributes for the editor's 'title', 'text' and 'public' inputs
   const journalDate = value => { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}) : 'Earlier'; };
   const entryTitle = entry => String(entry?.title || '').trim() || String(entry?.text || '').trim().split('\n')[0].trim().slice(0,80) || 'Untitled entry';
-  function journal({entries = [],draft = null,canAdd = false,withPublic = false,heading = '',emptyText = '',control,field} = {}) {
+  //   strip (default): entries oldest first (by note number) in a horizontal scroller, with 1..n buttons that jump to each
+  function journal({entries = [],draft = null,canAdd = false,withPublic = false,heading = '',emptyText = '',control,field,strip = true} = {}) {
     const publicBox = (attrs,checked,label) => checkbox({label:'Public',attrs:{type:'checkbox',...attrs,checked:!!checked,'aria-label':label},labelAttrs:{class:'creator-check creator-public-check'}});
     const editor = draft ? `<div class="creator-journal-editor">${field_({label:'Title',attrs:{...field('title'),type:'text',value:draft.title || '',maxlength:200,placeholder:'Title'}})}${field_({label:draft.id ? 'Edit entry' : 'New entry',kind:'textarea',value:draft.text || '',attrs:{...field('text'),rows:5,maxlength:20000}})}${withPublic ? publicBox(field('public'),draft.public,'Entry is public') : ''}${actionRow({bodyHtml:button({text:'Save entry',attrs:{...control('save',draft.id || ''),disabled:!String(draft.text || '').trim()}})+button({text:'Cancel',variant:'secondary',attrs:control('cancel',draft.id || '')})})}</div>` : '';
-    const list = [...entries].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(entry => {
+    const newest = (a,b) => (b.date || '').localeCompare(a.date || '');
+    const ordered = strip ? [...entries].sort((a,b) => (a.number || Infinity) - (b.number || Infinity) || -newest(a,b)) : [...entries].sort(newest);
+    const items = ordered.map(entry => {
       // entry.toolsHtml: extra buttons the caller builds (trusted markup), e.g. Remove from map.
       const tools = `${entry.toolsHtml || ''}${entry.canToggle ? publicBox(control('public',entry.id),entry.isPublic,'Entry is public') : ''}${entry.canEdit ? button({text:'Edit',variant:'quiet',size:'compact',attrs:{...control('edit',entry.id),'aria-label':'Edit journal entry'}}) : ''}${entry.canDelete ? button({text:'Delete',variant:'quiet',size:'compact',attrs:{...control('delete',entry.id),'aria-label':'Delete journal entry'}}) : ''}`;
       return `<article class="creator-journal-entry${entry.className ? ' '+entry.className : ''}" data-journal-id="${escape(entry.id)}"><header>${entry.number ? `<span class="creator-journal-number" title="Note number">#${escape(String(entry.number))}</span>` : ''}<time${entry.date ? ` datetime="${escape(entry.date)}"` : ''}>${escape(journalDate(entry.date))}</time>${entry.author ? `<span class="creator-journal-author">${escape(entry.author)}</span>` : ''}${entry.visibility && !entry.canToggle ? `<span class="creator-journal-visibility">${escape(entry.visibility)}</span>` : ''}${tools}</header><h4 class="creator-journal-title">${escape(entryTitle(entry))}</h4><p class="creator-journal-text">${escape(entry.text || '')}</p></article>`;
-    }).join('');
+    });
+    const nav = strip && ordered.length > 1 ? `<nav class="creator-journal-nav" aria-label="Jump to entry">${ordered.map((entry,i) => button({text:String(i+1),variant:'quiet',size:'compact',attrs:{'data-journal-jump':entry.id,title:entryTitle(entry),'aria-label':`Entry ${i+1}: ${entryTitle(entry)}`}})).join('')}</nav>` : '';
+    const list = strip && items.length ? `${nav}<div class="creator-journal-strip">${items.join('')}</div>` : items.join('');
     const head = heading || (canAdd && !draft) ? `<div class="creator-journal-head">${heading ? `<h3>${escape(heading)}</h3>` : '<span></span>'}${canAdd && !draft ? button({text:'+ Entry',attrs:control('new','')}) : ''}</div>` : '';
     return `<div class="creator-journal">${head}${editor}${list || (draft || !emptyText ? '' : `<div class="creator-empty">${escape(emptyText)}</div>`)}</div>`;
   }
@@ -260,5 +265,13 @@
   // Any image behind a tile: faint, centred, cropped (see .home-tile[data-tile-mon]).
   const tileArtStyle = src => src ? ` style="--tile-mon:url('${escape(src)}')" data-tile-mon` : '';
   function clanTileStyle(clan) { return tileArtStyle(window.CharacterCatalog?.clanMon(clan || '')); }
+  // Journal strip buttons scroll their entry into view.
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') document.addEventListener('click',event => {
+    const jump = event.target?.closest?.('[data-journal-jump]');
+    if (!jump) return;
+    const strip = jump.closest('.creator-journal')?.querySelector('.creator-journal-strip');
+    const target = [...(strip?.children || [])].find(item => item.dataset.journalId === jump.dataset.journalJump);
+    if (target) strip.scrollTo({left:target.offsetLeft - strip.offsetLeft,behavior:'smooth'});
+  });
   window.UI = {characterAvatar,characterTileBody,clanTileStyle,tileArtStyle,escape,attributes,element,button,ringMark,link,option,field,checkbox,choiceGroup,stepper,disclosure,panel,sectionHeading,actionRow,card,recordRow,dialog,feedback,recordEditor,journal,entryTitle,portrait,readPortrait,encodePortrait,cropGeometry,zoomGeometry,isPortrait,PORTRAIT_MAX_LENGTH};
 })();

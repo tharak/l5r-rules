@@ -515,3 +515,8 @@ details.creator-ability-more > summary { padding: 0; min-height: 0; }
 .creator-roll-ability[data-ring="Air"] { background: #eef1e3; } .creator-roll-ability[data-ring="Earth"] { background: #f1ead8; }
 .creator-roll-ability[data-ring="Water"] { background: #e8f0f3; } .creator-roll-ability[data-ring="Fire"] { background: #f8e9e2; }
 .creator-roll-ability[data-ring="Void"] { background: #efe9f4; }
+/* Journals: entries side by side in a horizontal scroller, with 1..n jump buttons. */
+.creator-journal-nav{display:flex;flex-wrap:wrap;gap:4px;margin:10px 0 0}
+.creator-journal-nav button{min-width:30px}
+.creator-journal-strip{position:relative;display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px;align-items:flex-start}
+.creator-journal-strip>.creator-journal-entry{flex:0 0 min(340px,85%);scroll-snap-align:start;max-height:60vh;overflow-y:auto}

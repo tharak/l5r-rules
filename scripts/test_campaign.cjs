@@ -197,7 +197,7 @@ test('the public view shows the profile, escapes text, and handles missing or ol
  assert.match(html,/public\/assets\/clans\/official\/crane\.webp/,'falls back to the clan mon without a valid picture');
  assert.match(html,/Glory<\/span><strong>2\.5/);assert.match(html,/Carries<\/h2><p>Katana/);assert.match(html,/Fame/);
  assert.ok(!html.includes('Disadvantages'),'empty sections are left out');
- assert.ok(html.indexOf('New entry')<html.indexOf('Old &lt;b&gt;entry'),'newest journal entry first');
+ assert.ok(html.indexOf('Old &lt;b&gt;entry')<html.indexOf('New entry'),'journal entries run oldest first, 1..n');assert.match(html,/data-journal-jump="a"[^>]*>1<[\s\S]*data-journal-jump="b"[^>]*>2</,'jump buttons numbered 1..n');
  assert.match(P.page(null),/Character unavailable/);
  assert.match(P.page({sections:{identity:{name:'Old Format'}}}),/Old Format[\s\S]*saves it again/);
 });

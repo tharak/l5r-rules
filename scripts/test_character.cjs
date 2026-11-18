@@ -676,7 +676,7 @@ test('the GM sees the player\'s journal read-only and adds, edits and deletes on
   // The fake root has no journal panel to patch in place, so re-render through Cancel.
   root.onclick({target:{closest:()=>({dataset:{action:'journal-cancel',journalGm:''}})}});
   assert.match(html,/Player entry/);assert.match(html,/GM entry/);
-  assert.ok(html.indexOf('GM entry')<html.indexOf('Player entry'),'newest first');
+  assert.ok(html.indexOf('Player entry')<html.indexOf('GM entry'),'oldest first, 1..n');
   // Only the GM's own entry has controls; the player's entry and another author's do not.
   const controls=[...html.matchAll(/data-action="journal-(edit|delete)" data-id="([^"]+)"/g)].map(m=>m[2]);
   assert.deepEqual([...new Set(controls)],['g']);
