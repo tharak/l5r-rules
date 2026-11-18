@@ -293,6 +293,13 @@ test('map: notes are numbered oldest first; characters and their note numbers dr
  assert.match(render(),/role="dialog"[^]*#4<\/span> Flees north[^]*Flees north text[^]*data-campaign="entry-open" data-id="npcs:n"/,'a numbered pin opens its note');
  assert.match(render(),/data-campaign="pin-remove" data-id="[^"]+"/,'the popup offers Remove pin');
  await d.click('note-popup-close');
+ await d.click('entry-open','npcs:n');
+ html=render();
+ assert.match(html,/creator-journal-number" title="Note number">#4<\/span>(?:(?!<\/header>)[^])*data-campaign="pin-remove" data-id="[^"]+"[^>]*>Remove from map</,'the pinned note has Remove from map in the NPC panel');
+ assert.match(html,/campaign-actions[^]*data-campaign="pin-remove"[^>]*>Remove from map</,'and the NPC token too');
+ await d.click('entry-close','npcs:n');
+ await d.click('note-popup','npcs:n:d');
+ await d.click('note-popup-close');
  // Hiding the tray reaches pins under it; a drop over the tray takes the pin off the map.
  await d.click('tray-toggle');
  assert.match(render(),/map-tray map-tray-hidden[^]*data-campaign="tray-toggle"[^>]*>PCs &amp; NPCs</);assert.doesNotMatch(render(),/data-tray-token/);

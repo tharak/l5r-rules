@@ -250,7 +250,7 @@
     const canAdd=canAddEntry(kind,id);
     if(!notes.length&&!canAdd&&!drafting)return '';
     const numbers=numberedNotes();
-    const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
+    const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,toolsHtml:kind==='npcs'||kind==='pcs'?unpinButton(noteKey(kind,id,n.id),true):'',title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
     const control=(name,entryId)=>({'data-campaign':`note-${name}`,'data-id':name==='new'?`${kind}:${id}`:entryId,disabled:busy});
     const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
     return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
@@ -482,22 +482,29 @@
     const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
+  }
+  // "Remove from map" for a character's token or one of its notes, when it is pinned and this
+  // member may move it (their own pin, or any as GM).
+  function unpinButton(key,compact = false) {
+    const pin = mapPins(numberedNotes()).find(p => p.key === key);
+    if (!pin || !canMovePin(pin)) return '';
+    return compact ? UI.button({text:'Remove from map',variant:'quiet',size:'compact',attrs:{'data-campaign':'pin-remove','data-id':pin.id}}) : button('pin-remove','Remove from map',pin.id);
   }
   // A PC's public journal entries carry their campaign note numbers.
   function withNumbers(pc,data) {
     const journal = data?.profile?.journal;
     if (!journal?.length) return data;
     const numbers = numberedNotes();
-    return {...data,profile:{...data.profile,journal:journal.map(j => ({...j,number:numbers.get(noteKey('pcs',pc.id,`journal:${j.id}`))?.number}))}};
+    return {...data,profile:{...data.profile,journal:journal.map(j => ({...j,number:numbers.get(noteKey('pcs',pc.id,`journal:${j.id}`))?.number,toolsHtml:unpinButton(noteKey('pcs',pc.id,`journal:${j.id}`),true)}))}};
   }
   function renderPCs(pcs,isGM,invitation) {
     const list = pcs.map(pc => {
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
       const pending = transfers.find(t => t.pcId === pc.id && t.fromUid === store().uid && t.status === 'offered');
       const handover = own(pc) ? (pending ? `<span class="campaign-transfer-pending">Offered to ${e(memberName(active,pending.toUid))}</span>${button('transfer-cancel','Cancel offer',pending.id)}` : button('pc-transfer','Transfer',pc.id)) : '';
-      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`;
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${unpinButton(`pcs:${pc.id}`)}`;
       // Your own PC falls back to its local sheet until its public profile arrives.
       const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
       return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan,name:label(pc),meta:profile?.family || mine?.family || ''}),
