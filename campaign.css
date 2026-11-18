@@ -103,10 +103,9 @@
 .book-sections>summary::-webkit-details-marker{display:none}
 .book-sections>summary::before{content:'▸';font-size:12px}
 .book-sections[open]>summary::before{content:'▾'}
-/* A book's own page: a lead under the title, then the same section tree as the Books page. */
-.article-intro h1 .book-mark{float:none;display:inline-block;vertical-align:middle;margin:0 16px 6px 0}
-.book-lead{max-width:680px;margin:0;font-size:15px;line-height:1.7;color:var(--muted)}
-.book-contents h2{margin:0 0 14px;font:normal 24px/1.3 var(--serif)}
+/* A book's own page: the ring mark beside the title, then the same section tree as the Books page. */
+.article-intro h1.book-title{display:flex;align-items:center;gap:16px}
+.article-intro h1.book-title .book-mark{float:none;flex:none;margin:0}
 .book-contents>ul{columns:2 260px;column-gap:36px;margin:0;padding-left:20px}
 .book-contents li{margin:0 0 6px;line-height:1.5}
 .book-contents>ul>li{break-inside:avoid}

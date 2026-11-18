@@ -5,14 +5,6 @@ const esc = UI.escape;
 // Rule pages that sit in a book live at their place in it: #/books/water/maho.
 // Built from the book tree once the wiki loads; other slugs stay flat (#/equipment).
 const bookPaths = new Map(), BOOK_RINGS = {'book-of-air':'air','book-of-earth':'earth','book-of-fire':'fire','book-of-water':'water','book-of-the-void':'void'};
-// What each of the five books covers, shown under its title.
-const BOOK_LEADS = {
-  'book-of-air':'The setting: the history of Rokugan, its religion, the code of Bushido and the people who live by it.',
-  'book-of-earth':'The core mechanics: how rolls work and how combat is fought.',
-  'book-of-fire':'Making a samurai: character creation, families, schools, advantages and disadvantages, ancestors, skills and equipment.',
-  'book-of-water':'Advanced rules: the Shadowlands Taint, katas, maho and mass battle.',
-  'book-of-the-void':'Magic and its secrets: how spells work, the spells of each element, kiho, and the lore of the Nothing, the nezumi and the naga.',
-};
 const pageHref = slug => `#/${(bookPaths.get(slug) || slug).split('/').map(encodeURIComponent).join('/')}`;
 
 // A route path (books/water/maho) or a flat slug, to the page slug it shows.
@@ -291,11 +283,12 @@ function renderArticle(page) {
       const links = [...block.querySelectorAll('a')].map(a => a.textContent).join('').replace(/\s+/g,'');
       if (links && links === block.textContent.replace(/\s+/g,'')) block.remove();
     }
-    for (const box of wrapper.querySelectorAll('.image-container')) if (!box.querySelector('img')) box.remove();
+    // The wiki's old book pictures go too; the ring mark beside the title replaces them.
+    for (const box of wrapper.querySelectorAll('.image-container')) box.remove();
+    for (const image of wrapper.querySelectorAll('img')) image.remove();
   }
-  const bookLead = book && BOOK_LEADS[book.slug] ? `<p class="book-lead">${esc(BOOK_LEADS[book.slug])}</p>` : '';
   // The full tree, as on the Books page, with each top section's subsections unfolded.
-  const bookContents = book?.children?.length ? `<section class="book-contents"><h2>In this book</h2>${bookTree(book.children, true)}</section>` : '';
+  const bookContents = book?.children?.length ? `<nav class="book-contents" aria-label="${esc(book.title)} sections">${bookTree(book.children, true)}</nav>` : '';
   const relatedSection = book ? null : findParent(state.data.navigation);
   const related = relatedSection?.children.filter(x => x.slug !== page.slug).slice(0, 3) || [];
   for (const link of wrapper.querySelectorAll('a[href]')) {
@@ -306,7 +299,7 @@ function renderArticle(page) {
       else link.replaceWith(document.createTextNode(link.textContent));
     }
   }
-  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1>${book ? bookMark(book.slug) : ''}${esc(page.title)}</h1>${bookLead}</div>${toc.length ? UI.disclosure({attrs:{'class':'inline-contents'},titleHtml:`Contents`,bodyHtml:`<nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>`}) : ''}<div class="article-content">${wrapper.innerHTML}</div>${bookContents}${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
+  return `<div class="article-layout"><article class="article"><div class="article-intro"><h1${book ? ' class="book-title"' : ''}>${book ? bookMark(book.slug) : ''}${esc(page.title)}</h1></div>${toc.length ? UI.disclosure({attrs:{'class':'inline-contents'},titleHtml:`Contents`,bodyHtml:`<nav class="toc">${toc.map(x => `<a href="#/${encodeURIComponent(page.slug)}#${encodeURIComponent(x.id)}">${esc(x.title)}</a>`).join('')}</nav>`}) : ''}<div class="article-content">${wrapper.innerHTML}</div>${bookContents}${related.length ? `<div class="related"><h2>Continue reading</h2><div class="related-grid">${related.map(x => card(x, relatedSection.title.toUpperCase())).join('')}</div></div>` : ''}</article></div>`;
 
 }
 
@@ -405,7 +398,7 @@ function render() {
   const title = slug === 'start' ? 'Start' : slug === 'library' ? 'Library' : designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // The page label only appears on rule pages; elsewhere the heading and nav already say it.
-  $('#breadcrumb').hidden = !page || slug === 'start';
+  $('#breadcrumb').hidden = !page || slug === 'start' || isBookPage(slug);
   document.title = `${title} · l5r-rules`;
   // Remove creator handlers before rendering a different workspace.
   $('#app').onclick = $('#app').onchange = $('#app').oninput = null;
