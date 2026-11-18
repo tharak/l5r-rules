@@ -177,47 +177,48 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .timeline-pin .timeline-pin-open{touch-action:none}
 /* An entry already on the map: crossed out, but clicking it opens its pin's note. */
 .timeline-entry-used{text-decoration:line-through;color:var(--muted)}
-/* Investigation board: a corkboard of NPC, PC and plot cards joined by coloured strings. */
-.campaign-board-row{grid-column:1/-1;display:grid;gap:8px}
-.board-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.board-head .ui-field{flex:0 1 200px;width:200px;min-width:120px}
-.board-hint{font-size:.85rem;color:var(--muted)}
-.board-legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-left:auto;font-size:.82rem}
-.board-legend-item{display:inline-flex;align-items:center;gap:5px}
-.board-legend-item i,.board-made-by i{display:inline-block;width:18px;height:4px;border-radius:2px}
-.board-legend-item input[type=color]{width:22px;height:22px;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer}
-.board-made-by{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted)}
-.board-viewport{overflow:hidden;border:1px solid var(--line);border-radius:8px;overscroll-behavior:contain}
-.board-surface{position:relative;width:100%;background-color:#b98d5e;background-image:radial-gradient(#0000001a 1px,transparent 1.5px),radial-gradient(#ffffff14 1px,transparent 1.5px);background-size:9px 9px,13px 13px;background-position:0 0,4px 6px}
-.board-surface-linking .board-card{cursor:crosshair}
-.board-strings{position:absolute;inset:0;pointer-events:none}
-.board-strings line{stroke-width:3;stroke-linecap:round;filter:drop-shadow(0 1px 1px #0005)}
-.board-card{position:absolute;width:clamp(84px,13%,220px);height:64px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:6px 10px;box-sizing:border-box;background-color:var(--paper,#fffaf0);background-size:cover;background-position:center;border-radius:4px;box-shadow:0 3px 8px #0005;cursor:grab;touch-action:none;user-select:none;overflow:hidden;border-left:5px solid var(--muted)}
-.board-card-npcs{border-left-color:var(--npc,#7a5a2b)}
-.board-card-pcs{border-left-color:var(--pc,#2f6f9f)}
-.board-card-plots{border-left-color:var(--red)}
-.board-card-place{border-left-color:#3b7d3a;border-radius:4px 14px 4px 4px}
-/* Bands: PCs, then one per session and plot, then the rest. */
-.board-band{position:absolute;left:0;right:0;padding:6px 12px 0;border-top:1px dashed #0000003d;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#3b2a16;pointer-events:none}
-.board-band:first-child{border-top:0}
-.board-card .character-tile-body,.board-card>*:not(.board-pushpin){min-width:0}
-.board-card{padding:6px 8px;gap:6px}
-.board-card .character-avatar{width:36px;height:36px;min-width:36px;flex:none}
-.board-card strong{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:.82rem;line-height:1.15;overflow-wrap:anywhere}
-.board-card small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.7rem}
-.board-pushpin{position:absolute;top:3px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f88,#a11);box-shadow:0 1px 2px #0007}
-.board-card-linking{outline:3px solid var(--red);outline-offset:2px}
-.board-card-dim{opacity:.3}
-.board-card-dragging{z-index:5;cursor:grabbing;box-shadow:0 10px 18px #0006}
-.board-tag{position:absolute;z-index:2;transform:translate(-50%,-50%);max-width:160px;padding:2px 7px;font-size:.75rem;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fffdf5;color:#222;border:2px solid var(--string,var(--red));border-radius:3px;box-shadow:0 1px 3px #0004;cursor:pointer}
-.board-card img{-webkit-user-drag:none;pointer-events:none}
-/* The lists are gone: NPCs and PCs live on the board, sessions and plots on the map. Their
+/* The lists are gone: everything lives on the map. Their
    sections stay only to hold an opened entry's panel (a popup over the page). */
 .campaign-row-hidden{position:absolute;width:0;height:0;margin:0;padding:0;overflow:visible}
 .campaign-row-hidden .campaign-add-tile,.campaign-row-hidden .campaign-entry:not([open]),.campaign-row-hidden .campaign-entry[open]>summary{display:none}
 .campaign-row-hidden .campaign-entries{display:block;width:0;height:0}
 .campaign-row-hidden .campaign-entry[open]{border:0;padding:0;width:0;height:0;min-height:0;background:none;box-shadow:none}
-.map-head{margin-bottom:8px}
+.map-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
 .map-head-plots{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .map-head-plot{border-left:3px solid var(--red)!important}
-.board-card .character-tile-text strong{white-space:normal;font-size:.82rem}
+
+/* Map tokens: centred on their hex; PCs blue, people violet, places green. */
+.timeline-map .timeline-pin{transform:translate(-50%,-50%)}
+.timeline-map .timeline-pin-name{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2px}
+.timeline-pin-pcs img,.timeline-pin-pcs .timeline-pin-dot{border-color:#3d6f9b;background:#3d6f9b}
+.timeline-pin-npcs img,.timeline-pin-npcs .timeline-pin-dot{border-color:#7a5296;background:#7a5296}
+.timeline-pin-place img,.timeline-pin-place .timeline-pin-dot{border-color:#3b7d3a;background:#3b7d3a;border-radius:8px}
+.timeline-pin-movable .timeline-pin-open{cursor:grab}
+.timeline-map img,.map-tray img,.map-drag-ghost img{-webkit-user-drag:none;user-select:none}
+.timeline-pin-dragging{opacity:.3}
+.timeline-arrow-place{--arrow:#3b7d3a}
+/* The tray: PCs, people and places to drag onto the map. */
+.map-tray{display:grid;gap:6px;width:min(300px,40%)}
+.map-tray .ui-field{margin:0}
+.map-tray-group{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.map-tray-title{flex:0 0 100%;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.map-tray-token{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:2px 8px 2px 2px;border:1px solid var(--line);border-left:4px solid #7a5296;border-radius:16px;background:var(--paper,#fffaf0);color:inherit;font:inherit;font-size:12px;cursor:grab;touch-action:none;user-select:none}
+.map-tray-token span:not(.timeline-pin-dot){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.map-tray-token img,.map-tray-token .timeline-pin-dot{width:24px;height:24px;flex:none;border-radius:50%;object-fit:cover;background:#7a5296}
+.map-tray-pcs{border-left-color:#3d6f9b}.map-tray-pcs .timeline-pin-dot{background:#3d6f9b}
+.map-tray-place{border-left-color:#3b7d3a}.map-tray-place .timeline-pin-dot{background:#3b7d3a}.map-tray-place img{border-radius:5px}
+.map-tray-placed{opacity:.55}
+.map-tray-token[hidden]{display:none}
+@media(max-width:700px){.map-tray{width:auto}}
+/* While dragging: a hex grid over the map, the target hex outlined, and the token under the pointer. */
+.map-hexes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.map-hexes pattern path{fill:none;stroke:#fffbf2b3;stroke-width:1;filter:drop-shadow(0 0 1px #000a)}
+.map-hexes rect{fill-opacity:1}
+.map-hex-target{fill:#c8322a40;stroke:#c8322a;stroke-width:2.5}
+.timeline-map-dragging{cursor:grabbing}
+.map-drag-ghost{position:fixed;z-index:60;transform:translate(-50%,-50%);pointer-events:none;filter:drop-shadow(0 6px 8px #0007)}
+.map-drag-ghost img,.map-drag-ghost .timeline-pin-dot{display:block;width:44px;height:44px;object-fit:cover;border:2px solid #fff;border-radius:50%;background:var(--red)}
+.map-drag-ghost.timeline-pin-pcs img,.map-drag-ghost.timeline-pin-pcs .timeline-pin-dot{border-color:#3d6f9b;background:#3d6f9b}
+.map-drag-ghost.timeline-pin-npcs img,.map-drag-ghost.timeline-pin-npcs .timeline-pin-dot{border-color:#7a5296;background:#7a5296}
+.map-drag-ghost.timeline-pin-place img,.map-drag-ghost.timeline-pin-place .timeline-pin-dot{border-color:#3b7d3a;background:#3b7d3a;border-radius:8px}
+.map-drag-ghost-off{opacity:.6}

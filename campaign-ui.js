@@ -4,7 +4,7 @@
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
-  let timelineSession='', pickTarget='', pickNote='', notePopup='', focusPopup=false;
+  let timelineSession='', focusPopup=false;
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
@@ -129,7 +129,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
-    timelineSession='';pickTarget='';pickNote='';notePopup='';inviteLink='';inviteCopied=false;transferPopup='';
+    timelineSession='';inviteLink='';inviteCopied=false;transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -262,10 +262,6 @@
         : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryOwner(plot) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('plot-edit','Edit plot',plot.id)+button('plot-delete','Delete plot',plot.id)}) : ''}${notesFor('plots',plot.id)}</article>`)).join('');
     return `${sectionBar('Plots')}${fresh}<div class="campaign-entries">${addTile(button('plot-new','+ Plot'))}${list || ''}</div>`;
   }
-  // The GM can keep PCs and NPCs off the timeline picker (their existing pins stay).
-  const hiddenOnPicker = () => new Set(store().get(`campaigns/${active}`)?.timelineHidden || []);
-  const onPicker = (kind,id) => !hiddenOnPicker().has(`${kind}:${id}`);
-  const pickerToggle = (kind,id) => gm() ? UI.checkbox({label:'Timeline',attrs:{type:'checkbox','data-campaign':'timeline-visibility','data-id':`${kind}:${id}`,checked:onPicker(kind,id),disabled:busy},labelAttrs:{class:'creator-check campaign-picker-toggle'}}) : '';
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
   // across re-renders (toggle events do not bubble, so listen in the capture phase).
   const openEntries = new Set();
@@ -290,7 +286,7 @@
   document.addEventListener('keydown',event => {
     if (event.key !== 'Escape') return;
     if (transferPopup) { transferPopup = ''; changed(); return; }
-    if (linkDraft || linkPopup || boardLinking) { linkDraft = null; linkPopup = ''; boardLinking = false; linkFrom = ''; changed(); return; }
+    if (drag) { endDrag(); return; }
     if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
@@ -300,71 +296,52 @@
   const entry = (key,summaryHtml,bodyHtml,tileAttrs = '') => `<details class="campaign-entry" data-entry="${e(key)}"${openEntries.has(key)?' open':''}${tileAttrs}><summary>${summaryHtml}</summary><div class="campaign-entry-body" role="dialog" aria-modal="true"><div class="campaign-entry-panel-head">${summaryHtml}${button('entry-close','✕',key)}</div>${bodyHtml}</div></details>`;
   const entryTitle = (title,meta) => `<span class="campaign-entry-title">${e(title)}</span>${meta?`<small class="campaign-entry-meta">${meta}</small>`:''}`;
   const byNewest = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
-  // Timeline: dated events, each with a map of Rokugan and pins for PCs, NPCs or plots.
-  // Everyone reads it; the GM adds events, orders them, and places pins by clicking the map.
+  // The map: each session's map holds PC and NPC tokens. Members drag them from the tray onto
+  // the selected session's map, where a hex grid shows while dragging and the token snaps to
+  // the hex under it; dragging a token off the map takes it off. Positions are stored in percent.
   const pinTarget = (kind,id) => {
     if (kind === 'pcs') { const pc = store().get(path('pcs',id)); if (!pc) return null; const profile = sheets.get(id+':public')?.data?.profile; return {name:label(pc),image:UI.isPortrait(profile?.portrait) ? profile.portrait : window.CharacterCatalog?.clanMon(profile?.clan || '') || ''}; }
-    if (kind === 'npcs') { const npc = store().get(path('npcs',id)); return npc ? {name:npc.name || 'Unnamed NPC',image:UI.isPortrait(npc.portrait) ? npc.portrait : ''} : null; }
-    if (kind === 'plots') { const plot = store().get(path('plots',id)); return plot ? {name:plot.title || 'Untitled plot',image:(plot.images || []).find(UI.isPortrait) || ''} : null; }
+    if (kind === 'npcs') { const npc = store().get(path('npcs',id)); return npc ? {name:npc.name || 'Unnamed NPC',image:UI.isPortrait(npc.portrait) ? npc.portrait : '',place:isPlace(npc)} : null; }
     return null;
   };
-  // A note's or journal entry's title is its first line; the popup shows the whole text.
-  const noteTitle = note => UI.entryTitle(note);
-  const notesOf = (kind,id) => store().list(path('notes','')).filter(n => n.targetKind === kind && n.targetId === id);
-  // Entries that can be pinned for a plot, PC or NPC: its campaign notes and, for a PC, the
-  // public entries of the character's journal (ids prefixed "journal:").
-  function entriesOf(kind,id) {
-    const notes = notesOf(kind,id).map(n => ({id:n.id,title:noteTitle(n),text:n.text || '',author:entryAuthor(n),date:n.updatedAt || n.createdAt || ''}));
-    const journal = kind === 'pcs' ? (sheets.get(id+':public')?.data?.profile?.journal || []).map(j => ({id:`journal:${j.id}`,title:noteTitle(j),text:j.text || '',author:playerName(store().get(path('pcs',id)) || {}),date:j.createdAt || ''})) : [];
-    return [...journal,...notes].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-  }
   const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
-  // Timeline events still pointing at an existing session, item and entry.
-  function timelineEvents(sessionId) {
-    return store().list(path('timeline','')).filter(item => !sessionId || item.sessionId === sessionId).map(item => {
-      const target = pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
-      return target && note ? {...item,target,note} : null;
+  // Tokens still pointing at an existing PC or NPC; one per character and session (older
+  // note pins for the same character collapse into the latest one; plot pins are not shown).
+  function mapTokens() {
+    const seen = new Set();
+    return store().list(path('timeline','')).sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map(item => {
+      const key = `${item.sessionId}|${item.kind}:${item.targetId}`, target = (item.kind === 'pcs' || item.kind === 'npcs') && !seen.has(key) && pinTarget(item.kind,item.targetId);
+      if (!target) return null;
+      seen.add(key);
+      return {...item,target};
     }).filter(Boolean).sort((a,b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   }
-  // The timeline is the game's sessions, newest first in a scrolling row; each session's events
-  // pin entries about PCs, NPCs or plots on the always-visible map. Only the GM edits it.
-  function renderTimeline(isGM,pcs,npcs,plots) {
+  const tokenClass = (kind,target) => target?.place ? 'place' : kind;
+  const tokenFace = target => target.image ? `<img src="${target.image}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
+  function renderTimeline(isGM,pcs,npcs) {
     const sessions = store().list(path('sessions','')).sort(newestFirst);
     if (timelineSession && !sessions.some(item => item.id === timelineSession)) timelineSession = '';
     const selected = sessions.find(item => item.id === timelineSession) || sessions[0] || null;
-    const events = selected ? timelineEvents(selected.id) : [];
-    const list = sessions.map(session => { const count = timelineEvents(session.id).length; return `<li>${UI.button({html:`<small>${e(day(session.createdAt || session.updatedAt))}</small><span>${e(session.title || 'Untitled session')}</span>${count ? `<b class="timeline-count" title="Pins" aria-label="${count} pin${count===1?'':'s'}">${count}</b>` : ''}`,variant:'quiet',attrs:{class:'timeline-event','data-campaign':'timeline-session','data-id':session.id,'aria-current':selected?.id === session.id ? 'true' : false}})}</li>`; }).join('');
-    // Every session's pins are on the map; the selected session's are in colour and on top, the
-    // others greyed out behind them.
-    const allPins = timelineEvents('').sort((a,b) => (a.sessionId === selected?.id) - (b.sessionId === selected?.id));
-    const pinHtml = allPins.map(item => `<span class="timeline-pin timeline-pin-${item.kind}${item.sessionId === selected?.id ? '' : ' timeline-pin-other'}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${item.target.image ? `<img src="${item.target.image}" alt="">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span class="timeline-pin-name">${e(item.note.title)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'note-popup','data-id':item.id,'aria-label':`${item.target.name}: ${item.note.title}`}})}${''}</span>`).join('');
-    let controls = '';
-    // Every member places pins (the GM can also move anyone's).
+    const tokens = mapTokens();
+    const list = sessions.map(session => { const count = tokens.filter(t => t.sessionId === session.id).length; return `<li>${UI.button({html:`<small>${e(day(session.createdAt || session.updatedAt))}</small><span>${e(session.title || 'Untitled session')}</span>${count ? `<b class="timeline-count" title="On the map" aria-label="${count} on the map">${count}</b>` : ''}`,variant:'quiet',attrs:{class:'timeline-event','data-campaign':'timeline-session','data-id':session.id,'aria-current':selected?.id === session.id ? 'true' : false}})}</li>`; }).join('');
+    // Every session's tokens are on the map; the selected session's are in colour and on top,
+    // the others greyed out behind them.
+    const ordered = [...tokens].sort((a,b) => (a.sessionId === selected?.id) - (b.sessionId === selected?.id));
+    const tokenHtml = ordered.map(item => { const mine = item.sessionId === selected?.id, movable = mine && canMovePin(item);
+      return `<span class="timeline-pin timeline-pin-${tokenClass(item.kind,item.target)}${mine ? '' : ' timeline-pin-other'}${movable ? ' timeline-pin-movable' : ''}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${tokenFace(item.target)}<span class="timeline-pin-name">${e(item.target.name)}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':'token-open','data-id':`${item.kind}:${item.targetId}`,'aria-label':item.target.name,title:movable ? `${item.target.name} · drag to move, or off the map to remove` : item.target.name}})}</span>`; }).join('');
+    // The tray: PCs, people and places, to drag onto the map. Those already on it are marked.
+    let tray = '';
     if (selected) {
-      // An entry already pinned in any session cannot be added again.
-      const used = new Map(store().list(path('timeline','')).map(item => [`${item.kind}:${item.targetId}:${item.noteId}`,item.id]));
-      // Plots on one row; PCs and NPCs share the next, told apart by colour.
-      const chip = (kind,id,name) => UI.button({text:`${name} (${entriesOf(kind,id).length})`,variant:'quiet',size:'compact',attrs:{class:`timeline-target timeline-target-${kind}`,'data-campaign':'timeline-target','data-id':`${kind}:${id}`,'aria-pressed':pickTarget === `${kind}:${id}`,'aria-label':`${{plots:'Plot',pcs:'PC',npcs:'NPC'}[kind]}: ${name}, ${entriesOf(kind,id).length} entries`}});
-      // Only plots, PCs and NPCs with notes to pin are offered, so the map stays uncluttered.
-      const hasNotes = (kind,id) => entriesOf(kind,id).length > 0;
-      const characters = [...pcs.map(pc => ['pcs',pc.id,label(pc)]),...npcs.map(n => ['npcs',n.id,n.name || 'Unnamed NPC'])].filter(([kind,id]) => onPicker(kind,id) && hasNotes(kind,id)).sort((a,b) => a[2].localeCompare(b[2]));
-      const notedPlots = plots.filter(p => hasNotes('plots',p.id));
-      const groups = [notedPlots.length ? `<div class="timeline-target-group" role="group" aria-label="Plots">${notedPlots.map(p => chip('plots',p.id,p.title || 'Untitled plot')).join('')}</div>` : '',
-        characters.length ? `<div class="timeline-target-group" role="group" aria-label="PCs and NPCs">${characters.map(([kind,id,name]) => chip(kind,id,name)).join('')}</div>` : ''].join('');
-      const [kind,id] = pickTarget.split(':'), entries = pickTarget ? entriesOf(kind,id) : [];
-      // An entry already pinned is crossed out; clicking it opens its pin's note, like the pin.
-      const entryButtons = entries.map(entry => { const pinId = used.get(`${kind}:${id}:${entry.id}`);
-        return UI.button({text:entry.title,variant:'quiet',size:'compact',attrs:pinId
-          ? {class:'timeline-entry timeline-entry-used','data-campaign':'note-popup','data-id':pinId,title:'On the map: open its note'}
-          : {class:'timeline-entry','data-campaign':'timeline-entry','data-id':entry.id,'aria-pressed':pickNote === entry.id}}); }).join('');
-      controls = `<div class="timeline-pin-controls">${groups ? `<div class="timeline-targets" role="group" aria-label="Plots, PCs and NPCs">${groups}</div>` : ''}${entryButtons ? `<div class="timeline-entries" role="group" aria-label="Entries">${entryButtons}</div>` : ''}</div>`;
+      const onMap = new Set(tokens.filter(t => t.sessionId === selected.id).map(t => `${t.kind}:${t.targetId}`));
+      const items = [...pcs.map(pc => ['pcs',pc.id]),...npcs.map(n => ['npcs',n.id])].map(([kind,id]) => ({kind,id,target:pinTarget(kind,id)})).filter(item => item.target).sort((a,b) => a.target.name.localeCompare(b.target.name));
+      const chip = item => `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${onMap.has(`${item.kind}:${item.id}`) ? ' map-tray-placed' : ''}" data-tray-token="${item.kind}:${e(item.id)}" data-campaign="token-open" data-id="${item.kind}:${e(item.id)}" title="${e(item.target.name)} · drag onto the map">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
+      const group = (title,list) => list.length ? `<div class="map-tray-group" role="group" aria-label="${title}"><span class="map-tray-title">${title}</span>${list.map(chip).join('')}</div>` : '';
+      const groups = group('PCs',items.filter(i => i.kind === 'pcs'))+group('People',items.filter(i => i.kind === 'npcs' && !i.target.place))+group('Places',items.filter(i => i.kind === 'npcs' && i.target.place));
+      tray = groups ? `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs and NPCs onto the map">${items.length > 8 ? UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}}) : ''}${groups}</div>` : '';
     }
-    const placing = selected && pickTarget && pickNote;
-    const eventList = events.length ? `<ul class="timeline-notes">${events.map(item => `<li>${UI.button({text:`${item.target.name}: ${item.note.title}`,variant:'quiet',size:'compact',attrs:{'data-campaign':'note-popup','data-id':item.id}})}</li>`).join('')}</ul>` : '';
-    // The selectors float over the map's top-left corner (above it on narrow screens).
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
-    const map = `<div class="timeline-stage">${controls}${mapActions}<div class="timeline-map${placing ? ' timeline-map-placing' : ''}"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="${e(mapSrc())}" alt="Campaign map">${pinHtml}</div></div>`;
-    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${map}<div class="timeline-arrows"></div>${eventList}</article></div>${renderNotePopup()}`;
+    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map"${selected ? ` data-timeline-map="${e(selected.id)}"` : ''}><img src="${e(mapSrc())}" alt="Campaign map" draggable="false">${tokenHtml}</div></div>`;
+    return `<div class="timeline">${sessions.length ? `<ol class="timeline-list" aria-label="Sessions">${list}</ol>` : ''}<article class="timeline-detail">${selected ? '' : `<p class="campaign-invite-note">${isGM ? 'Add a session' : 'Once the GM adds a session, you can'} to place PCs and NPCs on the map.</p>`}${map}<div class="timeline-arrows"></div></article></div>`;
   }
   // The campaign map: a media library picture the GM chose, else the map of Rokugan.
   const loadingMaps = new Set();
@@ -456,122 +433,17 @@
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
   const renderInvitePopup = () => '';
-  // The board: NPCs (people and places) and PCs as cards, joined by strings any member adds.
-  // A string is drawn in its maker's colour (shown once in the legend, so names are not
-  // repeated on every string).
-  // Its starting layout follows the story: PCs on top, then a band for each session (oldest
-  // first) and each plot, holding the places and then the people its notes mention, in the
-  // order they first appear; NPCs nothing mentions go last. A card someone dragged keeps its
-  // spot until Arrange puts every card back.
-  // The board fits the row's width: a card's x is its centre as a share of the width (0–2400),
-  // its y the top in pixels.
-  const BOARD = {w:2400,h:20000,cardH:64,cols:6,band:34,gap:22,edge:160};
-  const pct = x => `${Math.round(x / BOARD.w * 100000) / 1000}%`;
-  const PALETTE = ['#b23a2e','#2f6f9f','#3b7d3a','#8a5a9e','#c47a1c','#1f8a87','#a8456f','#5e6b2e'];
-  let boardLinking = false, linkFrom = '', linkDraft = null, linkPopup = '', boardSearch = '';
-  function memberColor(uid) {
-    const member = store().get(path('members',uid));
-    if (/^#[0-9a-f]{6}$/.test(member?.color || '')) return member.color;
-    // Members who have not picked one get the palette in turn, skipping colours already picked.
-    const members = store().list(path('members','')), picked = new Set(members.map(m => m.color).filter(Boolean));
-    const free = PALETTE.filter(c => !picked.has(c)), ids = members.filter(m => !m.color).map(m => m.id).sort(), index = Math.max(0,ids.indexOf(uid));
-    return (free.length ? free : PALETTE)[index % (free.length || PALETTE.length)];
-  }
-  const canEditLink = link => !!link && (gm() || link.creatorUid === store().uid);
-  // A colour is named once, by the player's PCs (the GM as "GM"), so strings need no names.
-  const legendName = member => member.id === store().get(`campaigns/${active}`)?.gmUid ? 'GM'
-    : store().list(path('pcs','')).filter(pc => pc.ownerUid === member.id).map(label).filter(name => name !== 'Private PC').join(', ') || member.displayName || 'Player';
   // Places are NPC records too: the GM ticks Place, and older records are guessed from the name (or a role like "O Castelo…" / "Onde…").
   const PLACE_WORDS = /(^|[^\p{L}])(shiro|kyuden|mura|toshi|koku|toi|jinja|dojo|village|vila|aldeia|cidade|city|castle|castelo|pal[aá]cio|palace|posto|templo|temple|santu[aá]rio|shrine|ponte|bridge|prov[ií]ncia|province|estrada|road|porto|port|floresta|forest|monte|mountain|rio|river|casa de ch[aá]|tea ?house)(?=$|[^\p{L}])/iu;
   const isPlace = npc => typeof npc.place === 'boolean' ? npc.place : PLACE_WORDS.test(npc.name || '') || /^(onde\b|(o|a|the) )/i.test(npc.role || '') && PLACE_WORDS.test(npc.role) || /^onde\b/i.test(npc.role || '');
-  // Where a name first appears in a text as a whole word (any case), or -1.
-  function firstMention(text,name) {
-    if (!name || !text) return -1;
-    const match = new RegExp(`(^|[^\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?=$|[^\\p{L}\\p{N}])`,'iu').exec(text);
-    return match ? match.index + match[1].length : -1;
-  }
-  function boardLayout(npcs,pcs) {
-    const pcCards = pcs.map(pc => { const profile = sheets.get(pc.id+':public')?.data?.profile, mine = own(pc) ? window.CharacterBuilder?.list().find(c => c.id === pc.characterId) : null;
-      return {key:`pcs:${pc.id}`,kind:'pcs',name:label(pc),meta:profile?.family || mine?.family || '',portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan}; }).sort((a,b) => a.name.localeCompare(b.name));
-    const npcCards = npcs.map(n => ({key:`npcs:${n.id}`,kind:'npcs',id:n.id,place:isPlace(n),name:n.name || 'Unnamed NPC',meta:n.role || '',portrait:n.portrait}));
-    const notes = store().list(path('notes','')), pins = store().list(path('timeline',''));
-    const oldestFirst = (a,b) => (a.createdAt || a.updatedAt || '').localeCompare(b.createdAt || b.updatedAt || '');
-    const textOf = (kind,item) => [item.title,item.text,...notes.filter(n => n.targetKind === kind && n.targetId === item.id).sort(oldestFirst).flatMap(n => [n.title,n.text])].filter(Boolean).join('\n');
-    const groups = [
-      ...store().list(path('sessions','')).sort(oldestFirst).map(s => ({title:s.title || 'Untitled session',text:textOf('sessions',s),pinned:new Set(pins.filter(p => p.sessionId === s.id && p.kind === 'npcs').map(p => p.targetId))})),
-      ...store().list(path('plots','')).sort(oldestFirst).map(p => ({title:p.title || 'Untitled plot',text:textOf('plots',p),pinned:new Set()})),
-    ];
-    const bands = [{title:'Player characters',cards:pcCards}], placed = new Set();
-    for (const group of groups) {
-      const found = npcCards.filter(card => !placed.has(card.key)).map(card => ({card,at:firstMention(group.text,card.name)}))
-        .filter(item => item.at >= 0 || group.pinned.has(item.card.id)).sort((a,b) => (a.at < 0 ? Infinity : a.at) - (b.at < 0 ? Infinity : b.at)).map(item => item.card);
-      found.forEach(card => placed.add(card.key));
-      bands.push({title:group.title,cards:[...found.filter(c => c.place),...found.filter(c => !c.place)]});
-    }
-    const rest = npcCards.filter(card => !placed.has(card.key)).sort((a,b) => a.name.localeCompare(b.name));
-    bands.push({title:'Others',cards:[...rest.filter(c => c.place),...rest.filter(c => !c.place)]});
-    // Each band is a title over rows of six; places and people start on separate rows.
-    let y = 12;
-    const shown = bands.filter(band => band.cards.length), cards = [];
-    for (const band of shown) {
-      band.y = y; y += BOARD.band;
-      const rows = [band.cards.filter(c => c.place),band.cards.filter(c => !c.place)].filter(row => row.length);
-      for (const row of rows) row.forEach((card,index) => {
-        const col = index % BOARD.cols, line = Math.floor(index / BOARD.cols);
-        cards.push({...card,x:(col + 0.5) * BOARD.w / BOARD.cols,y:y + line * (BOARD.cardH + BOARD.gap)});
-        if (index === row.length - 1) y += (line + 1) * (BOARD.cardH + BOARD.gap);
-      });
-      y += BOARD.gap;
-    }
-    // A dragged card keeps its spot, kept far enough from the sides to stay whole.
-    for (const card of cards) {
-      const saved = store().get(path('board',card.key));
-      if (saved) Object.assign(card,{x:Math.min(BOARD.w - BOARD.edge,Math.max(BOARD.edge,Number(saved.x))),y:Math.max(0,Number(saved.y))});
-    }
-    return {cards,bands:shown,height:y};
-  }
-  const boardCards = (npcs,pcs) => boardLayout(npcs,pcs).cards;
-  const centre = card => [card.x,card.y + BOARD.cardH / 2];
-  function renderBoard(npcs,pcs) {
-    const {cards,bands,height} = boardLayout(npcs,pcs), byKey = new Map(cards.map(card => [card.key,card]));
-    const links = store().list(path('links','')).filter(link => byKey.has(link.from) && byKey.has(link.to));
-    const strings = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
-      return `<line data-link="${e(link.id)}" data-from="${e(link.from)}" data-to="${e(link.to)}" data-x1="${x1}" data-x2="${x2}" x1="${pct(x1)}" y1="${y1}" x2="${pct(x2)}" y2="${y2}" stroke="${memberColor(link.creatorUid)}"/>`; }).join('');
-    const tags = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
-      return `<button type="button" class="board-tag" data-campaign="board-link" data-id="${e(link.id)}" data-tag-from="${e(link.from)}" data-tag-to="${e(link.to)}" style="left:${pct((x1+x2)/2)};top:${(y1+y2)/2}px;--string:${memberColor(link.creatorUid)}" aria-label="${e(byKey.get(link.from).name)} – ${e(byKey.get(link.to).name)}${link.label ? `: ${e(link.label)}` : ''}">${link.label ? e(link.label) : '·'}</button>`; }).join('');
-    const query = boardSearch.trim().toLowerCase();
-    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.place ? 'place' : card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" data-x="${card.x}" style="left:${pct(card.x)};top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
-    const members = store().list(path('members','')).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
-    const legend = `<div class="board-legend" aria-label="String colours">${members.map(m => `<span class="board-legend-item"><i style="background:${memberColor(m.id)}"></i>${e(legendName(m))}${m.id === store().uid ? `<input type="color" data-board-color value="${memberColor(m.id)}" aria-label="Your string colour" title="Your string colour">` : ''}</span>`).join('')}</div>`;
-    const hint = boardLinking ? `<span class="board-hint">${linkFrom ? 'Now click the card to link to.' : 'Click the first card.'}</span>` : '';
-    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${gm() ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}${button('board-arrange','Arrange')}${hint}${UI.field({attrs:{type:'search','data-board-search':true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
-      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="height:${Math.max(480,height,...cards.map(card => card.y + BOARD.cardH + 60))}px">${bands.map(band => `<div class="board-band" style="top:${band.y}px">${e(band.title)}</div>`).join('')}<svg class="board-strings" width="100%" height="100%" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
-  }
   // The map is the sessions and plots view: their + buttons, the selected session, and every plot.
   function renderMapHead(isGM,sessions,plots) {
     const selected = sessions.find(item => item.id === timelineSession) || [...sessions].sort(newestFirst)[0];
     const plotChips = [...plots].sort(byNewest).map(plot => UI.button({text:plot.title || 'Untitled plot',variant:'quiet',size:'compact',attrs:{class:'map-head-plot','data-campaign':'plot-open','data-id':plot.id}})).join('');
-    return `<div class="board-head map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${selected ? button('session-open','Open session',selected.id) : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
-  }
-  // Popups: a new string (optional label), or an existing one (label, remove).
-  function renderBoardPopup(npcs,pcs) {
-    const byKey = new Map(boardCards(npcs,pcs).map(card => [card.key,card]));
-    const between = (from,to) => `<p class="campaign-invite-note">${e(byKey.get(from)?.name || '?')} – ${e(byKey.get(to)?.name || '?')}</p>`;
-    if (linkDraft) return popup('board-popup-title','Link',`${between(linkDraft.from,linkDraft.to)}${UI.field({attrs:{'data-board-label':true,maxlength:120,placeholder:'How are they linked? (optional)','aria-label':'Link label'}})}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('board-link-save','Save')})}`,'board-close');
-    const link = linkPopup && store().get(path('links',linkPopup));
-    if (!link) return '';
-    const editable = canEditLink(link);
-    return popup('board-popup-title','Link',`${between(link.from,link.to)}<p class="board-made-by"><i style="background:${memberColor(link.creatorUid)}"></i>${e(memberName(active,link.creatorUid))}</p>${editable ? `${UI.field({attrs:{'data-board-label':true,maxlength:120,value:link.label || '',placeholder:'How are they linked? (optional)','aria-label':'Link label'}})}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('board-link-update','Save',linkPopup)+button('board-link-remove','Remove link',linkPopup)})}` : `<p>${e(link.label || '')}</p>`}`,'board-close');
+    return `<div class="map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${isGM ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${selected ? button('session-open','Open session',selected.id) : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
   }
   // A pin is moved or removed by whoever placed it, or by the GM (older pins count as the GM's).
   const canMovePin = item => !!item && (gm() || (!!item.creatorUid && item.creatorUid === store().uid));
-  function renderNotePopup() {
-    if (!notePopup) return '';
-    const item = store().get(path('timeline',notePopup)), target = item && pinTarget(item.kind,item.targetId), note = target && entriesOf(item.kind,item.targetId).find(entry => entry.id === item.noteId);
-    if (!note) return '';
-    const sectionName = {plots:'Plots',npcs:'NPC',pcs:'PC'}[item.kind];
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${target.image}" alt="">` : ''}<div><h3 id="timeline-popup-title">${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('pin-open-entry',`Open ${sectionName}`,`${item.kind}:${item.targetId}`)+(canMovePin(item)?button('pin-remove','Remove pin',notePopup):'')+button('note-popup-close','Close')})}</div>`;
-  }
   // Section titles are visually hidden; the tabs already name the section. Actions sit on top.
   // Each kind is a grid of tiles with no visible title: its add button is the first tile.
   // The title stays for screen readers; unread entries keep their own "!".
@@ -587,7 +459,7 @@
     const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+pickerToggle('npcs',npc.id)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
   function renderPCs(pcs,isGM,invitation) {
@@ -595,7 +467,7 @@
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
       const pending = transfers.find(t => t.pcId === pc.id && t.fromUid === store().uid && t.status === 'offered');
       const handover = own(pc) ? (pending ? `<span class="campaign-transfer-pending">Offered to ${e(memberName(active,pending.toUid))}</span>${button('transfer-cancel','Cancel offer',pending.id)}` : button('pc-transfer','Transfer',pc.id)) : '';
-      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${pickerToggle('pcs',pc.id)}`;
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}`;
       // Your own PC falls back to its local sheet until its public profile arrives.
       const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
       return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan,name:label(pc),meta:profile?.family || mine?.family || ''}),
@@ -631,13 +503,12 @@
     if (slug !== appliedRoute) {
       appliedRoute = slug;
       section = SECTIONS.includes(routeSection) ? routeSection : 'timeline';
-      notePopup = '';
       pendingItem = SECTIONS.includes(routeSection) && itemPart ? {kind:routeSection === 'timeline' ? 'sessions' : routeSection,segment:itemPart} : null;
     }
     if (pendingItem && window.Routes) {
       const found = window.Routes.resolve(pendingItem.segment,store().list(path(pendingItem.kind,'')));
       if (found) {
-        if (section === 'timeline') { timelineSession = found.id; pickTarget = pickNote = ''; }
+        if (section === 'timeline') { timelineSession = found.id; }
         else { openEntries.add(`${pendingItem.kind}:${found.id}`); scrollEntry = `${pendingItem.kind}:${found.id}`; }
         pendingItem = null;
       }
@@ -670,9 +541,8 @@
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="plots">${renderPlots(plots)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
-      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs)}</section>
-      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderMapHead(isGM,sessions,plots)}${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${renderBoardPopup(npcs,pcs)}${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderMapHead(isGM,sessions,plots)}${renderTimeline(isGM,pcs,npcs)}`})}</section>
+      </div>${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -751,24 +621,13 @@
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
       else if (action==='entry-close') {openEntries.delete(id);go(campaignHref(active),false);}
-      else if (action==='section') {if(SECTIONS.includes(id)){section=id;notePopup='';go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
+      else if (action==='section') {if(SECTIONS.includes(id)){section=id;go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
       else if (action==='plot-new') {plotId='';plotDraft={title:'',text:'',public:true};focusPopup=true;}
       else if (action==='plot-open') {plotId=id;plotDraft=null;openEntries.add(`plots:${id}`);}
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
-      else if (action==='timeline-visibility' && gm()) {
-        const c=store().get(`campaigns/${active}`),hidden=new Set(c?.timelineHidden||[]);
-        if(hidden.has(id))hidden.delete(id);else hidden.add(id);
-        store().queue(`campaigns/${active}`,{...c,timelineHidden:[...hidden]});
-        if(!onPicker(...id.split(':'))&&pickTarget===id){pickTarget='';pickNote='';}
-      }
-      else if (action==='timeline-session') {timelineSession=id;pickTarget='';pickNote='';go(campaignHref(active,'timeline','sessions',id));}
-      else if (action==='timeline-target') {pickTarget=pickTarget===id?'':id;pickNote='';}
-      else if (action==='timeline-entry') pickNote=pickNote===id?'':id;
-      else if (action==='note-popup') {notePopup=id;focusPopup=true;}
-      else if (action==='note-popup-close') {const back=notePopup;notePopup='';setTimeout(()=>document.querySelector(`[data-campaign="note-popup"][data-id="${back}"]`)?.focus(),0);}
-      else if (action==='timeline-unpin' && canMovePin(store().get(path('timeline',id)))) {if(window.confirm('Remove this pin from the map?'))store().queue(path('timeline',id),null);}
+      else if (action==='timeline-session') {timelineSession=id;go(campaignHref(active,'timeline','sessions',id));}
       else if (action==='mark-read') {const [kind,entryId]=id.split(':');if(READ_KINDS.includes(kind))markRead(kind,entryId);}
       else if (action==='image-remove') {
         const [kind,index]=id.split(':');
@@ -879,35 +738,9 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
-      else if (action==='board-link-mode') {boardLinking=!boardLinking;linkFrom='';}
-      else if (action==='board-card') {
-        if (!boardLinking) { const [kind,targetId]=id.split(':');openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);return; }
-        if (!linkFrom) linkFrom=id;
-        else if (linkFrom!==id) {linkDraft={from:linkFrom,to:id};linkFrom='';boardLinking=false;focusPopup=true;}
-      }
-      else if (action==='board-link-save'&&linkDraft) {
-        const now=new Date().toISOString(),label=(document.querySelector('[data-board-label]')?.value||'').trim().slice(0,120);
-        store().queue(path('links',crypto.randomUUID()),{from:linkDraft.from,to:linkDraft.to,label,creatorUid:store().uid,createdAt:now,updatedAt:now});linkDraft=null;
-      }
-      else if (action==='board-link') {linkPopup=id;focusPopup=true;}
-      else if (action==='board-link-update') {
-        const link=store().get(path('links',id));if(!canEditLink(link))return;
-        const {id:_,...rest}=link;store().queue(path('links',id),{...rest,label:(document.querySelector('[data-board-label]')?.value||'').trim().slice(0,120),updatedAt:new Date().toISOString()});linkPopup='';
-      }
-      else if (action==='board-link-remove') {const link=store().get(path('links',id));if(canEditLink(link)&&window.confirm('Remove this link?')){store().queue(path('links',id),null);linkPopup='';}}
-      else if (action==='board-arrange') {
-        const saved=store().list(path('board',''));
-        if(saved.length&&window.confirm('Put every card back in its starting place?'))for(const item of saved)store().queue(path('board',item.id),null);
-      }
-      else if (action==='board-close') {linkDraft=null;linkPopup='';}
-      else if (action==='pin-remove') {
-        const item=store().get(path('timeline',id));
-        if (!canMovePin(item)) return;
-        store().queue(path('timeline',id),null);notePopup='';
-      }
-      else if (action==='pin-open-entry') {
-        // Open the PC, NPC or plot behind the pin as its panel.
-        const [kind,targetId]=id.split(':');notePopup='';
+      else if (action==='token-open') {
+        // Open the PC or NPC behind a token as its panel.
+        const [kind,targetId]=id.split(':');
         openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);
       }
       else if (action==='npc-portrait-library') {
@@ -939,78 +772,86 @@
     } catch(err) {error=err.code==='permission-denied'?'Access denied. Check membership or invitation expiry.':err.message;}
     finally {busy=false;changed();}
   }
-  // Drag a pin to move it (yours, or any as GM). A drag that moved suppresses the click that
-  // would open the pin's note.
-  let drag=null, swallowClick=false;
-  // Board cards drag the same way (any member); their strings and tags follow.
-  let cardDrag=null;
-  function moveStrings(key,x,y) {
-    const cy=y+BOARD.cardH/2;
-    for (const line of document.querySelectorAll(`.board-strings line[data-from="${CSS.escape(key)}"]`)) {line.dataset.x1=x;line.setAttribute('x1',pct(x));line.setAttribute('y1',cy);}
-    for (const line of document.querySelectorAll(`.board-strings line[data-to="${CSS.escape(key)}"]`)) {line.dataset.x2=x;line.setAttribute('x2',pct(x));line.setAttribute('y2',cy);}
-    for (const tag of document.querySelectorAll(`.board-tag[data-tag-from="${CSS.escape(key)}"], .board-tag[data-tag-to="${CSS.escape(key)}"]`)) {
-      const line=document.querySelector(`.board-strings line[data-link="${CSS.escape(tag.dataset.id)}"]`);
-      if(line){tag.style.left=pct((Number(line.dataset.x1)+Number(line.dataset.x2))/2);tag.style.top=`${(Number(line.getAttribute('y1'))+Number(line.getAttribute('y2')))/2}px`;}
+  // Dragging a token: from the tray or from the map (yours, or any as GM). While dragging, a
+  // hex grid covers the map and the hex under the pointer is outlined; the token lands on its
+  // centre. Dropped off the map, a placed token is removed. A drag suppresses the click after it.
+  const HEX = 1/64; // a hex's radius, as a share of the map's width
+  function snapHex(px,py,width) {
+    const r = width * HEX, w = Math.sqrt(3) * r, h = 1.5 * r, row0 = Math.round(py / h);
+    let best = null;
+    for (let row = row0 - 1; row <= row0 + 1; row++) {
+      const offset = Math.abs(row) % 2 ? w / 2 : 0, cx = Math.round((px - offset) / w) * w + offset, cy = row * h, d = (cx - px) ** 2 + (cy - py) ** 2;
+      if (!best || d < best.d) best = {x:cx,y:cy,d};
     }
+    return best;
+  }
+  const hexPath = (cx,cy,r) => 'M'+[0,1,2,3,4,5].map(i => { const a = Math.PI / 3 * i - Math.PI / 2; return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`; }).join('L')+'Z';
+  function showHexes(map) {
+    map.classList.add('timeline-map-dragging');
+    const width = map.clientWidth, r = width * HEX, w = Math.sqrt(3) * r, h = 1.5 * r;
+    const svg = map.querySelector('.map-hexes');
+    if (svg && svg.dataset.width === String(width)) return svg;
+    svg?.remove();
+    map.insertAdjacentHTML('beforeend',`<svg class="map-hexes" data-width="${width}" aria-hidden="true"><defs><pattern id="map-hex-grid" width="${w}" height="${2 * h}" patternUnits="userSpaceOnUse"><path d="${[[0,0],[w,0],[w / 2,h],[0,2 * h],[w,2 * h]].map(([x,y]) => hexPath(x,y,r)).join('')}"/></pattern></defs><rect width="100%" height="100%" fill="url(#map-hex-grid)"/><path class="map-hex-target" d=""/></svg>`);
+    return map.querySelector('.map-hexes');
+  }
+  let drag=null, swallowClick=false;
+  const mapElement=()=>document.querySelector('[data-timeline-map]');
+  function endDrag() {
+    if(!drag)return;
+    drag.ghost?.remove();drag.source.classList?.remove('timeline-pin-dragging');
+    const map=mapElement();map?.classList.remove('timeline-map-dragging');map?.querySelector('.map-hexes')?.remove();
+    drag=null;
   }
   document.addEventListener('pointerdown',event=>{
-    const card=event.target.closest?.('.board-card[data-id]');
-    if(!card||boardLinking||event.button!==0)return;
-    const surface=card.closest('.board-surface');
-    cardDrag={card,key:card.dataset.id,x0:event.clientX,y0:event.clientY,left:Number(card.dataset.x)||0,top:parseFloat(card.style.top)||0,width:surface.clientWidth||1,half:card.offsetWidth/2,moved:false};
-  });
-  document.addEventListener('pointermove',event=>{
-    if(!cardDrag)return;
-    if(!cardDrag.moved&&Math.hypot(event.clientX-cardDrag.x0,event.clientY-cardDrag.y0)<5)return;
-    cardDrag.moved=true;event.preventDefault();
-    // Pointer pixels become shares of the board's width; the card stays inside the board.
-    const unit=BOARD.w/cardDrag.width, edge=Math.min(BOARD.w/2,cardDrag.half*unit);
-    cardDrag.x=Math.min(BOARD.w-edge,Math.max(edge,Math.round(cardDrag.left+(event.clientX-cardDrag.x0)*unit)));
-    cardDrag.y=Math.min(BOARD.h-BOARD.cardH,Math.max(0,Math.round(cardDrag.top+event.clientY-cardDrag.y0)));
-    cardDrag.card.style.left=pct(cardDrag.x);cardDrag.card.style.top=`${cardDrag.y}px`;cardDrag.card.classList.add('board-card-dragging');
-    moveStrings(cardDrag.key,cardDrag.x,cardDrag.y);
-  });
-  // Pictures inside a card would start the browser's own image drag and cancel ours.
-  document.addEventListener('dragstart',event=>{if(event.target.closest?.('.board-card'))event.preventDefault();});
-  document.addEventListener('pointercancel',()=>{if(cardDrag){cardDrag.card.classList.remove('board-card-dragging');cardDrag=null;changed();}});
-  document.addEventListener('pointerup',()=>{
-    if(!cardDrag)return;
-    const done=cardDrag;cardDrag=null;
-    if(!done.moved)return;
-    swallowClick=true;setTimeout(()=>{swallowClick=false;},400);
-    store().queue(path('board',done.key),{x:done.x,y:done.y,updatedAt:new Date().toISOString()});
-  });
-  document.addEventListener('pointerdown',event=>{
-    const pin=event.target.closest?.('.timeline-pin[data-pin-id]'), map=pin?.closest('.timeline-map');
-    if(!pin||!map||event.button!==0)return;
-    const item=store().get(path('timeline',pin.dataset.pinId));
-    if(!canMovePin(item))return;
-    // Keep where the pin was grabbed relative to its anchor (its point), so it does not jump.
-    const rect=map.getBoundingClientRect();
-    const ax=rect.left+Number(item.x)/100*rect.width, ay=rect.top+Number(item.y)/100*rect.height;
-    drag={pin,map,id:pin.dataset.pinId,item,x0:event.clientX,y0:event.clientY,dx:event.clientX-ax,dy:event.clientY-ay,moved:false,x:item.x,y:item.y};
+    const source=event.target.closest?.('[data-tray-token],.timeline-pin[data-pin-id]'), map=mapElement();
+    if(!source||!map||event.button!==0)return;
+    const sessionId=map.dataset.timelineMap;
+    let item=null,key=source.dataset.trayToken;
+    if(!key){item=store().get(path('timeline',source.dataset.pinId));if(!item||item.sessionId!==sessionId)return;item={...item,id:source.dataset.pinId};key=`${item.kind}:${item.targetId}`;}
+    else item=mapTokens().find(t=>t.sessionId===sessionId&&`${t.kind}:${t.targetId}`===key)||null;
+    if(item&&!canMovePin(item))return;
+    drag={source,key,sessionId,item,x0:event.clientX,y0:event.clientY,moved:false,ghost:null,at:null};
   });
   document.addEventListener('pointermove',event=>{
     if(!drag)return;
     if(!drag.moved&&Math.hypot(event.clientX-drag.x0,event.clientY-drag.y0)<5)return;
-    drag.moved=true;event.preventDefault();
-    const rect=drag.map.getBoundingClientRect();
-    drag.x=Math.min(100,Math.max(0,Math.round((event.clientX-drag.dx-rect.left)/rect.width*1000)/10));
-    drag.y=Math.min(100,Math.max(0,Math.round((event.clientY-drag.dy-rect.top)/rect.height*1000)/10));
-    drag.pin.style.left=`${drag.x}%`;drag.pin.style.top=`${drag.y}%`;drag.pin.classList.add('timeline-pin-dragging');
+    event.preventDefault?.();
+    const map=mapElement();
+    if(!map){endDrag();return;}
+    if(!drag.moved){
+      drag.moved=true;
+      drag.ghost=document.createElement('div');
+      drag.ghost.className=`map-drag-ghost ${drag.source.className.match(/(map-tray|timeline-pin)-(pcs|npcs|place)/)?.[0].replace(/^map-tray/,'timeline-pin')||''}`;
+      drag.ghost.innerHTML=drag.source.querySelector('img')?.outerHTML||'<span class="timeline-pin-dot"></span>';
+      document.body.append(drag.ghost);
+      if(drag.source.dataset.pinId)drag.source.classList.add('timeline-pin-dragging');
+    }
+    drag.ghost.style.left=`${event.clientX}px`;drag.ghost.style.top=`${event.clientY}px`;
+    const svg=showHexes(map),rect=map.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top;
+    const inside=px>=0&&py>=0&&px<=rect.width&&py<=rect.height;
+    const hex=inside&&snapHex(px,py,rect.width);
+    drag.at=hex?{x:Math.min(100,Math.max(0,Math.round(hex.x/rect.width*1000)/10)),y:Math.min(100,Math.max(0,Math.round(hex.y/rect.height*1000)/10))}:null;
+    svg?.querySelector('.map-hex-target')?.setAttribute('d',hex?hexPath(hex.x,hex.y,rect.width*HEX):'');
+    drag.ghost.classList.toggle('map-drag-ghost-off',!hex);
   });
+  document.addEventListener('pointercancel',endDrag);
   document.addEventListener('pointerup',()=>{
     if(!drag)return;
-    const done=drag;drag=null;
+    const done=drag;endDrag();
     if(!done.moved)return;
     swallowClick=true;setTimeout(()=>{swallowClick=false;},400);
-    const {id:_,...rest}=done.item;
-    store().queue(path('timeline',done.id),{...rest,x:done.x,y:done.y,creatorUid:done.item.creatorUid||store().uid,updatedAt:new Date().toISOString()});
+    const [kind,targetId]=done.key.split(':'),now=new Date().toISOString();
+    if(done.at){
+      const {id,target:_,...previous}=done.item||{};
+      store().queue(path('timeline',id||crypto.randomUUID()),{...previous,sessionId:done.sessionId,kind,targetId,x:done.at.x,y:done.at.y,createdAt:previous.createdAt||now,updatedAt:now,creatorUid:previous.creatorUid||store().uid});
+    } else if(done.item?.id) store().queue(path('timeline',done.item.id),null);
+    changed();
   });
   document.addEventListener('click',event=>{if(swallowClick){event.preventDefault();event.stopPropagation();swallowClick=false;}},true);
   document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');
     if(b?.dataset.campaign==='timeline-arrow'){const pin=document.querySelector(`.timeline-pin[data-pin-id="${CSS.escape(b.dataset.id)}"]`);if(pin){const r=pin.getBoundingClientRect();window.scrollTo({top:window.scrollY+r.top+r.height/2-window.innerHeight/2,left:window.scrollX+r.left+r.width/2-document.documentElement.clientWidth/2,behavior:'smooth'});}return;}
-    if(b)act(b.dataset.campaign,b.dataset.id);else placePin(event);});
+    if(b)act(b.dataset.campaign,b.dataset.id);});
   // A new NPC keeps its picture in the draft until saved; an existing NPC saves it at once.
   function setNPCPortrait(url) {
     if (!gm()) return;
@@ -1021,27 +862,16 @@
     if (url) next.portrait=url; else delete next.portrait;
     store().queue(path('npcs',npcId),next);
   }
-  // Placing pins: choose a PC, NPC or plot, then click the map; the pin is stored in percent.
-  // Placing an event: choose a plot, PC or NPC and one of its notes, then click the map.
-  // Choosing a note already on this session's map moves it. Positions are stored in percent.
-  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&notePopup){event.preventDefault();act('note-popup-close');}});
-  function placePin(event) {
-    const map=event.target.closest?.('[data-timeline-map]');
-    if(!map||!pickTarget||!pickNote||event.target.closest('.timeline-pin')||event.target.closest('.timeline-pin-controls'))return;
-    const sessionId=map.dataset.timelineMap,[kind,targetId]=pickTarget.split(':');
-    const rect=map.getBoundingClientRect(),x=Math.round((event.clientX-rect.left)/rect.width*1000)/10,y=Math.round((event.clientY-rect.top)/rect.height*1000)/10;
-    const now=new Date().toISOString(),existing=store().list(path('timeline','')).find(item=>item.kind===kind&&item.targetId===targetId&&item.noteId===pickNote);
-    // A player moves only a pin they placed; the GM moves any (keeping who placed it).
-    if(existing && !gm() && existing.creatorUid!==store().uid)return;
-    const {id:_,...previous}=existing||{};
-    store().queue(path('timeline',existing?.id||crypto.randomUUID()),{...previous,sessionId,kind,targetId,noteId:pickNote,x:Math.min(100,Math.max(0,x)),y:Math.min(100,Math.max(0,y)),createdAt:existing?.createdAt||now,updatedAt:now,creatorUid:existing?.creatorUid||store().uid});
-    pickTarget='';pickNote='';changed();
-  }
   // An image added to the plot being drafted, or to the session being edited (GM).
   function addEntryImage(kind,picture) {
     if (kind==='plot' && plotDraft) plotDraft.images=[...(plotDraft.images||[]),picture].slice(0,MAX_IMAGES);
     if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
   }
+  document.addEventListener('input',event=>{
+    if(event.target.dataset?.traySearch===undefined)return;
+    const query=event.target.value.trim().toLowerCase();
+    for(const token of event.target.closest('.map-tray')?.querySelectorAll('[data-tray-token]')||[])token.hidden=!!query&&!token.textContent.toLowerCase().includes(query);
+  });
   document.addEventListener('change',async event=>{
     if (event.target.dataset?.npcPlace !== undefined && gm()) {
       const place=event.target.checked;

@@ -89,12 +89,13 @@ function campaignCards() {
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
  vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('sheet-sharing.js','utf8'),{window,structuredClone,crypto:require('node:crypto')});
- vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:{addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null},location,Event,console,setTimeout,crypto:require('node:crypto')});
+ const doc={addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null};
+ vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:doc,location,Event,console,setTimeout,crypto:require('node:crypto')});
  // Like the app, render the address a click moved to (a section or item inside this campaign).
  const renderSlug=window.CampaignUI.render;
  window.CampaignUI.render=slug=>{const here=location.hash.slice(2).split('/').map(decodeURIComponent).join('/');return renderSlug(slug.startsWith('campaigns/')&&here.startsWith(slug+'/')?here:slug);};
  const render=()=>window.CampaignUI.render('campaigns');
- return {data,store,watches,window,location,listeners,documentListeners,render,setCharacters:value=>characters=value,
+ return {data,store,watches,window,location,listeners,documentListeners,doc,render,setCharacters:value=>characters=value,
   click:(action,id)=>documentListeners.click({target:{closest:()=>({dataset:{campaign:action,id}})}})};
 }
 test('only a PC\'s creator edits it; the GM views the full sheet and players open the public view',()=>{
@@ -241,64 +242,79 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  assert.match(render(),/Session one<\/span>[^]*?<span class="campaign-unread"/);assert.match(render(),/data-campaign="mark-read"/);
 });
 
-test('timeline: newest sessions first, an always-visible map, entries chosen with selectors, used entries disabled, and a popup',async()=>{
+// A fake map 640×400 and pointer events for dragging tokens.
+function dragOnMap(d,sessionId){
+ const nothing={add(){},remove(){},toggle(){}};
+ const map={dataset:{timelineMap:sessionId},clientWidth:640,getBoundingClientRect:()=>({left:0,top:0,width:640,height:400}),classList:nothing,querySelector:()=>null,insertAdjacentHTML(){}};
+ d.doc.querySelector=selector=>selector==='[data-timeline-map]'?map:null;
+ d.doc.createElement=()=>({className:'',innerHTML:'',style:{},classList:nothing,remove(){}});d.doc.body={append(){}};
+ const L=d.documentListeners;
+ return (source,from,to)=>{L.pointerdown({button:0,clientX:from[0],clientY:from[1],target:{closest:()=>source}});L.pointermove({clientX:to[0],clientY:to[1]});L.pointerup({});};
+}
+const trayToken=key=>({dataset:{trayToken:key},className:`map-tray-token map-tray-${key.split(':')[0]}`,querySelector:()=>null,classList:{add(){},remove(){}}});
+const mapToken=id=>({dataset:{pinId:id},className:'timeline-pin timeline-pin-npcs',querySelector:()=>null,classList:{add(){},remove(){}}});
+test('map: newest sessions first; PCs, people and places dragged from the tray snap to a hex; dragged off the map they go',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();await d.click('section','timeline');
  let html=render();
- assert.match(html,/timeline-map/);assert.doesNotMatch(html,/entry-help/,'no helper text');
+ assert.match(html,/timeline-map/);
  assert.match(html,/<h2 class="visually-hidden">Timeline<\/h2>/,'the map row has no visible title');
+ assert.match(html,/Add a session to place PCs and NPCs/);
  d.data.set('campaigns/c/sessions/s1',{title:'First session',text:'',createdAt:'2026-11-01',updatedAt:'2026-11-20'});
  d.data.set('campaigns/c/sessions/s2',{title:'Second session',text:'',createdAt:'2026-11-08',updatedAt:'2026-11-08'});
  d.data.set('campaigns/c/npcs/n',{name:'Court messenger',notes:''});
- d.data.set('campaigns/c/notes/note1',{creatorUid:'gm',targetKind:'npcs',targetId:'n',text:'Carries a sealed letter\nFrom the Emerald Champion.',createdAt:'2026-11-08',updatedAt:'2026-11-08'});
+ d.data.set('campaigns/c/npcs/k',{name:'Shiro Kitsuki',role:'O Castelo da Pergunta',notes:''});
  html=render();
  assert.ok(html.indexOf('Second session')<html.indexOf('First session'),'newest first');
  assert.match(html,/data-timeline-map="s2"/,'newest session selected');
- assert.match(html,/timeline-target timeline-target-npcs"[^>]*data-campaign="timeline-target" data-id="npcs:n"|data-campaign="timeline-target" data-id="npcs:n"[^>]*class="[^"]*timeline-target-npcs/);
- await d.click('timeline-target','npcs:n');
- assert.match(render(),/data-campaign="timeline-entry" data-id="note1"/);
- await d.click('timeline-entry','note1');
- assert.match(render(),/timeline-map-placing/);
- const map={dataset:{timelineMap:'s2'},getBoundingClientRect:()=>({left:0,top:0,width:200,height:400})};
- d.documentListeners.click({target:{closest:selector=>selector==='[data-campaign]'?null:selector==='[data-timeline-map]'?map:null},clientX:100,clientY:100});
- const [key]=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/'));
- assert.equal(d.data.get(key).noteId,'note1');assert.equal(d.data.get(key).sessionId,'s2');
+ assert.match(html,/map-head[^]*data-campaign="npc-new"[^]*data-campaign="pc-picker"/,'+ NPC and + PC sit on the map');
+ assert.match(html,/aria-label="People"[^]*data-tray-token="npcs:n"[^]*aria-label="Places"[^]*class="map-tray-token map-tray-place" data-tray-token="npcs:k"/,'people and places in the tray');
+ assert.doesNotMatch(html,/board|timeline-target|timeline-entry/,'no board and no note picker');
+ const drag=dragOnMap(d,'s2');
+ drag(trayToken('npcs:n'),[10,500],[100,100]);
+ let [key]=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/'));
+ const token=d.data.get(key);
+ assert.equal(`${token.sessionId} ${token.kind}:${token.targetId} ${token.creatorUid}`,'s2 npcs:n gm');
+ assert.equal(token.x,14.9,'snapped to the hex centre, not the pointer');assert.ok(Math.abs(token.y-26.25)<0.1);
  html=render();
- assert.match(html,/timeline-pin timeline-pin-npcs" data-pin-id="[^"]+" style="left:50%;top:25%"[\s\S]*Carries a sealed letter/);
- // The pinned entry is now disabled for every session.
- await d.click('timeline-session','s1');await d.click('timeline-target','npcs:n');
- assert.match(render(),/class="[^"]*timeline-entry-used"[^>]*data-campaign="note-popup" data-id="[^"]+"[^>]*>[^<]*</,'a pinned entry is crossed out and opens its pin\'s note');
- assert.doesNotMatch(render(),/data-campaign="timeline-entry" data-id="note1"/);
- await d.click('timeline-session','s2');
- await d.click('note-popup',key.split('/').pop());
- assert.match(render(),/role="dialog"[\s\S]*From the Emerald Champion/);
- await d.click('note-popup-close');
- // Players place pins too: they get the same picker.
- d.store.uid='alice';
- assert.match(render(),/data-campaign="timeline-target" data-id="npcs:n"/);
+ assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-movable" data-pin-id="[^"]+" style="left:14.9%;[^]*data-campaign="token-open" data-id="npcs:n"[^>]*>[^]*Court messenger/);
+ assert.match(html,/map-tray-placed" data-tray-token="npcs:n"/,'marked as on the map in the tray');
+ // Dragging it from the tray again moves the same token.
+ drag(trayToken('npcs:n'),[10,500],[300,200]);
+ assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,1);
+ assert.ok(d.data.get(key).x>40);
+ // Off the map, it is removed.
+ drag(mapToken(key.split('/').pop()),[300,200],[700,500]);
+ assert.equal(d.data.has(key),false);
+ // A click opens its NPC.
+ await d.click('token-open','npcs:n');
+ assert.match(render(),/class="campaign-entry" data-entry="npcs:n" open/);
 });
-test('timeline entries for a PC include the public entries of the character journal',()=>{
+test('map: players place tokens too; they move only their own, the GM moves any',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
- d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'a-pc'});
+ d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
+ d.data.set('campaigns/c/timeline/mine',{sessionId:'s',kind:'npcs',targetId:'n',x:10,y:10,createdAt:'1',updatedAt:'1',creatorUid:'alice'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();d.click('section','timeline');render();
- const watch=d.watches.find(w=>w.pcId==='p'&&!w.full);
- watch.receive({profile:{name:'Doji Ren',journal:[{id:'j1',text:'Reached the capital',createdAt:'2026-11-02'}]}},null,{fromCache:false});
- d.click('timeline-target','pcs:p');
- assert.match(render(),/data-campaign="timeline-entry" data-id="journal:j1"[^>]*>Reached the capital/);
+ const drag=dragOnMap(d,'s');
+ d.store.uid='bob';assert.doesNotMatch(render(),/timeline-pin-movable/);
+ drag(mapToken('mine'),[64,40],[700,500]);
+ assert.ok(d.data.has('campaigns/c/timeline/mine'),'not someone else\'s');
+ d.store.uid='alice';assert.match(render(),/timeline-pin-movable" data-pin-id="mine"/);
+ drag(mapToken('mine'),[64,40],[300,300]);
+ assert.ok(d.data.get('campaigns/c/timeline/mine').x>40);assert.equal(d.data.get('campaigns/c/timeline/mine').creatorUid,'alice');
+ d.store.uid='gm';render();drag(mapToken('mine'),[300,300],[-5,10]);
+ assert.equal(d.data.has('campaigns/c/timeline/mine'),false,'the GM removes any');
 });
-
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  const html=d.window.CampaignUI.render('campaigns/c');
  assert.doesNotMatch(html,/campaign-segments|data-campaign="section"/);
  const rows=[...html.matchAll(/data-campaign-row="([^"]+)"/g)].map(m=>m[1]);
- assert.equal(rows.join(),'sessions,plots,npcs,pcs,board,timeline','rows first, the board, the map last');
+ assert.equal(rows.join(),'sessions,plots,npcs,pcs,timeline','rows first, the map last');
  for(const [title,action] of [['Sessions','session-new'],['Plots','plot-new'],['NPCs','npc-new'],['PCs','pc-picker']])assert.match(html,new RegExp(`<h2 class="visually-hidden">${title}</h2><div class="campaign-entries"><div class="campaign-add-tile"><button[^>]*data-campaign="${action}"`),title);
  assert.doesNotMatch(html,/home-row-head|invite-settings/);
  assert.doesNotMatch(html,/entry-help|Add clues and plans/);
@@ -341,7 +357,7 @@ test('old campaign notes about a PC move into its journal, then the note is remo
  assert.equal(d.data.has('campaigns/c/notes/gmnote'),false);
 });
 
-test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on its picker',async()=>{
+test('the map comes first by default',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/sessions/s',{title:'New session 1',text:'',createdAt:'2026-10-08'});
@@ -353,15 +369,6 @@ test('the Timeline tab comes first; the GM chooses which PCs and NPCs appear on 
  assert.match(html,/data-timeline-map="s"/,'Timeline open by default');
  assert.doesNotMatch(html.slice(html.indexOf('timeline-detail')),/<h3>New session 1<\/h3>/,'no session heading above the map');
  assert.match(html,/data-id="npcs:n"/);
- await d.click('timeline-visibility','npcs:n');
- assert.equal(JSON.stringify(d.data.get('campaigns/c').timelineHidden),JSON.stringify(['npcs:n']));
- assert.doesNotMatch(render(),/data-campaign="timeline-target" data-id="npcs:n"/);
- await d.click('section','npcs');
- assert.match(render(),/data-campaign="timeline-visibility" data-id="npcs:n"(?![^>]*checked)/);
- await d.click('timeline-visibility','npcs:n');
- assert.equal(JSON.stringify(d.data.get('campaigns/c').timelineHidden),'[]');
- d.store.uid='alice';await d.click('section','pcs');
- assert.doesNotMatch(render(),/timeline-visibility/,'only the GM sees the checkbox');
 });
 test('campaign links open a section and item by name + short ID, and clicks move the address',async()=>{
  const d=campaignCards();
@@ -585,88 +592,6 @@ test('the map shows every session\'s pins; pins from other sessions are greyed o
  d.data.set('campaigns/c/timeline/p2',{sessionId:'s2',kind:'npcs',targetId:'n',noteId:'b',x:20,y:20,createdAt:'2'});
  const html=d.window.CampaignUI.render('campaigns/c'); // newest session (Two) is selected
  assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-other" data-pin-id="p1"/);
- assert.match(html,/class="timeline-pin timeline-pin-npcs" data-pin-id="p2"/);
+ assert.match(html,/class="timeline-pin timeline-pin-npcs timeline-pin-movable" data-pin-id="p2"/);
  assert.ok(html.indexOf('data-pin-id="p1"')<html.indexOf('data-pin-id="p2"'),'the selected session\'s pins are drawn on top');
-});
-test('the pin picker only offers plots, PCs and NPCs that have notes',()=>{
- const d=campaignCards();
- d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
- d.data.set('campaigns/c/npcs/withNotes',{name:'Mario',notes:''});
- d.data.set('campaigns/c/npcs/empty',{name:'Lady Doji',notes:''});
- d.data.set('campaigns/c/plots/p',{title:'Empty plot',creatorUid:'gm',public:true,createdAt:'1',updatedAt:'1',revision:'r'});
- d.data.set('campaigns/c/notes/a',{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'withNotes',title:'Met at the inn',text:'x',createdAt:'1',updatedAt:'1',revision:'r'});
- const html=d.window.CampaignUI.render('campaigns/c');
- assert.match(html,/data-campaign="timeline-target" data-id="npcs:withNotes"/);
- assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="npcs:empty"/);assert.doesNotMatch(html,/data-campaign="timeline-target" data-id="plots:p"/);
-});
-test('a pin\'s note popup offers Remove pin to whoever placed it and to the GM; removing deletes the pin',async()=>{
- const d=campaignCards();
- d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/sessions/s',{title:'Session',text:'',createdAt:'2026-11-01'});
- d.data.set('campaigns/c/npcs/n',{name:'Mario',notes:''});
- d.data.set('campaigns/c/notes/a',{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'n',title:'Met',text:'x',createdAt:'1',updatedAt:'1',revision:'r'});
- d.data.set('campaigns/c/timeline/mine',{sessionId:'s',kind:'npcs',targetId:'n',noteId:'a',x:10,y:10,createdAt:'1',creatorUid:'alice'});
- const render=()=>d.window.CampaignUI.render('campaigns/c');
- d.store.uid='bob';render();await d.click('note-popup','mine');
- assert.doesNotMatch(render(),/data-campaign="pin-remove"/,'not someone else\'s pin');
- await d.click('note-popup-close');
- d.store.uid='alice';render();await d.click('note-popup','mine');
- assert.match(render(),/data-campaign="pin-open-entry" data-id="npcs:n"[^]*data-campaign="pin-remove" data-id="mine"/);
- await d.click('pin-remove','mine');
- assert.equal(d.data.has('campaigns/c/timeline/mine'),false);
-});
-test('board: a card per NPC, PC and plot; link two cards; strings in the maker\'s colour; only maker or GM removes',async()=>{
- const d=campaignCards();
- d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});
- d.data.set('campaigns/c/members/alice',{displayName:'Alice',color:'#123456'});
- d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'k',name:'Hida Kaito'});
- d.data.set('campaigns/c/npcs/a',{name:'Miya Nobumasa',role:'Vítima'});
- d.data.set('campaigns/c/npcs/b',{name:'Haru',role:'Carvoeiro'});
- d.data.set('campaigns/c/board/npcs:b',{x:500,y:300,updatedAt:'1'});
- const render=()=>d.window.CampaignUI.render('campaigns/c');
- d.store.uid='alice';let html=render();
- for (const key of ['npcs:a','npcs:b','pcs:p']) assert.match(html,new RegExp(`class="board-card[^"]*" data-campaign="board-card" data-id="${key}"`));
- assert.match(html,/data-id="npcs:b" data-x="500" style="left:20.833%;top:300px"/,'a saved position is used');
- assert.match(html,/class="board-legend-item"><i style="background:#123456"><\/i>(Hida Kaito|Alice)<input type="color"/,'a player\'s colour is named once, by their PC or name');
- assert.match(html,/<\/i>GM</);
- await d.click('board-link-mode');await d.click('board-card','npcs:a');await d.click('board-card','npcs:b');
- assert.match(render(),/data-campaign="board-link-save"/);
- await d.click('board-link-save');
- const [id,link]=[...d.data].find(([k])=>k.startsWith('campaigns/c/links/'));
- assert.equal(`${link.from}>${link.to}:${link.creatorUid}`,'npcs:a>npcs:b:alice');
- html=render();
- assert.match(html,/<line data-link="[^"]+" data-from="npcs:a" data-to="npcs:b"[^>]*stroke="#123456"/);
- const linkId=id.split('/').pop();
- d.store.uid='bob';render();await d.click('board-link',linkId);
- assert.doesNotMatch(render(),/data-campaign="board-link-remove"/,'others cannot remove it');
- await d.click('board-close');
- d.store.uid='gm';render();await d.click('board-link',linkId);
- assert.match(render(),/data-campaign="board-link-remove"/,'the GM can');
-});
-test('board: starts in bands — PCs, then each session and plot with its places before its people, then the rest',async()=>{
- const d=campaignCards();
- d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});
- d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'k',name:'Hida Kaito'});
- d.data.set('campaigns/c/sessions/s1',{title:'Sessão 1',createdAt:'2026-01-02'});
- d.data.set('campaigns/c/plots/q',{title:'Quem matou?',createdAt:'2026-01-01'});
- d.data.set('campaigns/c/notes/n1',{targetKind:'sessions',targetId:'s1',title:'Neve',text:'Miya Harunobu chega a Shiro Kitsuki.'});
- d.data.set('campaigns/c/notes/n2',{targetKind:'plots',targetId:'q',title:'Pista',text:'O carvoeiro Haru viu tudo.'});
- d.data.set('campaigns/c/npcs/a',{name:'Miya Harunobu',role:'Mensageiro'});
- d.data.set('campaigns/c/npcs/b',{name:'Haru',role:'Carvoeiro'});
- d.data.set('campaigns/c/npcs/c',{name:'Shiro Kitsuki',role:'O Castelo da Pergunta'});
- d.data.set('campaigns/c/npcs/d',{name:'Ninguém',role:''});
- d.store.uid='gm';const html=d.window.CampaignUI.render('campaigns/c');
- const bands=[...html.matchAll(/class="board-band" style="top:(\d+)px">([^<]*)</g)].map(m=>m[2]);
- assert.deepEqual(bands,['Player characters','Sessão 1','Quem matou?','Others'],'sessions, then plots');
- const top=key=>Number(new RegExp(`data-id="${key}" data-x="[\\d.]+" style="left:[\\d.]+%;top:(\\d+)px`).exec(html)[1]);
- assert.ok(top('pcs:p')<top('npcs:c')&&top('npcs:c')<top('npcs:a')&&top('npcs:a')<top('npcs:b')&&top('npcs:b')<top('npcs:d'));
- assert.match(html,/data-campaign="board-arrange"[^]*data-board-search/,'Arrange and the search box are in the header');
- assert.match(html,/class="board-card board-card-place[^"]*" data-campaign="board-card" data-id="npcs:c"/,'a place is told apart');
- d.data.set('campaigns/c/board/npcs:d',{x:500,y:30,updatedAt:'1'});
- d.window.CampaignUI.render('campaigns/c');d.window.confirm=()=>true;
- await d.click('board-arrange');
- assert.equal(d.data.has('campaigns/c/board/npcs:d'),false,'Arrange puts cards back');
 });

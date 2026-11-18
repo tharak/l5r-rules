@@ -140,7 +140,7 @@ service cloud.firestore {
           && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
           && (request.resource.data.gmUid == u || invitation())
           && getAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c)).data.membershipId == request.resource.data.membershipId;
-        // A member changes their display name and their colour (strings they add on the board).
+        // A member changes their display name (and the colour kept from the old board).
         allow update: if owner(u) && joined(c) && validName()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','color'])
           && (!('color' in request.resource.data) || (request.resource.data.color is string && request.resource.data.color.matches('^#[0-9a-f]{6}$')));
@@ -158,9 +158,8 @@ service cloud.firestore {
           && request.resource.data.updatedAt is string;
         allow delete: if gm(c);
       }
-      // Timeline events: a note about a PC, NPC or plot, pinned on the map within a session.
-      // Every member reads them; only the GM writes them.
-      // Every member places pins; a pin is moved or removed by whoever placed it, or by the GM.
+      // Map tokens: members drag PCs and NPCs onto a session's map; a token is moved or removed
+      // by whoever placed it, or by the GM. Older pins also carry a noteId.
       // Pins from before players could place them have no creatorUid and count as the GM's.
       match /timeline/{id} {
         function placedBy(d) { return 'creatorUid' in d ? d.creatorUid : ''; }
@@ -168,40 +167,18 @@ service cloud.firestore {
         allow create, update: if joined(c)
           && (gm(c) || (placedBy(request.resource.data) == request.auth.uid && (resource == null || placedBy(resource.data) == request.auth.uid)))
           && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt','creatorUid'])
-          && request.resource.data.kind in ['pcs','npcs','plots']
+          && request.resource.data.kind in ['pcs','npcs']
           && request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80
           && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80
-          && request.resource.data.noteId is string && request.resource.data.noteId.size() <= 80
+          && (!('noteId' in request.resource.data) || (request.resource.data.noteId is string && request.resource.data.noteId.size() <= 80))
           && request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 100
           && request.resource.data.y is number && request.resource.data.y >= 0 && request.resource.data.y <= 100
           && request.resource.data.createdAt is string && request.resource.data.updatedAt is string;
         allow delete: if gm(c) || (joined(c) && placedBy(resource.data) == request.auth.uid);
       }
-      // Investigation board: where each card sits (shared; any member moves cards) and the strings
-      // between cards. A string remembers who made it; its maker or the GM changes or removes it.
-      match /board/{key} {
-        allow read: if joined(c);
-        allow create, update: if joined(c) && request.resource.data.keys().hasOnly(['x','y','updatedAt'])
-          && request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 2400
-          && request.resource.data.y is number && request.resource.data.y >= 0 && request.resource.data.y <= 20000
-          && request.resource.data.updatedAt is string && request.resource.data.updatedAt.size() <= 40
-          && key.matches('^(npcs|pcs|plots):[A-Za-z0-9_-]{1,80}$');
-        allow delete: if joined(c);
-      }
-      match /links/{id} {
-        function linkShape(d) {
-          return d.keys().hasOnly(['from','to','label','creatorUid','createdAt','updatedAt'])
-            && d.from is string && d.from.matches('^(npcs|pcs|plots):[A-Za-z0-9_-]{1,80}$')
-            && d.to is string && d.to.matches('^(npcs|pcs|plots):[A-Za-z0-9_-]{1,80}$') && d.from != d.to
-            && d.label is string && d.label.size() <= 120
-            && d.creatorUid is string && d.createdAt is string && d.createdAt.size() <= 40 && d.updatedAt is string && d.updatedAt.size() <= 40;
-        }
-        allow read: if joined(c);
-        allow create: if joined(c) && linkShape(request.resource.data) && request.resource.data.creatorUid == request.auth.uid;
-        allow update: if joined(c) && (gm(c) || resource.data.creatorUid == request.auth.uid) && linkShape(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','updatedAt']);
-        allow delete: if gm(c) || (joined(c) && resource.data.creatorUid == request.auth.uid);
-      }
+      // Left over from the removed board: the GM can still read and delete it (deleting a campaign).
+      match /board/{key} { allow read, delete: if gm(c); }
+      match /links/{id} { allow read, delete: if gm(c); }
       // Read marks: every member sees who has read what; each member writes only their own.
       match /reads/{u} {
         allow read: if joined(c);
