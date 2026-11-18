@@ -645,3 +645,27 @@ test('board: a card per NPC, PC and plot; link two cards; strings in the maker\'
  d.store.uid='gm';render();await d.click('board-link',linkId);
  assert.match(render(),/data-campaign="board-link-remove"/,'the GM can');
 });
+test('board: starts in bands — PCs, then each session and plot with its places before its people, then the rest',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});
+ d.data.set('campaigns/c/pcs/p',{ownerUid:'alice',characterId:'k',name:'Hida Kaito'});
+ d.data.set('campaigns/c/sessions/s1',{title:'Sessão 1',createdAt:'2026-01-02'});
+ d.data.set('campaigns/c/plots/q',{title:'Quem matou?',createdAt:'2026-01-01'});
+ d.data.set('campaigns/c/notes/n1',{targetKind:'sessions',targetId:'s1',title:'Neve',text:'Miya Harunobu chega a Shiro Kitsuki.'});
+ d.data.set('campaigns/c/notes/n2',{targetKind:'plots',targetId:'q',title:'Pista',text:'O carvoeiro Haru viu tudo.'});
+ d.data.set('campaigns/c/npcs/a',{name:'Miya Harunobu',role:'Mensageiro'});
+ d.data.set('campaigns/c/npcs/b',{name:'Haru',role:'Carvoeiro'});
+ d.data.set('campaigns/c/npcs/c',{name:'Shiro Kitsuki',role:'O Castelo da Pergunta'});
+ d.data.set('campaigns/c/npcs/d',{name:'Ninguém',role:''});
+ d.store.uid='gm';const html=d.window.CampaignUI.render('campaigns/c');
+ const bands=[...html.matchAll(/class="board-band" style="top:(\d+)px">([^<]*)</g)].map(m=>m[2]);
+ assert.deepEqual(bands,['Player characters','Sessão 1','Quem matou?','Others'],'sessions, then plots');
+ const top=key=>Number(new RegExp(`data-id="${key}" data-x="[\\d.]+" style="left:[\\d.]+%;top:(\\d+)px`).exec(html)[1]);
+ assert.ok(top('pcs:p')<top('npcs:c')&&top('npcs:c')<top('npcs:a')&&top('npcs:a')<top('npcs:b')&&top('npcs:b')<top('npcs:d'));
+ assert.match(html,/class="board-card board-card-place[^"]*" data-campaign="board-card" data-id="npcs:c"/,'a place is told apart');
+ d.data.set('campaigns/c/board/npcs:d',{x:500,y:30,updatedAt:'1'});
+ d.window.CampaignUI.render('campaigns/c');d.window.confirm=()=>true;
+ await d.click('board-arrange');
+ assert.equal(d.data.has('campaigns/c/board/npcs:d'),false,'Arrange puts cards back');
+});

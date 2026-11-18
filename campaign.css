@@ -196,6 +196,10 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .board-card-npcs{border-left-color:var(--npc,#7a5a2b)}
 .board-card-pcs{border-left-color:var(--pc,#2f6f9f)}
 .board-card-plots{border-left-color:var(--red)}
+.board-card-place{border-left-color:#3b7d3a;border-radius:4px 14px 4px 4px}
+/* Bands: PCs, then one per session and plot, then the rest. */
+.board-band{position:absolute;left:0;right:0;padding:6px 12px 0;border-top:1px dashed #0000003d;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#3b2a16;pointer-events:none}
+.board-band:first-child{border-top:0}
 .board-card .character-tile-body,.board-card>*:not(.board-pushpin){min-width:0}
 .board-card{padding:6px 8px;gap:6px}
 .board-card .character-avatar{width:36px;height:36px;min-width:36px;flex:none}

@@ -14,7 +14,7 @@
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-|arrange/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -183,7 +183,7 @@
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
       {label:'Role',value:npc.role || '',attrs:{'data-campaign-field':'npc-role',maxlength:200,placeholder:'e.g. Magistrate of the Lion'}},
       {label:'Description',kind:'textarea',value:npc.description || '',attrs:{'data-campaign-field':'npc-description',maxlength:20000,rows:4}},
-    ],actionsHtml:button('npc-save','Save','',!npc.name.trim())+(npcId?button('npc-delete','Delete',npcId):'')});
+    ],extraHtml:UI.checkbox({label:'Place (a location, not a person)',attrs:{'data-npc-place':true,checked:isPlace(npc)}}),actionsHtml:button('npc-save','Save','',!npc.name.trim())+(npcId?button('npc-delete','Delete',npcId):'')});
   }
   // Sessions, NPCs and plots each have a journal of entries (stored as campaign notes).
   // Any member writes in a session's journal; the GM writes NPC journals; the GM or the
@@ -456,12 +456,16 @@
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
   const renderInvitePopup = () => '';
-  // Investigation board: a manual corkboard of NPC, PC and plot cards joined by strings. Every
-  // member moves cards and adds strings; a string is drawn in its maker's colour (shown once in
-  // the legend, so names are not repeated on every string).
+  // The board: NPCs (people and places) and PCs as cards, joined by strings any member adds.
+  // A string is drawn in its maker's colour (shown once in the legend, so names are not
+  // repeated on every string).
+  // Its starting layout follows the story: PCs on top, then a band for each session (oldest
+  // first) and each plot, holding the places and then the people its notes mention, in the
+  // order they first appear; NPCs nothing mentions go last. A card someone dragged keeps its
+  // spot until Arrange puts every card back.
   // The board fits the row's width: a card's x is its centre as a share of the width (0–2400),
-  // its y the top in pixels; the board is as tall as its lowest card.
-  const BOARD = {w:2400,h:1600,cardH:64};
+  // its y the top in pixels.
+  const BOARD = {w:2400,h:20000,cardH:64,cols:6,band:34,gap:22,edge:160};
   const pct = x => `${Math.round(x / BOARD.w * 100000) / 1000}%`;
   const PALETTE = ['#b23a2e','#2f6f9f','#3b7d3a','#8a5a9e','#c47a1c','#1f8a87','#a8456f','#5e6b2e'];
   let boardLinking = false, linkFrom = '', linkDraft = null, linkPopup = '', boardSearch = '';
@@ -477,36 +481,71 @@
   // A colour is named once, by the player's PCs (the GM as "GM"), so strings need no names.
   const legendName = member => member.id === store().get(`campaigns/${active}`)?.gmUid ? 'GM'
     : store().list(path('pcs','')).filter(pc => pc.ownerUid === member.id).map(label).filter(name => name !== 'Private PC').join(', ') || member.displayName || 'Player';
-  function boardCards(npcs,pcs,plots) {
-    const pcCards = pcs.map(pc => { const profile = sheets.get(pc.id+':public')?.data?.profile, mine = own(pc) ? window.CharacterBuilder?.list().find(c => c.id === pc.characterId) : null;
-      return {key:`pcs:${pc.id}`,kind:'pcs',name:label(pc),meta:profile?.family || mine?.family || '',portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan}; });
-    const npcCards = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(n => ({key:`npcs:${n.id}`,kind:'npcs',name:n.name || 'Unnamed NPC',meta:n.role || '',portrait:n.portrait}));
-    const plotCards = plots.map(p => ({key:`plots:${p.id}`,kind:'plots',name:p.title || 'Untitled plot',meta:'Plot',portrait:(p.images || []).find(UI.isPortrait)}));
-    // Cards nobody has placed yet start in a grid: plots, then PCs, then NPCs.
-    let slot = 0;
-    return [...plotCards,...pcCards,...npcCards].map(card => {
-      const saved = store().get(path('board',card.key));
-      if (saved) return {...card,x:Number(saved.x),y:Number(saved.y)};
-      // Six across, with gaps wide enough for a string's label between neighbouring cards.
-      const index = slot++, col = index % 6, row = Math.floor(index / 6);
-      return {...card,x:(col + 0.5) * BOARD.w / 6,y:40 + row * (BOARD.cardH + 110)};
-    });
+  // Places are NPC records too: the GM ticks Place, and older records are guessed from the name (or a role like "O Castelo…" / "Onde…").
+  const PLACE_WORDS = /(^|[^\p{L}])(shiro|kyuden|mura|toshi|koku|toi|jinja|dojo|village|vila|aldeia|cidade|city|castle|castelo|pal[aá]cio|palace|posto|templo|temple|santu[aá]rio|shrine|ponte|bridge|prov[ií]ncia|province|estrada|road|porto|port|floresta|forest|monte|mountain|rio|river|casa de ch[aá]|tea ?house)(?=$|[^\p{L}])/iu;
+  const isPlace = npc => typeof npc.place === 'boolean' ? npc.place : PLACE_WORDS.test(npc.name || '') || /^(onde\b|(o|a|the) )/i.test(npc.role || '') && PLACE_WORDS.test(npc.role) || /^onde\b/i.test(npc.role || '');
+  // Where a name first appears in a text as a whole word (any case), or -1.
+  function firstMention(text,name) {
+    if (!name || !text) return -1;
+    const match = new RegExp(`(^|[^\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?=$|[^\\p{L}\\p{N}])`,'iu').exec(text);
+    return match ? match.index + match[1].length : -1;
   }
+  function boardLayout(npcs,pcs) {
+    const pcCards = pcs.map(pc => { const profile = sheets.get(pc.id+':public')?.data?.profile, mine = own(pc) ? window.CharacterBuilder?.list().find(c => c.id === pc.characterId) : null;
+      return {key:`pcs:${pc.id}`,kind:'pcs',name:label(pc),meta:profile?.family || mine?.family || '',portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan}; }).sort((a,b) => a.name.localeCompare(b.name));
+    const npcCards = npcs.map(n => ({key:`npcs:${n.id}`,kind:'npcs',id:n.id,place:isPlace(n),name:n.name || 'Unnamed NPC',meta:n.role || '',portrait:n.portrait}));
+    const notes = store().list(path('notes','')), pins = store().list(path('timeline',''));
+    const oldestFirst = (a,b) => (a.createdAt || a.updatedAt || '').localeCompare(b.createdAt || b.updatedAt || '');
+    const textOf = (kind,item) => [item.title,item.text,...notes.filter(n => n.targetKind === kind && n.targetId === item.id).sort(oldestFirst).flatMap(n => [n.title,n.text])].filter(Boolean).join('\n');
+    const groups = [
+      ...store().list(path('sessions','')).sort(oldestFirst).map(s => ({title:s.title || 'Untitled session',text:textOf('sessions',s),pinned:new Set(pins.filter(p => p.sessionId === s.id && p.kind === 'npcs').map(p => p.targetId))})),
+      ...store().list(path('plots','')).sort(oldestFirst).map(p => ({title:p.title || 'Untitled plot',text:textOf('plots',p),pinned:new Set()})),
+    ];
+    const bands = [{title:'Player characters',cards:pcCards}], placed = new Set();
+    for (const group of groups) {
+      const found = npcCards.filter(card => !placed.has(card.key)).map(card => ({card,at:firstMention(group.text,card.name)}))
+        .filter(item => item.at >= 0 || group.pinned.has(item.card.id)).sort((a,b) => (a.at < 0 ? Infinity : a.at) - (b.at < 0 ? Infinity : b.at)).map(item => item.card);
+      found.forEach(card => placed.add(card.key));
+      bands.push({title:group.title,cards:[...found.filter(c => c.place),...found.filter(c => !c.place)]});
+    }
+    const rest = npcCards.filter(card => !placed.has(card.key)).sort((a,b) => a.name.localeCompare(b.name));
+    bands.push({title:'Others',cards:[...rest.filter(c => c.place),...rest.filter(c => !c.place)]});
+    // Each band is a title over rows of six; places and people start on separate rows.
+    let y = 12;
+    const shown = bands.filter(band => band.cards.length), cards = [];
+    for (const band of shown) {
+      band.y = y; y += BOARD.band;
+      const rows = [band.cards.filter(c => c.place),band.cards.filter(c => !c.place)].filter(row => row.length);
+      for (const row of rows) row.forEach((card,index) => {
+        const col = index % BOARD.cols, line = Math.floor(index / BOARD.cols);
+        cards.push({...card,x:(col + 0.5) * BOARD.w / BOARD.cols,y:y + line * (BOARD.cardH + BOARD.gap)});
+        if (index === row.length - 1) y += (line + 1) * (BOARD.cardH + BOARD.gap);
+      });
+      y += BOARD.gap;
+    }
+    // A dragged card keeps its spot, kept far enough from the sides to stay whole.
+    for (const card of cards) {
+      const saved = store().get(path('board',card.key));
+      if (saved) Object.assign(card,{x:Math.min(BOARD.w - BOARD.edge,Math.max(BOARD.edge,Number(saved.x))),y:Math.max(0,Number(saved.y))});
+    }
+    return {cards,bands:shown,height:y};
+  }
+  const boardCards = (npcs,pcs) => boardLayout(npcs,pcs).cards;
   const centre = card => [card.x,card.y + BOARD.cardH / 2];
-  function renderBoard(npcs,pcs,plots) {
-    const cards = boardCards(npcs,pcs,plots), byKey = new Map(cards.map(card => [card.key,card]));
+  function renderBoard(npcs,pcs) {
+    const {cards,bands,height} = boardLayout(npcs,pcs), byKey = new Map(cards.map(card => [card.key,card]));
     const links = store().list(path('links','')).filter(link => byKey.has(link.from) && byKey.has(link.to));
     const strings = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
       return `<line data-link="${e(link.id)}" data-from="${e(link.from)}" data-to="${e(link.to)}" data-x1="${x1}" data-x2="${x2}" x1="${pct(x1)}" y1="${y1}" x2="${pct(x2)}" y2="${y2}" stroke="${memberColor(link.creatorUid)}"/>`; }).join('');
     const tags = links.map(link => { const [x1,y1] = centre(byKey.get(link.from)), [x2,y2] = centre(byKey.get(link.to));
       return `<button type="button" class="board-tag" data-campaign="board-link" data-id="${e(link.id)}" data-tag-from="${e(link.from)}" data-tag-to="${e(link.to)}" style="left:${pct((x1+x2)/2)};top:${(y1+y2)/2}px;--string:${memberColor(link.creatorUid)}" aria-label="${e(byKey.get(link.from).name)} – ${e(byKey.get(link.to).name)}${link.label ? `: ${e(link.label)}` : ''}">${link.label ? e(link.label) : '·'}</button>`; }).join('');
     const query = boardSearch.trim().toLowerCase();
-    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" data-x="${card.x}" style="left:${pct(card.x)};top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
+    const cardHtml = cards.map(card => `<div class="board-card board-card-${card.place ? 'place' : card.kind}${linkFrom === card.key ? ' board-card-linking' : ''}${query && !card.name.toLowerCase().includes(query) ? ' board-card-dim' : ''}" data-campaign="board-card" data-id="${e(card.key)}" data-x="${card.x}" style="left:${pct(card.x)};top:${card.y}px"${card.kind === 'pcs' ? UI.clanTileStyle(card.clan) : UI.tileArtStyle(UI.isPortrait(card.portrait) ? card.portrait : '')} role="button" tabindex="0">${UI.characterTileBody({portrait:card.portrait,clan:card.clan,name:card.name,meta:card.meta})}<span class="board-pushpin" aria-hidden="true"></span></div>`).join('');
     const members = store().list(path('members','')).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
     const legend = `<div class="board-legend" aria-label="String colours">${members.map(m => `<span class="board-legend-item"><i style="background:${memberColor(m.id)}"></i>${e(legendName(m))}${m.id === store().uid ? `<input type="color" data-board-color value="${memberColor(m.id)}" aria-label="Your string colour" title="Your string colour">` : ''}</span>`).join('')}</div>`;
     const hint = boardLinking ? `<span class="board-hint">${linkFrom ? 'Now click the card to link to.' : 'Click the first card.'}</span>` : '';
-    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${gm() ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}${hint}${UI.field({attrs:{type:'search','data-board-search':true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
-      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="height:${Math.max(480,...cards.map(card => card.y + BOARD.cardH + 60))}px"><svg class="board-strings" width="100%" height="100%" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
+    return `<h2 class="visually-hidden">Board</h2><div class="board-head">${gm() ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${UI.button({text:boardLinking ? 'Cancel link' : 'Link',variant:boardLinking ? 'primary' : 'secondary',size:'compact',attrs:{'data-campaign':'board-link-mode','aria-pressed':boardLinking}})}XX:true,value:boardSearch,placeholder:'Find a card','aria-label':'Find a card on the board'}})}${legend}</div>
+      <div class="board-viewport"><div class="board-surface${boardLinking ? ' board-surface-linking' : ''}" style="height:${Math.max(480,height,...cards.map(card => card.y + BOARD.cardH + 60))}px">${bands.map(band => `<div class="board-band" style="top:${band.y}px">${e(band.title)}</div>`).join('')}<svg class="board-strings" width="100%" height="100%" aria-hidden="true">${strings}</svg>${cardHtml}${tags}</div></div>`;
   }
   // The map is the sessions and plots view: their + buttons, the selected session, and every plot.
   function renderMapHead(isGM,sessions,plots) {
@@ -515,8 +554,8 @@
     return `<div class="board-head map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${selected ? button('session-open','Open session',selected.id) : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
   }
   // Popups: a new string (optional label), or an existing one (label, remove).
-  function renderBoardPopup(npcs,pcs,plots) {
-    const byKey = new Map(boardCards(npcs,pcs,plots).map(card => [card.key,card]));
+  function renderBoardPopup(npcs,pcs) {
+    const byKey = new Map(boardCards(npcs,pcs).map(card => [card.key,card]));
     const between = (from,to) => `<p class="campaign-invite-note">${e(byKey.get(from)?.name || '?')} – ${e(byKey.get(to)?.name || '?')}</p>`;
     if (linkDraft) return popup('board-popup-title','Link',`${between(linkDraft.from,linkDraft.to)}${UI.field({attrs:{'data-board-label':true,maxlength:120,placeholder:'How are they linked? (optional)','aria-label':'Link label'}})}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('board-link-save','Save')})}`,'board-close');
     const link = linkPopup && store().get(path('links',linkPopup));
@@ -631,9 +670,9 @@
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="plots">${renderPlots(plots)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
-      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs,[])}</section>
+      <section class="campaign-row campaign-board-row" data-campaign-row="board">${renderBoard(npcs,pcs)}</section>
       <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderMapHead(isGM,sessions,plots)}${renderTimeline(isGM,pcs,npcs,plots)}`})}</section>
-      </div>${renderBoardPopup(npcs,pcs,plots)}${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${renderBoardPopup(npcs,pcs)}${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -785,7 +824,7 @@
       else if (action==='npc-save') {
         const draft=npcDraft || store().get(path('npcs',npcId));
         if (!gm() || !draft || !draft.name.trim()) return;
-        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),role:String(draft.role || '').trim().slice(0,200),description:String(draft.description || '').slice(0,20000),notes:'',...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
+        store().queue(path('npcs',npcId || crypto.randomUUID()),{name:draft.name.trim(),role:String(draft.role || '').trim().slice(0,200),description:String(draft.description || '').slice(0,20000),notes:'',place:isPlace(draft),...(UI.isPortrait(draft.portrait)?{portrait:draft.portrait}:{}),updatedAt:new Date().toISOString()});
         npcId='';npcDraft=null;
         store().flush();
       }
@@ -856,6 +895,10 @@
         const {id:_,...rest}=link;store().queue(path('links',id),{...rest,label:(document.querySelector('[data-board-label]')?.value||'').trim().slice(0,120),updatedAt:new Date().toISOString()});linkPopup='';
       }
       else if (action==='board-link-remove') {const link=store().get(path('links',id));if(canEditLink(link)&&window.confirm('Remove this link?')){store().queue(path('links',id),null);linkPopup='';}}
+      else if (action==='board-arrange') {
+        const saved=store().list(path('board',''));
+        if(saved.length&&window.confirm('Put every card back in its starting place?'))for(const item of saved)store().queue(path('board',item.id),null);
+      }
       else if (action==='board-close') {linkDraft=null;linkPopup='';}
       else if (action==='pin-remove') {
         const item=store().get(path('timeline',id));
@@ -1000,6 +1043,12 @@
     if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
   }
   document.addEventListener('change',async event=>{
+    if (event.target.dataset?.npcPlace !== undefined && gm()) {
+      const place=event.target.checked;
+      if (npcDraft) npcDraft.place=place;
+      else {const data=store().get(path('npcs',npcId));if(data)store().queue(path('npcs',npcId),{...data,place,updatedAt:new Date().toISOString()});}
+      return;
+    }
     const imageKind=event.target.dataset?.entryImage;
     if (imageKind) {
       const file=event.target.files?.[0]; event.target.value='';
