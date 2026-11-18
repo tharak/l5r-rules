@@ -268,3 +268,9 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .campaign-entry[open] .creator-journal>*{flex:none}
 .campaign-entry[open] .creator-journal>.creator-journal-strip{flex:0 1 auto;min-height:0;overflow-y:hidden;align-items:stretch}
 .campaign-entry[open] .creator-journal-strip>.creator-journal-entry{max-height:none;margin:0}
+/* "Edit list" in the + PC and + NPC popups: each PC or NPC with its Remove button. */
+.campaign-list-editor{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.campaign-list-editor>summary{cursor:pointer;font-weight:600}
+.campaign-list-editor ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;max-height:40vh;overflow:auto}
+.campaign-list-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
+.campaign-list-row small{color:var(--muted)}

@@ -544,6 +544,31 @@ test('+ Plot and + Session share one form: a title and a first entry; saving mak
   assert.match(html,new RegExp(`data-campaign="${single}-delete" data-id="${id}"`),'Delete while editing');
  }
 });
+test('PC and NPC panels have no Remove; the + PC and + NPC popups edit the list instead',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
+ d.data.set('campaigns/c/pcs/alice',{ownerUid:'alice',characterId:'alice-pc'});d.data.set('campaigns/c/pcs/bob',{ownerUid:'bob',characterId:'bob-pc'});
+ d.data.set('campaigns/c/npcs/n',{name:'Shrine keeper',role:'Priest',notes:''});
+ d.window.confirm=()=>true;
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ const popupOf=html=>html.match(/<div class="timeline-popup campaign-popup"[^]*$/)?.[0] || '';
+ let html=render();
+ assert.doesNotMatch(html,/data-campaign="pc-remove"|data-campaign="npc-delete"/,'no Remove on the panels');
+ await d.click('npc-open','n');assert.doesNotMatch(render(),/data-campaign="npc-delete"/,'nor in the NPC editor');
+ // The GM: every NPC and PC is listed with Remove.
+ render();await d.click('npc-new');html=popupOf(render());
+ assert.match(html,/campaign-list-editor"><summary>Edit list \(1\)<\/summary>[^]*Shrine keeper[^]*data-campaign="npc-delete" data-id="n"/);
+ await d.click('npc-delete','n');assert.equal(d.data.get('campaigns/c/npcs/n'),undefined,'Remove deletes the NPC');
+ await d.click('new-close');render();await d.click('pc-picker');html=popupOf(render());
+ assert.match(html,/Edit list \(2\)[^]*data-campaign="pc-remove" data-id="alice"[^]*data-campaign="pc-remove" data-id="bob"|Edit list \(2\)[^]*data-campaign="pc-remove" data-id="bob"[^]*data-campaign="pc-remove" data-id="alice"/);
+ await d.click('new-close');
+ // A player removes only their own PC.
+ d.store.uid='alice';render();await d.click('pc-picker');html=popupOf(render());
+ assert.match(html,/data-campaign="pc-remove" data-id="alice"/);assert.doesNotMatch(html,/data-campaign="pc-remove" data-id="bob"/);
+ await d.click('pc-remove','bob');assert.ok(d.data.get('campaigns/c/pcs/bob'),'not another player\'s PC');
+ await d.click('pc-remove','alice');assert.equal(d.data.get('campaigns/c/pcs/alice'),undefined);
+});
 test('NPCs have a name, role, description and a notes list (journal entries)',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

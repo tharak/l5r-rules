@@ -189,7 +189,7 @@
       {label:'Name',value:npc.name,attrs:{'data-campaign-field':'npc-name',maxlength:200}},
       {label:'Role',value:npc.role || '',attrs:{'data-campaign-field':'npc-role',maxlength:200,placeholder:'e.g. Magistrate of the Lion'}},
       {label:'Description',kind:'textarea',value:npc.description || '',attrs:{'data-campaign-field':'npc-description',maxlength:20000,rows:4}},
-    ],extraHtml:UI.checkbox({label:'Place (a location, not a person)',attrs:{'data-npc-place':true,checked:isPlace(npc)}}),actionsHtml:button('npc-save','Save','',!npc.name.trim())+(npcId?button('npc-delete','Delete',npcId):'')});
+    ],extraHtml:UI.checkbox({label:'Place (a location, not a person)',attrs:{'data-npc-place':true,checked:isPlace(npc)}}),actionsHtml:button('npc-save','Save','',!npc.name.trim())});
   }
   // Sessions, NPCs and plots each have a journal of entries (stored as campaign notes).
   // Any member writes in a session's journal; the GM writes NPC journals; the GM or the
@@ -410,11 +410,20 @@
   // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).
   const popup = (id,title,bodyHtml,closeAction) => `<div class="timeline-popup-backdrop" data-campaign="${closeAction}"></div><div class="timeline-popup campaign-popup" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${e(title)}</h3></div>${button(closeAction,'✕')}</header>${bodyHtml}</div>`;
   const newOpen = () => (plotDraft && !plotId) || (sessionDraft && !sessionId) || (npcDraft && !npcId) || picking;
+  // "Edit list" in the + PC and + NPC popups: everything in the campaign, each with Remove.
+  // The GM removes any PC or NPC; a player removes only their own PCs. Removing a PC only
+  // unlinks it (the sheet stays with its player); removing an NPC deletes it and its journal.
+  function listEditor(kind,items) {
+    const pcList=kind==='pcs';
+    const rows=items.map(item=>({item,name:pcList?label(item):item.name||'Unnamed NPC',meta:pcList?playerName(item):isPlace(item)?'Place':item.role||'',canRemove:pcList?gm()||own(item):gm()}))
+      .sort((a,b)=>a.name.localeCompare(b.name)).map(({item,name,meta,canRemove})=>`<li class="campaign-list-row"><span><strong>${e(name)}</strong>${meta?` <small>${e(meta)}</small>`:''}</span>${canRemove?UI.button({text:'Remove',variant:'secondary',size:'compact',attrs:{'data-campaign':pcList?'pc-remove':'npc-delete','data-id':item.id,disabled:busy,'aria-label':`Remove ${name}`}}):''}</li>`).join('');
+    return rows?`<details class="campaign-list-editor"><summary>Edit list (${items.length})</summary><ul>${rows}</ul></details>`:'';
+  }
   function renderNewPopup(pcs) {
     if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
     if (sessionDraft && !sessionId && gm()) return popup('new-popup-title','New session',entryEditor('session',sessionDraft),'new-close');
-    if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft),'new-close');
-    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${gm() ? inviteSection() : ''}`,'new-close');
+    if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft)+listEditor('npcs',store().list(path('npcs',''))),'new-close');
+    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${listEditor('pcs',pcs)}${gm() ? inviteSection() : ''}`,'new-close');
     return '';
   }
   // Offers made to you in this campaign (accept saves the PC to your account and links it), and,
@@ -515,7 +524,7 @@
     const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
-        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+button('npc-delete','Delete',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
+        : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${npc.portrait}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
     return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
   }
   // "Remove from map" for a character's token or one of its notes, when it is pinned and this
@@ -537,7 +546,7 @@
       const data = sheets.get(pc.id+':public')?.data, profile = data?.profile;
       const pending = transfers.find(t => t.pcId === pc.id && t.fromUid === store().uid && t.status === 'offered');
       const handover = own(pc) ? (pending ? `<span class="campaign-transfer-pending">Offered to ${e(memberName(active,pending.toUid))}</span>${button('transfer-cancel','Cancel offer',pending.id)}` : button('pc-transfer','Transfer',pc.id)) : '';
-      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${isGM||own(pc)?button('pc-remove','Remove',pc.id):''}${unpinButton(`pcs:${pc.id}`)}`;
+      const actions = `${button('pc-open',own(pc)?'Edit':isGM?'Full sheet':'Open',pc.id)}${handover}${unpinButton(`pcs:${pc.id}`)}`;
       // Your own PC falls back to its local sheet until its public profile arrives.
       const mine = own(pc) ? window.CharacterBuilder.list().find(c => c.id === pc.characterId) : null;
       return entry(`pcs:${pc.id}`,UI.characterTileBody({portrait:profile?.portrait || mine?.portrait,clan:profile?.clan || mine?.clan,name:label(pc),meta:profile?.family || mine?.family || ''}),
@@ -763,7 +772,7 @@
         npcId='';npcDraft=null;
         store().flush();
       }
-      else if (action==='npc-delete') {if(window.confirm('Delete this NPC?'))store().queue(path('npcs',id),null);}
+      else if (action==='npc-delete') {const npc=store().get(path('npcs',id));if(gm()&&npc&&window.confirm(`Remove ${npc.name||'this NPC'} from the campaign? Its journal goes with it.`)){store().queue(path('npcs',id),null);store().flush();if(npcId===id){npcId='';npcDraft=null;}}}
       else if (action==='pc-picker') {
         picking=!picking;focusPopup=picking;
         // The GM's + PC popup also holds the invite link, so players can be invited from it.
@@ -778,7 +787,7 @@
         // The GM reads the full sheet; other players see the public view.
         else if (gm()) {sheetId=id;editor=null;}
         else location.hash=`#/pc/${encodeURIComponent(pc.ownerUid)}/${encodeURIComponent(pc.characterId)}`;
-      } else if (action==='pc-remove') {store().queue(path('pcs',id),null);sheetId='';}
+      } else if (action==='pc-remove') {const pc=store().get(path('pcs',id));if(pc&&(gm()||own(pc))&&window.confirm(`Remove ${label({...pc,id})} from the campaign? The sheet stays with its player.`)){store().queue(path('pcs',id),null);store().flush();if(sheetId===id)sheetId='';}}
       else if (action==='close-sheet') {sheetId='';editor=null;}
       else if (action==='share-invite'||action==='invite') {
         if (!gm()) return;
