@@ -222,7 +222,7 @@ test('the GM adds and removes session images; plot drafts carry their images to 
  assert.match(render(),/data-campaign="image-remove" data-id="plot:0"/);
 });
 
-test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it; everyone sees who read',async()=>{
+test('read marks: "!" on unread entries, tabs and cards; opening the entry marks it read; everyone sees who read',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/members/gm',{displayName:'Game Master'});d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
@@ -232,14 +232,14 @@ test('read marks: "!" on unread entries, tabs and cards; Mark as read clears it;
  assert.match(d.window.CampaignUI.render('campaigns'),/campaign-unread/);
  render();await d.click('section','sessions');
  let html=render();
- assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.match(html,/data-campaign="mark-read"/);
- await d.click('mark-read','sessions:s');
+ assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.doesNotMatch(html,/mark-read/,'no Mark read button');
+ await d.click('session-open','s');render();
  assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-01T10:00:00Z');
  html=render();
  assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/aria-label="Read by Alice"/);
- // A new note on the session makes it unread again.
+ // A new note on the session makes it unread; while it is open, the next render reads it.
  d.data.set('campaigns/c/notes/n',{creatorUid:'gm',targetKind:'sessions',targetId:'s',text:'More',createdAt:'2026-11-02',updatedAt:'2026-11-02T10:00:00Z'});
- assert.match(render(),/Session one<\/span>[^]*?<span class="campaign-unread"/);assert.match(render(),/data-campaign="mark-read"/);
+ assert.doesNotMatch(render(),/campaign-unread/);assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-02T10:00:00Z');
 });
 
 // A fake map 640×400 and pointer events for dragging tokens.

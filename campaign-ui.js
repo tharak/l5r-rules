@@ -14,7 +14,7 @@
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|mark-read|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-|arrange/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-|arrange/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -75,11 +75,17 @@
     const marks = {...myMarks(active),[readKey(kind,id)]:entryStamp(active,kind,{...item,id})};
     store().queue(path('reads',store().uid),{name:memberName(active,store().uid),marks});
   }
-  const unreadMark = '<span class="campaign-unread" title="Updated since you last marked it read" aria-label="Unread update">!</span>';
-  // "Read by" names (visible to everyone) and a Mark as read button while it is unread.
+  const unreadMark = '<span class="campaign-unread" title="Updated since you last opened it" aria-label="Unread update">!</span>';
+  // "Read by" names, visible to everyone. Opening a session or plot marks it read.
   function readStatus(kind,item) {
-    const readers = readersOf(active,kind,item), unread = isUnread(active,kind,item);
-    return `${readers.length || unread ? `<p class="campaign-read-status">${readers.length ? `<small title="Read by" aria-label="Read by ${e(readers.join(', '))}">✓ ${readers.map(e).join(', ')}</small>` : ''}${unread ? button('mark-read','Mark read',readKey(kind,item.id)) : ''}</p>` : ''}`;
+    const readers = readersOf(active,kind,item);
+    return readers.length ? `<p class="campaign-read-status"><small title="Read by" aria-label="Read by ${e(readers.join(', '))}">✓ ${readers.map(e).join(', ')}</small></p>` : '';
+  }
+  function markOpenRead() {
+    for (const key of openEntries) {
+      const [kind,id] = key.split(':'), item = READ_KINDS.includes(kind) && store().get(path(kind,id));
+      if (item && isUnread(active,kind,{...item,id})) markRead(kind,id);
+    }
   }
   function clearCardSheets() {
     for (const item of cardSheets.values()) item.stop?.();
@@ -557,6 +563,7 @@
       go(campaignHref(active)+(rest ? '/'+rest : ''),false);
     }
     if (scrollEntry) { const key = scrollEntry; scrollEntry = ''; setTimeout(() => document.querySelector(`.campaign-entry[data-entry="${key}"]`)?.scrollIntoView({block:'start'}),0); }
+    if (c && store().uid) markOpenRead();
     if (!c) { reset(''); return store().ready ? notInvited(campaignPart) : '<div class="workspace"><p class="campaign-invite-note">Loading campaign…</p></div>'; }
     // The GM keeps the public lookup current so shared links can name this campaign.
     if (gm() && published.get(active) !== c.title) { published.set(active,c.title); store().backend?.publishDirectory?.(active,c.title).catch(()=>{}); }
@@ -665,7 +672,6 @@
       else if (action==='plot-edit') {const data=store().get(path('plots',id));if(data&&entryOwner(data)){plotId=id;plotDraft={...data};openEntries.add(`plots:${id}`);}}
       else if (action==='plot-cancel') plotDraft=null;
       else if (action==='timeline-session') {timelineSession=id;go(campaignHref(active,'timeline','sessions',id));}
-      else if (action==='mark-read') {const [kind,entryId]=id.split(':');if(READ_KINDS.includes(kind))markRead(kind,entryId);}
       else if (action==='image-remove') {
         const [kind,index]=id.split(':');
         if (kind==='plot' && plotDraft) plotDraft.images=(plotDraft.images||[]).filter((_,i)=>i!==Number(index));
