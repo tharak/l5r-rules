@@ -203,7 +203,7 @@ test('the public view shows the profile, escapes text, and handles missing or ol
  assert.match(P.page({sections:{identity:{name:'Old Format'}}}),/Old Format[\s\S]*saves it again/);
 });
 
-test('the GM adds and removes session images from the library; plot drafts carry their images to the save',async()=>{
+test('the GM adds and removes session images from the library; session and plot drafts carry their images to the save',async()=>{
  const picture='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN8+P9/PQAJYwPRVdM7zQAAAABJRU5ErkJggg==';
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
@@ -219,9 +219,11 @@ test('the GM adds and removes session images from the library; plot drafts carry
  let html=render();
  assert.match(html,/data-campaign="image-library" data-id="session"[^>]*>Add image</,'pictures come from the library');assert.doesNotMatch(html,/type="file"/,'no file chooser');
  d.click('image-library','session');await new Promise(r=>setTimeout(r));
- assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),JSON.stringify([picture]));
  assert.match(render(),/campaign-image"><img src="data:image\/png/);
- await d.click('image-remove','session:0');
+ assert.equal(d.data.get('campaigns/c/sessions/s').images,undefined,'pictures wait for Save, like a plot');
+ await d.click('session-save');
+ assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),JSON.stringify([picture]));
+ await d.click('session-open','s');await d.click('image-remove','session:0');await d.click('session-save');
  assert.equal(JSON.stringify(d.data.get('campaigns/c/sessions/s').images),'[]');
  render();d.click('section','plots');await d.click('plot-new');
  d.click('image-library','plot');await new Promise(r=>setTimeout(r));
@@ -239,7 +241,7 @@ test('read marks: "!" on unread entries, tabs and cards; opening the entry marks
  render();await d.click('section','sessions');
  let html=render();
  assert.match(html,/Session one<\/span>(<small[^>]*>[^<]*<\/small>)?<span class="campaign-unread"/);assert.doesNotMatch(html,/mark-read/,'no Mark read button');
- await d.click('session-open','s');render();
+ await d.click('entry-open','sessions:s');render();
  assert.equal(d.data.get('campaigns/c/reads/alice').marks['sessions:s'],'2026-11-01T10:00:00Z');
  html=render();
  assert.doesNotMatch(html,/campaign-unread/);assert.match(html,/aria-label="Read by Alice"/);
@@ -518,21 +520,29 @@ test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close b
   assert.doesNotMatch(render(),/campaign-popup/,`${title} closes`);
  }
 });
-test('+ Plot asks for a title and a first entry; saving makes the plot, then that entry as its first note',async()=>{
- const d=campaignCards();
- d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.store.uid='alice';
- const render=()=>d.window.CampaignUI.render('campaigns/c');
- render();await d.click('plot-new');
- assert.match(render(),/data-entry-field="firstEntry"/,'the new plot form has a First entry box');
- const input=(name,value)=>d.documentListeners.input({target:{dataset:{entryField:name,entryKind:'plot'},value}});
- input('title','The missing ferry');input('firstEntry','  The ferryman vanished at dawn.  ');
- await d.click('plot-save');
- const plots=[...d.data].filter(([k])=>k.startsWith('campaigns/c/plots/')),notes=[...d.data].filter(([k])=>k.startsWith('campaigns/c/notes/'));
- assert.equal(plots.length,1);assert.ok(!('firstEntry' in plots[0][1]),'the plot does not keep the draft field');
- const plotId=plots[0][0].split('/').pop();
- assert.equal(notes.length,1);assert.deepEqual([notes[0][1].text,notes[0][1].targetKind,notes[0][1].targetId,notes[0][1].targetCreatorUid],['The ferryman vanished at dawn.','plots',plotId,'alice']);
- await d.click('plot-edit',plotId);
- assert.doesNotMatch(render(),/data-entry-field="firstEntry"/,'editing a plot keeps its journal for entries');
+test('+ Plot and + Session share one form: a title and a first entry; saving makes the item, then that entry as its first note',async()=>{
+ for(const [kind,single,uid] of [['plots','plot','alice'],['sessions','session','gm']]){
+  const d=campaignCards();
+  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.store.uid=uid;
+  const render=()=>d.window.CampaignUI.render('campaigns/c');
+  render();await d.click(`${single}-new`);
+  let html=render();
+  assert.match(html,new RegExp(`<h3 id="new-popup-title">New ${single}</h3>[^]*data-entry-field="title"[^]*data-entry-field="firstEntry"[^]*data-campaign="image-library"`),`${single}: one form`);
+  assert.match(html,new RegExp(`data-campaign="${single}-save"[^>]*disabled`),'Save waits for a title');
+  const input=(name,value)=>d.documentListeners.input({target:{dataset:{entryField:name,entryKind:single},value}});
+  input('title',`The ${single}`);input('firstEntry','  It begins at dawn.  ');
+  await d.click(`${single}-save`);
+  const items=[...d.data].filter(([k])=>k.startsWith(`campaigns/c/${kind}/`)),notes=[...d.data].filter(([k])=>k.startsWith('campaigns/c/notes/'));
+  assert.equal(items.length,1);assert.equal(items[0][1].title,`The ${single}`);assert.ok(!('firstEntry' in items[0][1]),'the item does not keep the draft field');
+  if(kind==='sessions')assert.deepEqual(Object.keys(items[0][1]).sort(),['createdAt','images','text','title','updatedAt'],'a session keeps only the fields its rules allow');
+  const id=items[0][0].split('/').pop();
+  assert.equal(notes.length,1);assert.deepEqual([notes[0][1].text,notes[0][1].targetKind,notes[0][1].targetId],['It begins at dawn.',kind,id]);
+  assert.equal(notes[0][1].targetCreatorUid,kind==='plots'?uid:undefined);
+  await d.click(kind==='plots'?'plot-edit':'session-open',id);
+  html=render();
+  assert.doesNotMatch(html,/data-entry-field="firstEntry"/,'editing keeps the journal for entries');
+  assert.match(html,new RegExp(`data-campaign="${single}-delete" data-id="${id}"`),'Delete while editing');
+ }
 });
 test('NPCs have a name, role, description and a notes list (journal entries)',async()=>{
  const d=campaignCards();

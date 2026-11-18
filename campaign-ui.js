@@ -3,7 +3,7 @@
   const store = () => window.CampaignStorage;
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
-  let plotId='', plotDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
+  let plotId='', plotDraft=null, sessionDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
   let timelineSession='', notePopup='', focusPopup=false, trayHidden=false;
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
@@ -134,7 +134,7 @@
     watchGeneration++;
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
-    plotId=noteId=pcNotesId='';plotDraft=noteDraft=noteTarget=null;
+    plotId=noteId=pcNotesId='';plotDraft=sessionDraft=noteDraft=noteTarget=null;
     timelineSession='';notePopup='';inviteLink='';inviteCopied=false;transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
@@ -172,19 +172,16 @@
     const add = editable && list.length < MAX_IMAGES ? button('image-library','Add image',kind) : '';
     return thumbs || add ? `<div class="campaign-images">${thumbs}${add}</div>` : '';
   }
+  // Sessions and plots share one editor: a title, a first entry when new, pictures, and
+  // Save, Cancel and (for one that exists) Delete. kind is 'plot' or 'session'.
   function entryEditor(kind,draft) {
-    const plot=kind==='plot';
+    const editingId=kind==='plot'?plotId:sessionId,name=kind==='plot'?'plot':'session';
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
-      {label:'Plot title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
-      // A new plot can start its journal at once; later entries come from "+ Entry".
-      ...(plot&&!plotId?[{label:'First entry',kind:'textarea',value:draft.firstEntry||'',attrs:{...attrs('firstEntry'),rows:6,maxlength:20000,placeholder:'What is this plot about?'}}]:[]),
-    ],extraHtml:gallery(draft.images,{kind:'plot',editable:true}),actionsHtml:button(kind+'-save','Save plot','',!draft.title.trim())+button(kind+'-cancel','Cancel')+(plot&&plotId?button('plot-delete','Delete plot',plotId):'')});
-  }
-  function sessionEditor(session,isGM) {
-    return UI.recordEditor({fields:[
-      {label:'Title',value:session.title,attrs:{'data-campaign-field':'session-title',maxlength:200,readonly:!isGM}},
-    ],extraHtml:gallery(session.images,{kind:'session',editable:isGM}),actionsHtml:isGM?button('session-save','Save')+button('session-delete','Delete',session.id):button('session-close','Close')});
+      {label:kind==='plot'?'Plot title':'Session title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
+      // A new one can start its journal at once; later entries come from "+ Entry".
+      ...(!editingId?[{label:'First entry',kind:'textarea',value:draft.firstEntry||'',attrs:{...attrs('firstEntry'),rows:6,maxlength:20000,placeholder:`What is this ${name} about?`}}]:[]),
+    ],extraHtml:gallery(draft.images,{kind,editable:true}),actionsHtml:button(kind+'-save',`Save ${name}`,'',!String(draft.title||'').trim())+button(kind+'-cancel','Cancel')+(editingId?button(kind+'-delete',`Delete ${name}`,editingId):'')});
   }
   function npcEditor(npc) {
     const picture = UI.portrait({label:'NPC picture',src:npc.portrait,name:npc.name,attrs:{class:'npc-portrait'},inputAttrs:{'data-npc-portrait':true},removeAttrs:{'data-campaign':'npc-portrait-remove','aria-label':'Remove NPC picture'},actionsHtml:button('npc-portrait-create','Create picture')+(window.MediaLibrary?button('npc-portrait-library','Library'):'')});
@@ -305,7 +302,7 @@
     if (transferPopup) { transferPopup = ''; changed(); return; }
     if (drag) { endDrag(); return; }
     if (notePopup) { notePopup = ''; changed(); return; }
-    if (newOpen()) { if (!plotId) plotDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
+    if (newOpen()) { if (!plotId) plotDraft = null; if (!sessionId) sessionDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
@@ -412,9 +409,10 @@
   // The full entry behind a timeline event, in an overlay dialog.
   // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).
   const popup = (id,title,bodyHtml,closeAction) => `<div class="timeline-popup-backdrop" data-campaign="${closeAction}"></div><div class="timeline-popup campaign-popup" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${e(title)}</h3></div>${button(closeAction,'✕')}</header>${bodyHtml}</div>`;
-  const newOpen = () => (plotDraft && !plotId) || (npcDraft && !npcId) || picking;
+  const newOpen = () => (plotDraft && !plotId) || (sessionDraft && !sessionId) || (npcDraft && !npcId) || picking;
   function renderNewPopup(pcs) {
     if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
+    if (sessionDraft && !sessionId && gm()) return popup('new-popup-title','New session',entryEditor('session',sessionDraft),'new-close');
     if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft),'new-close');
     if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${gm() ? inviteSection() : ''}`,'new-close');
     return '';
@@ -509,7 +507,7 @@
   const addTile = actionsHtml => actionsHtml ? `<div class="campaign-add-tile">${actionsHtml}</div>` : '';
   function renderSessions(sessions,isGM) {
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
-      isGM && sessionId === session.id ? `${sessionEditor(session,true)}${notesFor('sessions',session.id)}`
+      isGM && sessionDraft && sessionId === session.id ? entryEditor('session',sessionDraft)
         : `${gallery(session.images)}${readStatus('sessions',session)}${entryActions('sessions',session.id,isGM ? button('session-open','Edit',session.id) : '')}${notesFor('sessions',session.id,{addInRow:true})}`)).join('');
     return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','+ Session'):'')}${list}</div>`;
   }
@@ -601,7 +599,7 @@
     migrateDescriptions();
     const plots=store().list(path('plots',''));
     if(plotId&&!plots.some(p=>p.id===plotId)){plotId='';plotDraft=null;if(noteTarget?.kind==='plots'){noteTarget=noteDraft=null;noteId='';}}
-    if (sessionId && !sessions.some(s=>s.id===sessionId)) sessionId = '';
+    if (sessionId && !sessions.some(s=>s.id===sessionId)) { sessionId = ''; sessionDraft = null; if (noteTarget?.kind==='sessions') { noteTarget=noteDraft=null; noteId=''; } }
     const s = sessions.find(s=>s.id===sessionId), n = npcDraft || npcs.find(n=>n.id===npcId);
     for (const pc of pcs) watch(pc);
     for (const [key,stop] of stops) if (!pcs.some(pc=>key.startsWith(pc.id+':'))) { stop?.(); stops.delete(key); sheets.delete(key); }
@@ -705,7 +703,7 @@
       else if (action==='image-remove') {
         const [kind,index]=id.split(':');
         if (kind==='plot' && plotDraft) plotDraft.images=(plotDraft.images||[]).filter((_,i)=>i!==Number(index));
-        if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:(session.images||[]).filter((_,i)=>i!==Number(index)),updatedAt:new Date().toISOString()}); }
+        if (kind==='session' && sessionDraft) sessionDraft.images=(sessionDraft.images||[]).filter((_,i)=>i!==Number(index));
       }
       else if (action==='note-new') {const [kind,targetId]=id.split(':');if(!canAddEntry(kind,targetId))return;noteId='';noteTarget={kind,id:targetId};noteDraft={title:'',text:'',public:true};}
       else if (action==='note-edit') {const data=store().get(path('notes',id));if(data&&entryOwner(data)){noteId=id;noteTarget={kind:data.targetKind,id:data.targetId};noteDraft={...data};}}
@@ -737,17 +735,20 @@
           if(kind==='plots'){plotId='';plotDraft=null;}else if(noteId===id){noteId='';noteDraft=noteTarget=null;}
         }
       }
-      else if (action==='session-new') { const now=new Date().toISOString();sessionId=crypto.randomUUID();openEntries.add(`sessions:${sessionId}`);store().queue(path('sessions',sessionId),{title:'New session',text:'',createdAt:now,updatedAt:now}); }
-      else if (action==='session-open') {sessionId=id;openEntries.add(`sessions:${id}`);}
+      else if (action==='session-new') {if(!gm())return;sessionId='';sessionDraft={title:'',firstEntry:'',images:[]};focusPopup=true;}
+      else if (action==='session-open') {const data=store().get(path('sessions',id));if(data&&gm()){sessionId=id;sessionDraft={...data};openEntries.add(`sessions:${id}`);}}
+      else if (action==='session-cancel') sessionDraft=null;
       else if (action==='session-save') {
-        const session=store().get(path('sessions',sessionId));
-        if(!gm() || !session)return;
-        store().queue(path('sessions',sessionId),{...session,updatedAt:new Date().toISOString()});
-        markRead('sessions',sessionId);
-        sessionId='';store().flush();
+        const draft=sessionDraft;
+        if(!gm()||!draft?.title?.trim())return;
+        const now=new Date().toISOString(),entryId=sessionId||crypto.randomUUID(),firstEntry=sessionId?'':String(draft.firstEntry||'').trim();
+        // A session keeps only its title, text, dates and pictures.
+        store().queue(path('sessions',entryId),{title:draft.title.trim(),text:draft.text||'',createdAt:draft.createdAt||now,updatedAt:now,images:(draft.images||[]).slice(0,MAX_IMAGES)});
+        if(firstEntry)store().queue(path('notes',crypto.randomUUID()),{title:'',text:firstEntry,public:true,creatorUid:store().uid,createdAt:now,updatedAt:now,revision:crypto.randomUUID(),targetKind:'sessions',targetId:entryId});
+        markRead('sessions',entryId);
+        sessionId=entryId;sessionDraft=null;openEntries.add(`sessions:${entryId}`);store().flush();
       }
-      else if (action==='session-close') sessionId='';
-      else if (action==='session-delete') {if(window.confirm('Delete this session?'))store().queue(path('sessions',id),null);}
+      else if (action==='session-delete') {if(gm()&&window.confirm('Delete this session?')){store().queue(path('sessions',id),null);store().flush();if(sessionId===id){sessionId='';sessionDraft=null;}}}
       else if (action==='npc-new') {npcId='';npcDraft={name:'',role:'',description:'',notes:''};focusPopup=true;}
       else if (action==='npc-open') {npcId=id;npcDraft=null;openEntries.add(`npcs:${id}`);}
       else if (action==='npc-portrait-remove') setNPCPortrait('');
@@ -838,7 +839,7 @@
         const {mapId:previous,...rest}=c;
         store().queue(`campaigns/${active}`,mapId ? {...rest,mapId} : rest);
       }
-      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
+      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!sessionId)sessionDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
       else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;
@@ -945,10 +946,10 @@
     if (url) next.portrait=url; else delete next.portrait;
     store().queue(path('npcs',npcId),next);
   }
-  // An image added to the plot being drafted, or to the session being edited (GM).
+  // An image added to the plot or session being drafted; it is saved with the rest.
   function addEntryImage(kind,picture) {
-    if (kind==='plot' && plotDraft) plotDraft.images=[...(plotDraft.images||[]),picture].slice(0,MAX_IMAGES);
-    if (kind==='session' && gm()) { const session=store().get(path('sessions',sessionId)); if(session) store().queue(path('sessions',sessionId),{...session,images:[...(session.images||[]),picture].slice(0,MAX_IMAGES),updatedAt:new Date().toISOString()}); }
+    const draft=kind==='plot'?plotDraft:kind==='session'?sessionDraft:null;
+    if (draft) draft.images=[...(draft.images||[]),picture].slice(0,MAX_IMAGES);
   }
   document.addEventListener('input',event=>{
     if(event.target.dataset?.traySearch===undefined)return;
@@ -978,11 +979,12 @@
   document.addEventListener('input',event=>{
     const entryField=event.target.dataset.entryField;
     if(entryField) {
-      const kind=event.target.dataset.entryKind,draft=kind==='plot'?plotDraft:noteDraft;
+      const kind=event.target.dataset.entryKind,draft=kind==='plot'?plotDraft:kind==='session'?sessionDraft:noteDraft;
       if(!draft)return;
       draft[entryField]=event.target.value;
+      // Plots and sessions need a title; journal entries need text.
       const save=document.querySelector(`[data-campaign="${kind}-save"]`);
-      if(save)save.disabled=busy||!draft.text.trim()||(kind==='plot'&&!draft.title.trim());
+      if(save)save.disabled=busy||(kind==='note'?!String(draft.text||'').trim():!String(draft.title||'').trim());
       return;
     }
     const field=event.target.dataset.campaignField;if(!field||!gm())return;
