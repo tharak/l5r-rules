@@ -520,3 +520,4 @@ details.creator-ability-more > summary { padding: 0; min-height: 0; }
 .creator-journal-nav button{min-width:30px}
 .creator-journal-strip{position:relative;display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:6px;align-items:flex-start}
 .creator-journal-strip>.creator-journal-entry{flex:0 0 90%;scroll-snap-align:start;max-height:60vh;overflow-y:auto}
+.creator-journal-strip>.creator-journal-entry:only-child{flex-basis:100%}
