@@ -242,8 +242,11 @@ async function mountOfficialImages(element) {
 
 // The start page: a row each for campaigns, characters (your PCs, most recently updated
 // first) and books.
+const OLD_LIST_PAGES = ['campaigns','characters','books'];
+let homeRow = '';
 function renderHome() {
-  const row = (title,href,items,action = '') => `<section class="home-row" aria-labelledby="home-${title.toLowerCase()}"><div class="home-row-head"><h2 id="home-${title.toLowerCase()}"><a href="${href}">${title}</a></h2>${action}</div><div class="home-row-items">${items}</div></section>`;
+  // Row titles are plain headings: the rows are the navigation (the old list pages are gone).
+  const row = (title,href,items,action = '') => `<section class="home-row" aria-labelledby="home-${title.toLowerCase()}"><div class="home-row-head"><h2 id="home-${title.toLowerCase()}">${href ? `<a href="${href}">${title}</a>` : title}</h2>${action}</div><div class="home-row-items">${items}</div></section>`;
   const campaigns = window.CampaignUI.homeCampaigns();
   const byUpdated = (a,b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
   const pcs = window.CharacterBuilder.list().sort(byUpdated).map(c => `<a class="home-tile" href="${esc(window.CharacterBuilder.href(c.id))}"${UI.clanTileStyle(c.clan)}>${UI.characterTileBody({portrait:c.portrait,clan:c.clan,name:c.name || 'Unnamed PC',meta:c.family})}</a>`);
@@ -251,9 +254,9 @@ function renderHome() {
   const ringName = slug => { const ring = BOOK_RINGS[slug]; return ring ? ring[0].toUpperCase()+ring.slice(1) : ''; };
   const books = bookSections().map(book => `<a class="home-tile home-book" href="${pageHref(book.slug)}" aria-label="${esc(book.title)}"${UI.tileArtStyle(BOOK_RINGS[book.slug] ? `public/assets/rings/${BOOK_RINGS[book.slug]}.webp` : '')}>${bookMark(book.slug)}<span><strong>${esc(ringName(book.slug) || book.title)}</strong></span></a>`);
   return `<div class="workspace home"><h1 class="visually-hidden">l5r-rules</h1>${
-    row('Campaigns','#/campaigns',campaigns.html,campaigns.create || '')}${
-    row('Characters','#/characters',pcs.join(''),UI.button({text:'+ PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${
-    row('Books','#/books',books.join(''))}${
+    row('Campaigns','',campaigns.html,campaigns.create || '')}${
+    row('Characters','',pcs.join(''),UI.button({text:'+ PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${
+    row('Books','',books.join(''),'<a class="home-row-link" href="#/all-pages">All pages</a>')}${
     window.CampaignStorage?.uid ? row('Library','#/library',window.MediaLibrary.homeTiles()) : ''}</div>`;
 }
 
@@ -381,6 +384,8 @@ function render() {
     const fragment = location.hash.split('#').slice(2).join('#');
     location.replace(pageHref(slug) + (fragment ? `#${fragment}` : '')); return;
   }
+  // The old Campaigns, Characters and Books list pages now open Start at that row.
+  if (OLD_LIST_PAGES.includes(slug)) { homeRow = slug; location.replace('#/'); return; }
   const page = state.data.pages[slug];
   const campaignRoute = slug === 'campaigns' || slug.startsWith('campaigns/') || slug.startsWith('invite/');
   const characterEditor = !!character;
@@ -428,6 +433,7 @@ function render() {
   lastRenderedHash = scrollKey;
   const fragment = location.hash.split('#').slice(2).join('#');
   if (fragment) requestAnimationFrame(() => document.getElementById(decodeURIComponent(fragment))?.scrollIntoView());
+  else if (slug === 'start' && homeRow) { const row = homeRow; homeRow = ''; requestAnimationFrame(() => document.getElementById(`home-${row}`)?.closest('.home-row')?.scrollIntoView({block:'start'})); }
   else window.scrollTo(0, 0);
 }
 
