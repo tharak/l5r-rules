@@ -7,7 +7,7 @@
   let timelineSession='', notePopup='', clanPopup='', focusPopup=false;
   const trayClosed=new Set();
   // The GM's invite popup: the current invite link while it is open.
-  let inviteLink='', inviteCopied=false;
+  let inviteLink='', inviteCopied=false, pageLinkCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
   // ('campaign' for the GM handover, or 'pc:<pcId>' for a PC offer).
   let transfers=[], transferPopup='', stopTransfers=null, transfersBackend=null;
@@ -52,6 +52,9 @@
     if (!hasHistory()) return;
     history.replaceState(history.state,'',href); appliedRoute = decodedRoute();
   }
+  // Apps that open links in their own browser (WhatsApp, Instagram, Facebook, Line, TikTok…),
+  // where Google refuses to sign in.
+  const inAppBrowser = () => typeof navigator !== 'undefined' && /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|MicroMessenger|TikTok|musical_ly|Snapchat|Twitter|; wv\)/i.test(navigator.userAgent || '');
   const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
@@ -683,16 +686,21 @@
     if (slug !== 'campaigns') clearCardSheets();
     if (store().uid) watchTransfers();
     if (!store().uid) { reset(''); return slug.startsWith('invite/')
-      ? `<div class="workspace"><h1>Campaign invitation</h1><p>You were invited to a campaign. Sign in with Google, then press Join campaign.</p>${button('sign-in','Sign in with Google')}</div>`
+      ? `<div class="workspace"><h1>Campaign invitation</h1>${inAppBrowser() ? `<p class="campaign-invite-warning"><strong>Open this link in Chrome or Safari.</strong> It opened inside an app (WhatsApp, Instagram…), where Google does not allow signing in. Use the app's menu (⋮ or ···) → Open in browser, or copy the link and paste it there.</p>${button('invite-page-copy',pageLinkCopied ? 'Copied' : 'Copy link')}` : ''}<p>You were invited to a campaign. Sign in with Google and you join it straight away.</p>${button('sign-in','Sign in with Google')}</div>`
       : `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
       if (inviteLoaded !== token) {
         inviteLoaded = token; invite = null; error = '';
         const backend = store().backend;
-        backend.invitation(token).then(data=>{if(inviteLoaded===token && store().backend===backend){invite=data;changed();}}).catch(err=>{if(inviteLoaded===token){error='This invitation has expired or was revoked.';changed();}});
+        // Signed in with a valid link: join at once (the link is the invitation); if joining
+        // fails, the error shows with a Join campaign button to try again.
+        backend.invitation(token).then(data=>{if(inviteLoaded===token && store().backend===backend){invite=data;changed();
+          return backend.join(token).then(c=>{if(inviteLoaded===token && store().backend===backend)location.hash='#/campaigns/'+c;})
+            .catch(err=>{if(inviteLoaded===token){error=err.code==='permission-denied'?'Could not join: the invitation was replaced or revoked. Ask the GM for a new link.':`Could not join: ${err.message}`;changed();}});}})
+          .catch(()=>{if(inviteLoaded===token){error='This invitation has expired or was revoked.';changed();}});
       }
-      return `<div class="workspace"><h1>Campaign invitation</h1><p>${e(error || (invite ? 'Join this campaign with your signed-in account.' : 'Checking invitation…'))}</p>${invite?button('join','Join campaign',token):''}<a href="#/campaigns">Campaigns</a></div>`;
+      return `<div class="workspace"><h1>Campaign invitation</h1><p>${e(error || (invite ? 'Joining the campaign…' : 'Checking invitation…'))}</p>${invite&&error?button('join','Join campaign',token):''}<a href="#/campaigns">Campaigns</a></div>`;
     }
     if (slug === 'campaigns') {
       reset('');
@@ -827,6 +835,7 @@
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
+      else if (action==='invite-page-copy') {try{await navigator.clipboard.writeText(location.href);pageLinkCopied=true;}catch{}}
       else if (action==='entry-close') {openEntries.delete(id);go(campaignHref(active),false);}
       else if (action==='section') {if(SECTIONS.includes(id)){section=id;go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;

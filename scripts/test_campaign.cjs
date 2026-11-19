@@ -457,6 +457,19 @@ test('players who joined show for the GM beside the invite link, with their PCs 
  assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Add your character with <strong>\+ PC<\/strong>/);
  a.data.set('campaigns/c/pcs/q',{ownerUid:'alice',characterId:'x'});assert.doesNotMatch(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign/);
 });
+test('an invite link joins at once when signed in; signed out it says so, and warns inside app browsers where Google sign-in fails',async()=>{
+ const d=campaignCards();let joined='';
+ d.store.backend.invitation=async()=>({campaignId:'c'});d.store.backend.join=async token=>{joined=token;return 'c';};
+ const render=slug=>d.window.CampaignUI.render(slug);
+ render('invite/tok');for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r));
+ assert.equal(joined,'tok','no Join button to miss');assert.equal(d.location.hash,'#/campaigns/c');
+ const f=campaignCards();f.store.backend.invitation=async()=>({campaignId:'c'});f.store.backend.join=async()=>{throw Object.assign(new Error('x'),{code:'permission-denied'});};
+ f.window.CampaignUI.render('invite/t2');for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r));
+ assert.match(f.window.CampaignUI.render('invite/t2'),/Could not join: the invitation was replaced or revoked[^]*data-campaign="join" data-id="t2"/,'a failed join explains itself and can be retried');
+ const out=campaignCards();out.store.uid=null;
+ assert.match(out.window.CampaignUI.render('invite/t3'),/You were invited to a campaign\. Sign in with Google and you join it straight away/);
+ assert.doesNotMatch(out.window.CampaignUI.render('invite/t3'),/campaign-invite-warning/);
+});
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

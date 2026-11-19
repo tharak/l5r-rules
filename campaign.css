@@ -296,3 +296,5 @@ details[open]>.map-tray-title::before,details[open]>.map-tray-branch-title::befo
 .campaign-list-editor ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px;max-height:40vh;overflow:auto}
 .campaign-list-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
 .campaign-list-row small{color:var(--muted)}
+
+.campaign-invite-warning{padding:10px 12px;border:1px solid var(--red);border-radius:3px;background:#fff4ec}
