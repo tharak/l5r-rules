@@ -413,7 +413,9 @@ test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes a
  assert.equal(d.data.has('campaigns/c/tree/npcs:h'),false);assert.equal(d.data.has('campaigns/c/notes/clan_w'),false);
  d.data.set('campaigns/c/notes/clan_w',copy);
  let html=render();
- assert.match(html,/data-tray-clan="Crab"[^>]*>[^]*?<\/button><button type="button" class="map-tray-note map-tray-note-clans[^"]*" data-tray-token="clans:Crab:clan_w"/,'the clan\'s notes follow it in the tray');
+ assert.match(html,/data-tray-clan="Crab"[^>]*>[^]*?<\/button><button type="button" class="map-tray-note map-tray-note-clans[^"]*has-clan" style="--clan:#4b6a88" data-tray-token="clans:Crab:clan_w"/,'the clan\'s notes follow it in the tray');
+ assert.match(html,/map-tray-token map-tray-npcs has-clan" style="--clan:#4b6a88" data-tray-token="npcs:a"/,'a member takes the clan\'s colour');
+ assert.match(html,/map-tray-token map-tray-npcs" data-tray-token="npcs:x"/,'without a clan, the usual NPC colour');
  await d.click('clan-open','Crab');html=render();
  assert.match(html,/campaign-clan-popup[^]*Crab[^]*data-id="npcs:a"[^]*data-campaign="note-new" data-id="clans:Crab"[^]*The Wall holds/,'the clan panel: members, journal and + Entry');
  d.store.uid='alice';render();await d.click('clan-open','Crab');assert.match(render(),/data-campaign="note-new" data-id="clans:Crab"/,'any member adds entries');
@@ -421,7 +423,7 @@ test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes a
  const drag=dragOnMap(d,'');drag(trayToken('clans:Crab:clan_w'),[10,500],[100,100]);
  const pin=[...d.data.entries()].find(([k])=>k.startsWith('campaigns/c/timeline/'))[1];
  assert.equal(`${pin.kind}:${pin.targetId}:${pin.noteId}`,'clans:Crab:clan_w','a clan note goes on the map');
- assert.match(render(),/timeline-pin timeline-pin-clans timeline-pin-note/);
+ assert.match(render(),/timeline-pin timeline-pin-clans timeline-pin-note timeline-pin-movable has-clan" data-pin-id="[^"]+" style="[^"]*--clan:#4b6a88"/,'and its pin takes the clan\'s colour');
 });
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();

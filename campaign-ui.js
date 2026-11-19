@@ -422,6 +422,8 @@
   // under another PC or NPC. Links to something gone, or that loop back, are ignored.
   const CLANS = ['Crab','Crane','Dragon','Lion','Mantis','Phoenix','Scorpion','Unicorn','Imperial'];
   const clanName = clan => clan === 'Imperial' ? 'Imperial Families' : clan;
+  // Each clan's colour, used on its members' map pins, tray names and note numbers.
+  const CLAN_COLORS = {Crab:'#4b6a88',Crane:'#5aa9d6',Dragon:'#3e9a4f',Lion:'#d9a514',Mantis:'#1f8f8f',Phoenix:'#e06a1b',Scorpion:'#b3202a',Unicorn:'#7d4aa6',Imperial:'#1f5e3a'};
   const treeLinks = () => new Map(store().list(path('tree','')).filter(t => t && ['pcs','npcs','clans'].includes(t.parentKind) && t.parentId).map(t => [t.id,`${t.parentKind}:${t.parentId}`]));
   function treeParents(existing) {
     const links = new Map([...treeLinks()].filter(([key,parent]) => existing.has(key) && existing.has(parent) && key !== parent)), parents = new Map();
@@ -432,33 +434,44 @@
   }
   // Whether `key` sits somewhere under `ancestor` (so dropping the ancestor on it would loop).
   const isUnder = (key,ancestor) => { const links = treeLinks(), seen = new Set(); for (let at = links.get(key); at && !seen.has(at); at = links.get(at)) { if (at === ancestor) return true; seen.add(at); } return false; };
+  // A token's clan: the clan it sits under (through any parents), else the clan on the sheet of
+  // the PC at the top of its tree. A clan's own notes take its colour.
+  function clanColors(pcs,npcs) {
+    const parents = treeParents(new Set([...pcs.map(pc => `pcs:${pc.id}`),...npcs.map(n => `npcs:${n.id}`),...CLANS.map(c => `clans:${c}`)]));
+    const clanOf = key => { const {kind,targetId} = splitKey(key); let at = `${kind}:${targetId}`;
+      while (parents.has(at)) at = parents.get(at);
+      if (at.startsWith('clans:')) return at.slice(6);
+      return at.startsWith('pcs:') ? clanFromSheet(sheets.get(at.slice(4)+':public')?.data?.profile) : ''; };
+    const color = key => CLAN_COLORS[clanOf(key)] || '';
+    return {parents,color,cls:key => color(key) ? ' has-clan' : '',style:key => color(key) ? `--clan:${color(key)}` : ''};
+  }
   function renderTimeline(isGM,pcs,npcs) {
-    const numbers = numberedNotes(), pins = mapPins(numbers);
+    const numbers = numberedNotes(), pins = mapPins(numbers), clan = clanColors(pcs,npcs);
     const pinHtml = pins.map(item => { const movable = canMovePin(item), label = item.note ? `#${item.note.number} ${item.target.name}: ${item.note.title}` : item.target.name;
-      return `<span class="timeline-pin timeline-pin-${tokenClass(item.kind,item.target)}${item.note ? ' timeline-pin-note' : ''}${movable ? ' timeline-pin-movable' : ''}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%">${UI.button({html:`${tokenFace(item.target)}${numberBadge(item.note)}<span class="timeline-pin-name"><span>${e(item.target.name)}</span>${item.note ? `<small class="timeline-pin-entry">${e(item.note.title)}</small>` : ''}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':item.note ? 'note-popup' : 'entry-open','data-id':item.note ? item.key : `${item.kind}:${item.targetId}`,'aria-label':label,title:movable ? `${label} · drag to move, or off the map to remove` : label}})}</span>`; }).join('');
+      return `<span class="timeline-pin timeline-pin-${tokenClass(item.kind,item.target)}${item.note ? ' timeline-pin-note' : ''}${movable ? ' timeline-pin-movable' : ''}${clan.cls(item.key)}" data-pin-id="${e(item.id)}" style="left:${Number(item.x)}%;top:${Number(item.y)}%;${clan.style(item.key)}">${UI.button({html:`${tokenFace(item.target)}${numberBadge(item.note)}<span class="timeline-pin-name"><span>${e(item.target.name)}</span>${item.note ? `<small class="timeline-pin-entry">${e(item.note.title)}</small>` : ''}</span>`,variant:'quiet',attrs:{class:'timeline-pin-open','data-campaign':item.note ? 'note-popup' : 'entry-open','data-id':item.note ? item.key : `${item.kind}:${item.targetId}`,'aria-label':label,title:movable ? `${label} · drag to move, or off the map to remove` : label}})}</span>`; }).join('');
     // The tray: the clans, then each PC, person and place, followed by its note numbers; any
     // character can be dragged onto the map. Those already on it are marked. Members drop a
     // name on another name (or on a clan) to put it under it; nested names fold with their parent.
     const placed = new Set(pins.map(p => p.key));
     const items = [...pcs.map(pc => ['pcs',pc.id]),...npcs.map(n => ['npcs',n.id])].map(([kind,id]) => ({kind,id,key:`${kind}:${id}`,target:pinTarget(kind,id)})).filter(item => item.target).sort((a,b) => a.target.name.localeCompare(b.target.name));
     const byKey = new Map(items.map(item => [item.key,item]));
-    const parents = treeParents(new Set([...byKey.keys(),...CLANS.map(c => `clans:${c}`)]));
+    const parents = clan.parents;
     const kids = new Map();
     for (const item of items) { const parent = parents.get(item.key); if (parent) kids.set(parent,[...(kids.get(parent) || []),item]); }
     const rootOf = key => { while (parents.has(key)) key = parents.get(key); return key; };
     const notesOf = item => [...numbers.values()].filter(n => n.kind === item.kind && n.targetId === item.id);
     const noteChips = item => notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
-      return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
+      return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}${clan.cls(noteKeyValue)}"${clan.style(noteKeyValue) ? ` style="${clan.style(noteKeyValue)}"` : ''} data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
     const countUnder = key => (kids.get(key) || []).reduce((sum,child) => sum + 1 + countUnder(child.key),0);
     const branch = (key,name) => { const list = kids.get(key) || []; if (!list.length) return '';
       return `<details class="map-tray-branch" data-tray-group="${e(key)}"${trayClosed.has(key) ? '' : ' open'}><summary class="map-tray-branch-title" aria-label="${e(name)}: ${countUnder(key)} under">${countUnder(key)}</summary><div class="map-tray-children">${list.map(row).join('')}</div></details>`; };
     function row(item) { const key = item.key;
-      const chip = `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${placed.has(key) ? ' map-tray-placed' : ''}" data-tray-token="${e(key)}" data-campaign="entry-open" data-id="${e(key)}" title="${e(item.target.name)} · drag onto the map, or onto another name or clan to put it under it">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
+      const chip = `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${placed.has(key) ? ' map-tray-placed' : ''}${clan.cls(key)}"${clan.style(key) ? ` style="${clan.style(key)}"` : ''} data-tray-token="${e(key)}" data-campaign="entry-open" data-id="${e(key)}" title="${e(item.target.name)} · drag onto the map, or onto another name or clan to put it under it">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
       const notes = noteChips(item);
       return `<div class="map-tray-row" data-tray-row>${chip}${notes}${branch(key,item.target.name)}</div>`; }
     // A clan opens its panel (notes and members); its note numbers follow; members are dropped onto it.
     const clanRow = clan => { const key = `clans:${clan}`, item = {kind:'clans',id:clan,key,target:pinTarget('clans',clan)};
-      return `<div class="map-tray-row" data-tray-row><button type="button" class="map-tray-token map-tray-clan" data-tray-clan="${e(clan)}" data-campaign="clan-open" data-id="${e(clan)}" title="${e(clanName(clan))} · open its notes; drop a name here to put it in this clan">${tokenFace(item.target)}<span>${e(clanName(clan))}</span></button>${noteChips(item)}${branch(key,clanName(clan))}</div>`; };
+      return `<div class="map-tray-row" data-tray-row><button type="button" class="map-tray-token map-tray-clan has-clan" style="--clan:${CLAN_COLORS[clan]}" data-tray-clan="${e(clan)}" data-campaign="clan-open" data-id="${e(clan)}" title="${e(clanName(clan))} · open its notes; drop a name here to put it in this clan">${tokenFace(item.target)}<span>${e(clanName(clan))}</span></button>${noteChips(item)}${branch(key,clanName(clan))}</div>`; };
     // Each group (Clans, PCs, People, Places) folds; the choice is kept while the page redraws.
     const group = (title,list,body = list.map(row).join(''),count = list.length) => body ? `<details class="map-tray-group" data-tray-group="${title}"${trayClosed.has(title) ? '' : ' open'}><summary class="map-tray-title" title="Drop a name here to take it out of its clan or parent">${title} <small>${count}</small></summary><div class="map-tray-group-body" role="group" aria-label="${title}">${body}</div></details>` : '';
     const top = items.filter(item => !parents.has(item.key)), inGroup = test => items.filter(item => { const root = byKey.get(rootOf(item.key)); return root && test(root); }).length;
@@ -1005,7 +1018,8 @@
       drag.ghost.className=`map-drag-ghost ${drag.source.className.match(/(map-tray|timeline-pin)-(pcs|npcs|place)/)?.[0].replace(/^map-tray/,'timeline-pin')||''}`;
       // The ghost is the character's face, with the note's number when it is a note.
       const {kind,targetId,noteId}=splitKey(drag.key),target=pinTarget(kind,targetId),note=noteId&&numberedNotes().get(drag.key);
-      drag.ghost.className=`map-drag-ghost timeline-pin-${tokenClass(kind,target)}`;
+      const color=drag.source.style?.getPropertyValue?.('--clan')||'';
+      drag.ghost.className=`map-drag-ghost timeline-pin-${tokenClass(kind,target)}${color?' has-clan':''}`;if(color)drag.ghost.style.setProperty?.('--clan',color);
       drag.ghost.innerHTML=(target?tokenFace(target):'<span class="timeline-pin-dot"></span>')+numberBadge(note);
       document.body.append(drag.ghost);
       if(drag.source.dataset.pinId)drag.source.classList.add('timeline-pin-dragging');
