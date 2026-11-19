@@ -270,3 +270,15 @@ test('players place pins; a pin is moved or removed by whoever placed it, or the
  await assertSucceeds(deleteDoc(r(db('alice'),'campaigns/c/timeline/a1')));
  await assertFails(setDoc(r(db('stranger'),'campaigns/c/timeline/a3'),pin('stranger')),'members only');
 });
+test('clans and family trees: any member puts a PC or NPC under a clan or another character',async()=>{
+ const link={parentKind:'clans',parentId:'Crab',updatedAt:'now'};
+ for(const u of ['gm','alice','bob'])await assertSucceeds(setDoc(r(db(u),'campaigns/c/tree/pcs:p1'),{...link,updatedAt:u}));
+ await assertSucceeds(setDoc(r(db('alice'),'campaigns/c/tree/npcs:n1'),{parentKind:'pcs',parentId:'p1',updatedAt:'now'}));
+ for(const u of ['gm','bob'])await assertSucceeds(getDoc(r(db(u),'campaigns/c/tree/pcs:p1')));
+ for(const u of ['outsider',null])await assertFails(getDoc(r(db(u),'campaigns/c/tree/pcs:p1')));
+ await assertFails(setDoc(r(db('stranger'),'campaigns/c/tree/pcs:p2'),link),'members only');
+ for(const bad of [{...link,extra:1},{...link,parentKind:'sessions'},{...link,parentId:''},{...link,parentId:'x'.repeat(81)},{parentKind:'clans',parentId:'Crab'}])await assertFails(setDoc(r(db('alice'),'campaigns/c/tree/pcs:p3'),bad));
+ for(const id of ['sessions:s','pcs:','p1',`pcs:${'x'.repeat(81)}`])await assertFails(setDoc(r(db('alice'),`campaigns/c/tree/${id}`),link));
+ await assertSucceeds(deleteDoc(r(db('bob'),'campaigns/c/tree/pcs:p1')));
+ await assertFails(deleteDoc(r(db('outsider'),'campaigns/c/tree/npcs:n1')));
+});

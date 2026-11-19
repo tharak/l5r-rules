@@ -362,6 +362,38 @@ test('map: players place tokens too; they move only their own, the GM moves any'
  d.store.uid='gm';render();drag(mapToken('mine'),[300,300],[-5,10]);
  assert.equal(d.data.has('campaigns/c/timeline/mine'),false,'the GM removes any');
 });
+test('map: members put PCs and NPCs under the clans and under each other; loops and missing parents fall back to the top',()=>{
+ const d=campaignCards();d.store.uid='alice';
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/pcs/bob',{ownerUid:'bob',characterId:'bob-pc'});
+ d.data.set('campaigns/c/npcs/a',{name:'Kuni Ayame',notes:''});d.data.set('campaigns/c/npcs/b',{name:'Kuni Botan',notes:''});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ let html=render();
+ assert.match(html,/data-tray-group="Clans"[^]*Crab[^]*Crane[^]*Dragon[^]*Lion[^]*Mantis[^]*Phoenix[^]*Scorpion[^]*Unicorn[^]*Imperial Families[^]*data-tray-group="PCs"/,'the eight Great Clans and the Imperial Families come first');
+ assert.doesNotMatch(html,/data-tray-clan="Crab"[^>]*data-tray-token/,'a clan never goes on the map');
+ const drag=dragOnMap(d,'');const L=d.documentListeners;
+ const onto=(key,target)=>{d.doc.elementFromPoint=()=>({closest:()=>target});L.pointerdown({button:0,clientX:0,clientY:0,target:{closest:()=>trayToken(key)}});L.pointermove({clientX:50,clientY:50});L.pointerup({});d.doc.elementFromPoint=undefined;};
+ const chip=data=>({dataset:data,classList:{contains:()=>false,add(){},remove(){}}});
+ onto('npcs:a',chip({trayClan:'Crab'}));
+ assert.deepEqual({...d.data.get('campaigns/c/tree/npcs:a'),updatedAt:0},{parentKind:'clans',parentId:'Crab',updatedAt:0});
+ onto('npcs:b',chip({trayToken:'npcs:a'}));onto('pcs:bob',chip({trayToken:'npcs:b'}));
+ assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,0,'nesting places nothing on the map');
+ html=render();
+ assert.match(html,/data-tray-clan="Crab"[^]*<small>3<\/small>[^]*Kuni Ayame[^]*map-tray-children[^]*Kuni Botan[^]*map-tray-children[^]*data-tray-token="pcs:bob"[^]*data-tray-clan="Crane"/,'Crab › Ayame › Botan › the PC');
+ assert.doesNotMatch(html,/data-tray-group="People"|data-tray-group="PCs"/,'nobody is left at the top');
+ onto('npcs:a',chip({trayToken:'pcs:bob'}));
+ assert.equal(d.data.get('campaigns/c/tree/npcs:a').parentId,'Crab','no loops: a parent never goes under its own child');
+ onto('npcs:a:x',chip({trayClan:'Lion'}));assert.equal(d.data.has('campaigns/c/tree/npcs:a:x'),false,'notes do not nest');
+ // A loop written elsewhere, or a parent that is gone, puts the names back at the top.
+ d.data.set('campaigns/c/tree/npcs:a',{parentKind:'pcs',parentId:'bob',updatedAt:'x'});
+ html=render();assert.match(html,/data-tray-group="People"[^]*Kuni Ayame/);assert.match(html,/data-tray-group="PCs"/);
+ d.data.set('campaigns/c/tree/npcs:a',{parentKind:'npcs',parentId:'gone',updatedAt:'x'});
+ assert.match(render(),/data-tray-group="People" open><summary class="map-tray-title"[^>]*>People <small>3<\/small>[^]*Kuni Ayame[^]*Kuni Botan[^]*pcs:bob/);
+ // Dropped on a group title, a name comes out of its parent.
+ onto('pcs:bob',{dataset:{},classList:{contains:c=>c==='map-tray-title',add(){},remove(){}}});
+ assert.equal(d.data.has('campaigns/c/tree/pcs:bob'),false);
+ assert.match(render(),/data-tray-group="PCs"[^]*pcs:bob/);
+});
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

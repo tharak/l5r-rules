@@ -176,6 +176,16 @@ service cloud.firestore {
           && request.resource.data.createdAt is string && request.resource.data.updatedAt is string;
         allow delete: if gm(c) || (joined(c) && placedBy(resource.data) == request.auth.uid);
       }
+      // Clans and family trees: any member puts a PC or NPC (the document id, "<kind>:<id>")
+      // under one of the clans or under another PC or NPC; deleting the link takes it out.
+      match /tree/{id} {
+        allow read, delete: if joined(c);
+        allow create, update: if joined(c) && id.matches('^(pcs|npcs):[^/]{1,80}$')
+          && request.resource.data.keys().hasOnly(['parentKind','parentId','updatedAt'])
+          && request.resource.data.parentKind in ['pcs','npcs','clans']
+          && request.resource.data.parentId is string && request.resource.data.parentId.size() > 0 && request.resource.data.parentId.size() <= 80
+          && request.resource.data.updatedAt is string;
+      }
       // Left over from the removed board: the GM can still read and delete it (deleting a campaign).
       match /board/{key} { allow read, delete: if gm(c); }
       match /links/{id} { allow read, delete: if gm(c); }
