@@ -994,6 +994,18 @@ test('the Traveling Pack offers its book list; ten picks, a pet as two; misc equ
   c.change({packSort:''},'name');
   c.inputs['#new-equipment']={value:'Tea Set'};c.click({action:'add-equipment'});
   assert.match(sectionHtml(c,'equipment'),/<strong>Tea Set<\/strong><small>Personal equipment · 1 koku<\/small>/);
+  // Every item in 07 has a Public box: outfit and personal items alike.
+  html=sectionHtml(c,'equipment');
+  const keyOf=async name=>(await c.data()).derived.equipment.find(e=>e.name===name).key;
+  const daisho=await keyOf('Daisho'),tea=await keyOf('Tea Set');
+  assert.match(html,new RegExp(`data-equipment-public="${daisho}"`));assert.match(html,new RegExp(`data-equipment-public="${tea}"`));
+  c.change({equipmentPublic:daisho},'on',{checked:true});c.change({equipmentPublic:tea},'on',{checked:true});
+  let result=await c.data();assert.ok(result.derived.equipment.find(e=>e.name==='Daisho').public);
+  assert.match(sectionHtml(c,'equipment'),new RegExp(`data-equipment-public="${tea}"[^>]*checked`));
+  const teaIndex=result.character.equipment.findIndex(e=>e.name==='Tea Set');c.click({action:'remove-equipment',index:String(teaIndex)});
+  assert.equal((await c.data()).character.equipmentPublic[tea],undefined,'a removed item leaves no Public mark');
+  c.school('Crane','Kakita Bushi');
+  assert.deepEqual(Object.keys((await c.data()).character.equipmentPublic),[],'a new school\'s outfit starts private');
 });
 
 test('separate equipment list preserves saved gear and money without equipped controls',async()=>{

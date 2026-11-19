@@ -600,5 +600,8 @@ test('Core pp. 205-207: miscellaneous equipment is in the catalog; a Traveling P
  d=calc(change(s,x=>{x.travelingPack=names.slice(0,10);x.packPublic={[names[1]]:true,'Not chosen':true};}));
  assert.equal(d.travelingPack.publicItems.join(),names[1],'only chosen items ticked Public are public');
  assert.ok(S.profile(change(s,x=>{x.travelingPack=names.slice(0,10);x.packPublic={[names[1]]:true};}),d).gear.includes(names[1]),'and the shared page lists them with what the character carries');
+ const withGear=change(s,x=>{x.equipment=[{id:'tea',name:'Tea Set'},{id:'wig',name:'Wig'}];x.equipmentPublic={tea:true,'school:2':true};});d=calc(withGear);
+ const gear=S.profile(withGear,d).gear;
+ assert.ok(gear.includes('Tea Set')&&gear.includes(d.school.equipment[2].name),'outfit and personal items ticked Public are shared');assert.ok(!gear.includes('Wig'),'the rest stay private');
  d=calc(change(s,x=>{x.school='';x.equipment=[{id:'p',name:'Traveling Pack'}];}));assert.ok(d.travelingPack.present,'a personal Traveling Pack also asks for its items');
 });

@@ -160,6 +160,8 @@
   const build = () => R.calculate(sheet,catalog);
   const read = selector => root.querySelector(selector)?.value?.trim() || '';
   const newId = () => makeId();
+  // A new clan or school brings a new outfit, so the old outfit's Public ticks go.
+  function dropSchoolPublic() { sheet.equipmentPublic=Object.fromEntries(Object.entries(sheet.equipmentPublic||{}).filter(([key])=>!key.startsWith('school:'))); }
   function commitEdit() {
     save(); render();
   }
@@ -402,7 +404,7 @@
   }
   function renderEquipment(data) {
     const firstPack = data.travelingPack?.present ? data.equipment.find(entry => /^travell?ing pack$/i.test(String(entry.name).trim())) : null;
-    const rows = data.equipment.map(entry => UI.recordRow({attrs:{'class':'creator-equipment-row'},bodyHtml:`<div><strong>${escapeHtml(entry.name)}</strong>${entry.source==='personal' || entry.pending || entry.item?.kind==='item'?`<small>${[entry.source==='personal'?'Personal equipment':'',entry.item?.kind==='item'&&entry.item.price?entry.item.price:'',entry.pending?'Choose an item':''].filter(Boolean).join(' · ')}</small>`:''}</div>${entry.source === 'school' && entry.choice ? renderEquipmentChoice(data,entry) : ''}${entry.source === 'personal' ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-equipment','data-index':entry.index,'aria-label':`Remove ${entry.name}`}}) : ''}${entry === firstPack ? renderTravelingPack(data.travelingPack) : ''}`})).join('');
+    const rows = data.equipment.map(entry => UI.recordRow({attrs:{'class':'creator-equipment-row'},bodyHtml:`<div><strong>${escapeHtml(entry.name)}</strong>${entry.source==='personal' || entry.pending || entry.item?.kind==='item'?`<small>${[entry.source==='personal'?'Personal equipment':'',entry.item?.kind==='item'&&entry.item.price?entry.item.price:'',entry.pending?'Choose an item':''].filter(Boolean).join(' · ')}</small>`:''}</div>${entry.source === 'school' && entry.choice ? renderEquipmentChoice(data,entry) : ''}${publicToggle(`${entry.name} is public`,{'data-equipment-public':entry.key},entry.public)}${entry.source === 'personal' ? UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-equipment','data-index':entry.index,'aria-label':`Remove ${entry.name}`}}) : ''}${entry === firstPack ? renderTravelingPack(data.travelingPack) : ''}`})).join('');
     return UI.panel({attrs:{class:'creator-panel creator-equipment',id:'creator-equipment'},bodyHtml:`${UI.sectionHeading({step:'07',title:'Equipment',actionsHtml:sectionRules('equipment','Equipment rules')})}${UI.actionRow({attrs:{class:'creator-money-fields'},bodyHtml:['koku','bu','zeni'].map(k=>renderNumber(k,Number(data.money[k]) || 0,{label:k,step:1,min:0,action:'money-step',size:'compact'})).join('')})}${rows ? `<div class="creator-equipment-list">${rows}</div>` : ''}${(()=>{const types=[...new Set(catalog.weapons.map(w=>w.type))].sort((a,b)=>a.localeCompare(b));
       const item=e=>({value:e.name,label:e.price?`${e.name} · ${e.price}`:e.name});
       const itemGroups=[...new Set((catalog.items||[]).map(i=>i.category))].map(category=>[category,catalog.items.filter(i=>i.category===category).map(item)]);
@@ -1099,7 +1101,8 @@
       if (!name) return;
       const item=C.item(name,catalog);sheet.equipment.push({id:newId(),name,catalogId:item?.id || ''});
     } else if (action === 'remove-equipment') {
-      sheet.equipment.splice(Number(button.dataset.index),1);
+      const [removed]=sheet.equipment.splice(Number(button.dataset.index),1);
+      if(removed&&sheet.equipmentPublic)delete sheet.equipmentPublic[removed.id];
     } else if (action === 'add-advantage' || action === 'add-disadvantage') {
       const kind = action.slice(4), name = root.querySelector(`#${kind}-select`).value;
       const choice = catalog[kind === 'advantage' ? 'advantages' : 'disadvantages'].find(entry => entry.name === name);
@@ -1192,10 +1195,10 @@
     }
     if (handleExtendedChange(event)) return;
     const field = event.target.dataset.field;
-    if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }
+    if (field === 'clan') { sheet.clan = event.target.value; sheet.family = ''; sheet.familyTrait = ''; sheet.school = ''; sheet.schoolChoices = []; sheet.equipmentChoices = []; dropSchoolPublic(); sheet.status = sheet.clan === 'Ronin' ? 0 : 1; }
     else if (field === 'family') { sheet.family = event.target.value; sheet.familyTrait = ''; }
     else if (field === 'familyTrait') sheet.familyTrait = selectedFamily()?.traitOptions?.includes(event.target.value) ? event.target.value : '';
-    else if (field === 'school') { sheet.disadvantages=sheet.disadvantages.filter(a=>!a.grantSchool || a.grantSchool!==sheet.school); sheet.school = event.target.value; sheet.schoolChoices = []; sheet.equipmentChoices = []; sheet.money = null;sheet.honor = null; const selected=C.school(sheet.school,catalog); if(selected?.brotherhood) sheet.status=0; if(/Shinmaki/i.test(selected?.name || '') && !sheet.disadvantages.some(a=>a.name==='Disturbing Countenance'))sheet.disadvantages.push({id:newId(),name:'Disturbing Countenance',cost:0,free:true,grantSchool:sheet.school}); }
+    else if (field === 'school') { sheet.disadvantages=sheet.disadvantages.filter(a=>!a.grantSchool || a.grantSchool!==sheet.school); sheet.school = event.target.value; sheet.schoolChoices = []; sheet.equipmentChoices = []; dropSchoolPublic(); sheet.money = null;sheet.honor = null; const selected=C.school(sheet.school,catalog); if(selected?.brotherhood) sheet.status=0; if(/Shinmaki/i.test(selected?.name || '') && !sheet.disadvantages.some(a=>a.name==='Disturbing Countenance'))sheet.disadvantages.push({id:newId(),name:'Disturbing Countenance',cost:0,free:true,grantSchool:sheet.school}); }
     else if(field==='startingXP'){if(event.target.value.trim()===''){render();return;}sheet.startingXP=Math.max(0,Math.floor(Number(event.target.value)||0));}
     else if (['status','glory','honor','taint','woundsTaken'].includes(field)) sheet[field] = Math.max(0, Number(event.target.value) || 0);
     else if (event.target.dataset.skillTrait !== undefined) {
@@ -1213,6 +1216,10 @@
       const name=event.target.dataset.packItem, chosen=(sheet.travelingPack||[]).filter(item=>item!==name);
       sheet.travelingPack=event.target.checked?[...chosen,name]:chosen;
       if(!event.target.checked&&sheet.packPublic)delete sheet.packPublic[name];
+    }
+    else if (event.target.dataset.equipmentPublic !== undefined) {
+      const key=event.target.dataset.equipmentPublic;sheet.equipmentPublic={...(sheet.equipmentPublic||{})};
+      if(event.target.checked)sheet.equipmentPublic[key]=true;else delete sheet.equipmentPublic[key];
     }
     else if (event.target.dataset.packPublic !== undefined) {
       const name=event.target.dataset.packPublic;sheet.packPublic={...(sheet.packPublic||{})};
