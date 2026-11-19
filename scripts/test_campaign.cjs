@@ -443,6 +443,20 @@ test('map: the Rokugan map is never loaded (it is the page background); the GM\'
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});html=render();
  assert.doesNotMatch(html,/rokugan-map/);assert.match(html,/timeline-map-blank" data-timeline-map>/,'no map chosen: the empty frame');
 });
+test('players who joined show for the GM beside the invite link, with their PCs or "no PC yet"; a player without a PC is told to add one',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/c/members/gm',{displayName:'GM'});
+ d.data.set('campaigns/c/members/alice',{displayName:'Alice'});d.data.set('campaigns/c/members/bob',{displayName:'Bob'});
+ d.data.set('campaigns/c/pcs/p',{ownerUid:'bob',characterId:'bob-pc'});d.data.set('campaigns/c/requests/carol',{displayName:'Carol',createdAt:'now'});
+ d.store.backend.get=async()=>null;d.store.backend.invite=async()=>'tok';d.store.backend.invitation=async()=>({});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');render();
+ await d.click('pc-picker');await new Promise(r=>setTimeout(r));
+ const html=render();
+ assert.match(html,/campaign-players"><h4>Players <small>2<\/small><\/h4><ul><li[^>]*><span><strong>Alice<\/strong> <small>joined · no PC yet<\/small>[^]*<strong>Bob<\/strong> <small>[^<]+<\/small>[^]*<strong>Carol<\/strong> <small>asks to join<\/small>[^]*data-campaign="request-approve" data-id="carol"/);
+ const a=campaignCards();a.store.uid='alice';a.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});a.data.set('campaigns/c/members/alice',{displayName:'Alice'});
+ assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Add your character with <strong>\+ PC<\/strong>/);
+ a.data.set('campaigns/c/pcs/q',{ownerUid:'alice',characterId:'x'});assert.doesNotMatch(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign/);
+});
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

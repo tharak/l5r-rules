@@ -531,7 +531,7 @@
     if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
     if (sessionDraft && !sessionId && gm()) return popup('new-popup-title','New session',entryEditor('session',sessionDraft),'new-close');
     if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft)+listEditor('npcs',store().list(path('npcs',''))),'new-close');
-    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${listEditor('pcs',pcs)}${gm() ? inviteSection() : ''}`,'new-close');
+    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${listEditor('pcs',pcs)}${gm() ? playersSection(pcs)+inviteSection() : ''}`,'new-close');
     return '';
   }
   // Offers made to you in this campaign (accept saves the PC to your account and links it), and,
@@ -539,7 +539,10 @@
   function renderOffers() {
     const mine = transfers.filter(t => t.toUid === store().uid && t.status === 'offered' && t.campaignId === active);
     const requests = gm() ? store().list(path('requests','')) : [];
+    // A player who joined but has no PC here yet is invisible to the others until they add one.
+    const noPC = !gm() && !store().list(path('pcs','')).some(pc => pc.ownerUid === store().uid);
     const rows = [
+      ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Add your character with <strong>+ PC</strong> so the GM and the other players see you.</span>${button('pc-picker','+ PC')}</div>`] : []),
       ...mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`),
       ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
     ];
@@ -604,6 +607,17 @@
       <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
   }
   const renderInvitePopup = () => '';
+  // Who is in the campaign (for the GM, beside the invite link): each player who joined and the
+  // PCs they linked, "no PC yet" until they add one with + PC, and anyone asking to join.
+  function playersSection(pcs) {
+    const campaign = store().get(`campaigns/${active}`);
+    const members = store().list(path('members','')).filter(m => m.id !== campaign?.gmUid).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
+    const requests = store().list(path('requests',''));
+    const rows = members.map(m => { const theirs = pcs.filter(pc => pc.ownerUid === m.id).map(pc => label(pc));
+      return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong> <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span></li>`; })
+      .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}</li>`));
+    return `<div class="campaign-players"><h4>Players <small>${members.length}</small></h4>${rows.length ? `<ul>${rows.join('')}</ul>` : '<p class="campaign-invite-note">Nobody has joined yet. A player opens the invite link, signs in with Google and presses Join campaign.</p>'}</div>`;
+  }
   // Places are NPC records too: the GM ticks Place, and older records are guessed from the name (or a role like "O Castelo…" / "Onde…").
   const PLACE_WORDS = /(^|[^\p{L}])(shiro|kyuden|mura|toshi|koku|toi|jinja|dojo|village|vila|aldeia|cidade|city|castle|castelo|pal[aá]cio|palace|posto|templo|temple|santu[aá]rio|shrine|ponte|bridge|prov[ií]ncia|province|estrada|road|porto|port|floresta|forest|monte|mountain|rio|river|casa de ch[aá]|tea ?house)(?=$|[^\p{L}])/iu;
   const isPlace = npc => typeof npc.place === 'boolean' ? npc.place : PLACE_WORDS.test(npc.name || '') || /^(onde\b|(o|a|the) )/i.test(npc.role || '') && PLACE_WORDS.test(npc.role) || /^onde\b/i.test(npc.role || '');
@@ -668,7 +682,9 @@
     if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
     if (slug !== 'campaigns') clearCardSheets();
     if (store().uid) watchTransfers();
-    if (!store().uid) { reset(''); return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
+    if (!store().uid) { reset(''); return slug.startsWith('invite/')
+      ? `<div class="workspace"><h1>Campaign invitation</h1><p>You were invited to a campaign. Sign in with Google, then press Join campaign.</p>${button('sign-in','Sign in with Google')}</div>`
+      : `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
     if (slug.startsWith('invite/')) {
       reset(''); const token = slug.slice(7);
       if (inviteLoaded !== token) {

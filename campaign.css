@@ -156,6 +156,7 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .campaign-timeline-row .timeline-list{flex-wrap:wrap;overflow-x:visible}
 /* Invite players, inside the + PC popup (GM only). */
 .campaign-invite{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.campaign-players{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}.campaign-players ul{list-style:none;margin:6px 0 0;padding:0}.campaign-players h4 small{font-weight:400;color:var(--muted)}
 .campaign-invite h4{margin:0 0 8px;font:17px var(--serif)}
 
 /* Campaign lists: tiles size to their content and wrap (long titles wrap within a cap). */
