@@ -4,7 +4,7 @@
   const e = UI.escape;
   let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, sessionDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
-  let timelineSession='', notePopup='', focusPopup=false;
+  let timelineSession='', notePopup='', clanPopup='', focusPopup=false;
   const trayClosed=new Set();
   // The GM's invite popup: the current invite link while it is open.
   let inviteLink='', inviteCopied=false;
@@ -136,7 +136,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=sessionDraft=noteDraft=noteTarget=null;
-    timelineSession='';notePopup='';inviteLink='';inviteCopied=false;transferPopup='';
+    timelineSession='';notePopup='';clanPopup='';inviteLink='';inviteCopied=false;transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -220,6 +220,55 @@
       } catch (error) { movingNotes.delete(note.id); }
     }
   }
+  // The GM's older clan NPCs, named "- Crab" (or "- Clã do Caranguejo"…): their journal entries
+  // are copied once into the matching built-in clan, keeping their dates (so their order). A copy
+  // has a fixed id, so it is never made twice; this device remembers what it copied, so a copy
+  // that is deleted does not come back.
+  const CLAN_WORDS = {Crab:/\b(crab|caranguejo)\b/,Crane:/\b(crane|garca)\b/,Dragon:/\b(dragon|dragao)\b/,Lion:/\b(lion|leao)\b/,Mantis:/\b(mantis|louva.a.deus)\b/,Phoenix:/\b(phoenix|fenix)\b/,Scorpion:/\b(scorpion|escorpiao)\b/,Unicorn:/\b(unicorn|unicornio)\b/,Imperial:/\b(imperial|imperiais|imperio)\b/};
+  const clanOfNPC = npc => { const name = String(npc.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    if (!/^\s*[-–—]/.test(name)) return ''; const found = CLANS.filter(c => CLAN_WORDS[c].test(name)); return found.length === 1 ? found[0] : ''; };
+  // Characters already in the campaign go into their clan once, on the GM's device: a PC by the
+  // clan on its sheet, an NPC that sat under an older "- Crab" NPC into that clan, any other
+  // person by a family name in their name (Kuni → Crab). Places and unknown families stay put,
+  // and anything moved or taken out by hand afterwards is left alone.
+  const FAMILIES = {Crab:'Hida Hiruma Kaiu Kuni Yasuki Toritaka',Crane:'Doji Daidoji Kakita Asahina',Dragon:'Mirumoto Togashi Kitsuki Tamori',Lion:'Akodo Ikoma Kitsu Matsu',
+    Mantis:'Yoritomo Moshi Tsuruchi',Phoenix:'Shiba Isawa Asako Agasha',Scorpion:'Bayushi Shosuro Soshi Yogo',Unicorn:'Shinjo Utaku Moto Iuchi Ide Horiuchi',Imperial:'Otomo Seppun Miya Toturi Hantei'};
+  const FAMILY_CLAN = new Map(Object.entries(FAMILIES).flatMap(([clan,names]) => names.toLowerCase().split(' ').map(name => [name,clan])));
+  const clanByFamily = text => { const found = new Set(String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().split(/[^a-z]+/).map(word => FAMILY_CLAN.get(word)).filter(Boolean)); return found.size === 1 ? [...found][0] : ''; };
+  const clanFromSheet = profile => CLANS.find(clan => clan.toLowerCase() === String(profile?.clan || '').trim().toLowerCase()) || (profile?.clan ? '' : clanByFamily(profile?.family));
+  // What this device already did once, kept in memory too when browser storage is unavailable.
+  const rememberedSets = new Map();
+  const remembered = key => { if (!rememberedSets.has(key)) { let list = []; try { list = JSON.parse(localStorage.getItem(key)) || []; } catch {} rememberedSets.set(key,new Set(list)); } return rememberedSets.get(key); };
+  function placeInClans() {
+    const uid = store().uid; if (!gm() || !uid) return;
+    const doneKey = `l5r-rules-account-${uid}-clan-places-v1`, done = remembered(doneKey);
+    const before = done.size, now = new Date().toISOString();
+    const place = (key,clan) => { const mark = `${active}/${key}`; if (!clan || done.has(mark)) return; done.add(mark);
+      store().queue(path('tree',key),{parentKind:'clans',parentId:clan,updatedAt:now}); };
+    const linkOf = key => store().get(path('tree',key));
+    for (const pc of store().list(path('pcs',''))) { const key = `pcs:${pc.id}`, profile = sheets.get(pc.id+':public')?.data?.profile;
+      if (profile && !linkOf(key)) place(key,clanFromSheet(profile)); }
+    for (const npc of store().list(path('npcs',''))) { const key = `npcs:${npc.id}`, link = linkOf(key);
+      if (clanOfNPC(npc) || isPlace(npc)) continue;
+      if (link?.parentKind === 'npcs') { const old = store().get(path('npcs',link.parentId)); if (old && clanOfNPC(old)) place(key,clanOfNPC(old)); }
+      else if (!link) place(key,clanByFamily(npc.name)); }
+    if (done.size !== before) try { localStorage.setItem(doneKey,JSON.stringify([...done])); } catch {}
+  }
+  function copyClanNPCNotes() {
+    const uid = store().uid; if (!gm() || !uid) return;
+    const doneKey = `l5r-rules-account-${uid}-clan-copies-v1`, done = remembered(doneKey);
+    const before = done.size;
+    for (const npc of store().list(path('npcs',''))) { const clan = clanOfNPC(npc); if (!clan) continue;
+      for (const note of store().list(path('notes','')).filter(n => n.targetKind === 'npcs' && n.targetId === npc.id && n.creatorUid === uid && String(n.text || '').trim())) {
+        const copyId = `clan_${note.id}`.slice(0,120), mark = `${active}/${copyId}`;
+        if (done.has(mark)) continue;
+        done.add(mark);
+        if (store().get(path('notes',copyId))) continue;
+        const now = new Date().toISOString();
+        store().queue(path('notes',copyId),{title:note.title || '',text:note.text,public:true,creatorUid:uid,createdAt:note.createdAt || note.updatedAt || now,updatedAt:now,revision:crypto.randomUUID(),targetKind:'clans',targetId:clan});
+      } }
+    if (done.size !== before) try { localStorage.setItem(doneKey,JSON.stringify([...done])); } catch {}
+  }
   // Session, plot and NPC descriptions used to be a text field; each moves once into the
   // first entry of its journal (written by the GM for sessions and NPCs, by the creator for plots).
   function migrateDescriptions() {
@@ -246,6 +295,7 @@
   }
   function canAddEntry(kind,id) {
     if (kind === 'sessions') return true;
+    if (kind === 'clans') return CLANS.includes(id);
     if (kind === 'npcs') return gm();
     if (kind === 'plots') return gm() || store().get(path('plots',id))?.creatorUid === store().uid;
     return false;
@@ -258,7 +308,7 @@
     const canAdd=canAddEntry(kind,id)&&!addInRow;
     if(!notes.length&&!canAdd&&!drafting)return '';
     const numbers=numberedNotes();
-    const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,toolsHtml:kind==='npcs'||kind==='pcs'?unpinButton(noteKey(kind,id,n.id),true):'',title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
+    const entries=notes.map(n=>({id:n.id,number:numbers.get(noteKey(kind,id,n.id))?.number,toolsHtml:['npcs','pcs','clans'].includes(kind)?unpinButton(noteKey(kind,id,n.id),true):'',title:n.title||'',text:n.text||'',date:n.createdAt||n.updatedAt||'',author:entryAuthor(n),canEdit:entryOwner(n),canDelete:entryOwner(n)}));
     const control=(name,entryId)=>({'data-campaign':`note-${name}`,'data-id':name==='new'?`${kind}:${id}`:entryId,disabled:busy});
     const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
     return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
@@ -318,7 +368,7 @@
   const noteKey = (kind,targetId,noteId) => `${kind}:${targetId}:${noteId}`;
   const splitKey = key => { const [kind,targetId,...rest] = key.split(':'); return {kind,targetId,noteId:rest.join(':')}; };
   function numberedNotes() {
-    const exists = (kind,id) => ['sessions','plots','npcs','pcs'].includes(kind) && !!store().get(path(kind,id));
+    const exists = (kind,id) => kind === 'clans' ? CLANS.includes(id) : ['sessions','plots','npcs','pcs'].includes(kind) && !!store().get(path(kind,id));
     const notes = store().list(path('notes','')).filter(n => exists(n.targetKind,n.targetId)).map(n => ({kind:n.targetKind,targetId:n.targetId,id:n.id,title:UI.entryTitle(n),text:n.text || '',author:entryAuthor(n),date:n.createdAt || n.updatedAt || ''}));
     const journals = store().list(path('pcs','')).flatMap(pc => (sheets.get(pc.id+':public')?.data?.profile?.journal || []).map(j => ({kind:'pcs',targetId:pc.id,id:`journal:${j.id}`,title:UI.entryTitle(j),text:j.text || '',author:j.authorName || playerName(pc),date:j.createdAt || ''})));
     const list = [...notes,...journals].sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)).map((n,i) => ({...n,number:i + 1}));
@@ -349,6 +399,7 @@
   const pinTarget = (kind,id) => {
     if (kind === 'pcs') { const pc = store().get(path('pcs',id)); if (!pc) return null; const profile = sheets.get(id+':public')?.data?.profile; return {name:label(pc),image:UI.isPortrait(profile?.portrait) ? profile.portrait : window.CharacterCatalog?.clanMon(profile?.clan || '') || ''}; }
     if (kind === 'npcs') { const npc = store().get(path('npcs',id)); return npc ? {name:npc.name || 'Unnamed NPC',image:UI.isPortrait(npc.portrait) ? npc.portrait : '',place:isPlace(npc)} : null; }
+    if (kind === 'clans') return CLANS.includes(id) ? {name:clanName(id),image:window.CharacterCatalog?.clanMon(id) || '',clan:true} : null;
     return null;
   };
   const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
@@ -357,14 +408,14 @@
   function mapPins(numbers) {
     const seen = new Set();
     return store().list(path('timeline','')).sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map(item => {
-      const target = (item.kind === 'pcs' || item.kind === 'npcs') && pinTarget(item.kind,item.targetId);
+      const target = ['pcs','npcs','clans'].includes(item.kind) && pinTarget(item.kind,item.targetId);
       const key = item.noteId ? noteKey(item.kind,item.targetId,item.noteId) : `${item.kind}:${item.targetId}`, note = item.noteId ? numbers.get(key) : null;
       if (!target || (item.noteId && !note) || seen.has(key)) return null;
       seen.add(key);
       return {...item,target,note,key};
     }).filter(Boolean).sort((a,b) => (a.note?.order || a.note?.number || 0) - (b.note?.order || b.note?.number || 0));
   }
-  const tokenClass = (kind,target) => target?.place ? 'place' : kind;
+  const tokenClass = (kind,target) => target?.clan ? 'clans' : target?.place ? 'place' : kind;
   const tokenFace = target => target.image ? `<img src="${UI.imageLink(target.image)}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>';
   const numberBadge = note => note ? `<b class="timeline-pin-number${note.private ? ' timeline-pin-private' : ''}"${note.private ? ' title="Private: only its player and the GM see it"' : ''}>${note.number}</b>` : '';
   // Clans and family trees: campaigns/<c>/tree/<kind>:<id> puts a PC or NPC under a clan or
@@ -396,17 +447,18 @@
     for (const item of items) { const parent = parents.get(item.key); if (parent) kids.set(parent,[...(kids.get(parent) || []),item]); }
     const rootOf = key => { while (parents.has(key)) key = parents.get(key); return key; };
     const notesOf = item => [...numbers.values()].filter(n => n.kind === item.kind && n.targetId === item.id);
+    const noteChips = item => notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
+      return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
     const countUnder = key => (kids.get(key) || []).reduce((sum,child) => sum + 1 + countUnder(child.key),0);
     const branch = (key,name) => { const list = kids.get(key) || []; if (!list.length) return '';
       return `<details class="map-tray-branch" data-tray-group="${e(key)}"${trayClosed.has(key) ? '' : ' open'}><summary class="map-tray-branch-title" aria-label="${e(name)}: ${countUnder(key)} under">${countUnder(key)}</summary><div class="map-tray-children">${list.map(row).join('')}</div></details>`; };
     function row(item) { const key = item.key;
       const chip = `<button type="button" class="map-tray-token map-tray-${tokenClass(item.kind,item.target)}${placed.has(key) ? ' map-tray-placed' : ''}" data-tray-token="${e(key)}" data-campaign="entry-open" data-id="${e(key)}" title="${e(item.target.name)} · drag onto the map, or onto another name or clan to put it under it">${tokenFace(item.target)}<span>${e(item.target.name)}</span></button>`;
-      const notes = notesOf(item).map(n => { const noteKeyValue = noteKey(item.kind,item.id,n.id);
-        return `<button type="button" class="map-tray-note map-tray-note-${tokenClass(item.kind,item.target)}${n.private ? ' map-tray-private' : ''}${placed.has(noteKeyValue) ? ' map-tray-placed' : ''}" data-tray-token="${e(noteKeyValue)}" data-campaign="note-popup" data-id="${e(noteKeyValue)}" title="#${n.number} ${e(n.title)}${n.private ? ' · private: only you and the GM see it' : ''} · drag onto the map">${n.number}</button>`; }).join('');
+      const notes = noteChips(item);
       return `<div class="map-tray-row" data-tray-row>${chip}${notes}${branch(key,item.target.name)}</div>`; }
-    // A clan folds on its name; members are dropped onto it.
-    const clanRow = clan => { const key = `clans:${clan}`, mon = window.CharacterCatalog?.clanMon(clan) || '', list = kids.get(key) || [];
-      return `<div class="map-tray-row" data-tray-row><details class="map-tray-clan-branch" data-tray-group="${e(key)}"${trayClosed.has(key) ? '' : ' open'}><summary class="map-tray-token map-tray-clan" data-tray-clan="${e(clan)}" title="${e(clanName(clan))} · drop a name here to put it in this clan">${mon ? `<img src="${e(UI.imageLink(mon))}" alt="" draggable="false">` : '<span class="timeline-pin-dot" aria-hidden="true"></span>'}<span>${e(clanName(clan))}</span>${list.length ? `<small>${countUnder(key)}</small>` : ''}</summary>${list.length ? `<div class="map-tray-children">${list.map(row).join('')}</div>` : ''}</details></div>`; };
+    // A clan opens its panel (notes and members); its note numbers follow; members are dropped onto it.
+    const clanRow = clan => { const key = `clans:${clan}`, item = {kind:'clans',id:clan,key,target:pinTarget('clans',clan)};
+      return `<div class="map-tray-row" data-tray-row><button type="button" class="map-tray-token map-tray-clan" data-tray-clan="${e(clan)}" data-campaign="clan-open" data-id="${e(clan)}" title="${e(clanName(clan))} · open its notes; drop a name here to put it in this clan">${tokenFace(item.target)}<span>${e(clanName(clan))}</span></button>${noteChips(item)}${branch(key,clanName(clan))}</div>`; };
     // Each group (Clans, PCs, People, Places) folds; the choice is kept while the page redraws.
     const group = (title,list,body = list.map(row).join(''),count = list.length) => body ? `<details class="map-tray-group" data-tray-group="${title}"${trayClosed.has(title) ? '' : ' open'}><summary class="map-tray-title" title="Drop a name here to take it out of its clan or parent">${title} <small>${count}</small></summary><div class="map-tray-group-body" role="group" aria-label="${title}">${body}</div></details>` : '';
     const top = items.filter(item => !parents.has(item.key)), inGroup = test => items.filter(item => { const root = byKey.get(rootOf(item.key)); return root && test(root); }).length;
@@ -418,13 +470,20 @@
     const tray = !groups ? '' : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}${groups}</div>`;
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
     const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(UI.imageLink(mapSrc()))}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
-    return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}`;
+    return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}${renderClanPopup(numbers,kids)}`;
+  }
+  // A clan's panel: its mon and name, who is in it, and its journal (any member adds entries).
+  function renderClanPopup(numbers,kids) {
+    if (!CLANS.includes(clanPopup)) return '';
+    const mon = window.CharacterCatalog?.clanMon(clanPopup) || '', members = kids.get(`clans:${clanPopup}`) || [];
+    const list = members.length ? `<p class="campaign-clan-members">${members.map(m => UI.button({text:m.target.name,variant:'quiet',size:'compact',attrs:{'data-campaign':'entry-open','data-id':m.key}})).join(' ')}</p>` : '<p class="campaign-clan-members">Nobody yet: drop a name on the clan in the tray.</p>';
+    return `<div class="timeline-popup-backdrop" data-campaign="clan-popup-close"></div><div class="timeline-popup campaign-clan-popup" role="dialog" aria-modal="true" aria-labelledby="clan-popup-title" tabindex="-1"><header>${mon ? `<img src="${e(UI.imageLink(mon))}" alt="">` : ''}<div><h3 id="clan-popup-title">${e(clanName(clanPopup))}</h3><small>${members.length} in the clan</small></div></header>${list}${notesFor('clans',clanPopup)}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('clan-popup-close','Close')})}</div>`;
   }
   // A numbered note in a popup: from a pin, or from its number in the tray.
   function renderNotePopup(numbers) {
     const note = notePopup && numbers.get(notePopup), target = note && pinTarget(note.kind,note.targetId), pin = note && mapPins(numbers).find(p => p.key === notePopup);
     if (!note || !target) return '';
-    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${UI.imageLink(target.image)}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`)+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
+    return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${UI.imageLink(target.image)}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:(note.kind === 'clans' ? button('clan-open','Open clan',note.targetId) : button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`))+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
   }
   // The campaign map: a media library picture the GM chose, else the map of Rokugan.
   const loadingMaps = new Set();
@@ -636,6 +695,8 @@
     const isGM = gm(), sessions = store().list(path('sessions','')), npcs = store().list(path('npcs','')), pcs = store().list(path('pcs',''));
     migratePCNotes();
     migrateDescriptions();
+    copyClanNPCNotes();
+    placeInClans();
     const plots=store().list(path('plots',''));
     if(plotId&&!plots.some(p=>p.id===plotId)){plotId='';plotDraft=null;if(noteTarget?.kind==='plots'){noteTarget=noteDraft=null;noteId='';}}
     if (sessionId && !sessions.some(s=>s.id===sessionId)) { sessionId = ''; sessionDraft = null; if (noteTarget?.kind==='sessions') { noteTarget=noteDraft=null; noteId=''; } }
@@ -853,12 +914,14 @@
       else if (action==='request-invite') await backend.requestInvite(id);
       else if (action==='note-popup') {notePopup=id;focusPopup=true;}
       else if (action==='note-popup-close') notePopup='';
+      else if (action==='clan-open') {if(CLANS.includes(id)){clanPopup=id;notePopup='';focusPopup=true;}}
+      else if (action==='clan-popup-close') {clanPopup='';if(noteTarget?.kind==='clans'){noteTarget=noteDraft=null;noteId='';}}
       else if (action==='pin-remove') {const item=store().get(path('timeline',id));if(canMovePin(item)){store().queue(path('timeline',id),null);notePopup='';}}
       else if (action==='request-withdraw') await backend.withdrawRequest(id);
       else if (action==='request-approve'||action==='request-decline') { if (gm()) await backend.answerRequest(active,id,action==='request-approve'); }
       else if (action==='entry-open') {
         // Open a PC, NPC, session or plot as its panel (from a token, a popup or the map head).
-        const [kind,targetId]=id.split(':');notePopup='';
+        const [kind,targetId]=id.split(':');notePopup='';clanPopup='';
         openEntries.clear();openEntries.add(`${kind}:${targetId}`);section=kind;go(campaignHref(active,kind,kind,targetId),false);
       }
       else if (action==='npc-portrait-library') {

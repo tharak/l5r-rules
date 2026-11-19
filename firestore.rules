@@ -167,7 +167,7 @@ service cloud.firestore {
         allow create, update: if joined(c)
           && (gm(c) || (placedBy(request.resource.data) == request.auth.uid && (resource == null || placedBy(resource.data) == request.auth.uid)))
           && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt','creatorUid'])
-          && request.resource.data.kind in ['pcs','npcs']
+          && request.resource.data.kind in ['pcs','npcs','clans']
           && (!('sessionId' in request.resource.data) || (request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80))
           && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80
           && (!('noteId' in request.resource.data) || (request.resource.data.noteId is string && request.resource.data.noteId.size() <= 80))
@@ -226,7 +226,8 @@ service cloud.firestore {
       match /{kind}/{id} {
         function entryKind() { return kind in ['plots','notes']; }
         function targetReadable(m) {
-          return kind == 'plots' || (m.targetKind in ['sessions','pcs','npcs','plots']
+          return kind == 'plots' || (m.targetKind == 'clans' && m.targetId in ['Crab','Crane','Dragon','Lion','Mantis','Phoenix','Scorpion','Unicorn','Imperial'])
+            || (m.targetKind in ['sessions','pcs','npcs','plots']
             && exists(/databases/$(database)/documents/campaigns/$(c)/$(m.targetKind)/$(m.targetId))
             && (m.targetKind != 'plots' || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == m.targetCreatorUid));
         }
@@ -255,10 +256,10 @@ service cloud.firestore {
         }
         // Only ownership, visibility, and attachment metadata are shared. Text lives in protected bodies.
         allow read: if entryKind() && joined(c);
-        // Journal entries (stored as notes): anyone on sessions, the GM on NPCs, the GM or the
+        // Journal entries (stored as notes): anyone on sessions and clans, the GM on NPCs, the GM or the
         // plot's creator on plots. PC journals live with the character, so no new PC notes.
         function canAddEntry(m) {
-          return kind == 'plots' || m.targetKind == 'sessions' || (m.targetKind == 'npcs' && gm(c))
+          return kind == 'plots' || m.targetKind == 'sessions' || m.targetKind == 'clans' || (m.targetKind == 'npcs' && gm(c))
             || (m.targetKind == 'plots' && (gm(c) || get(/databases/$(database)/documents/campaigns/$(c)/plots/$(m.targetId)).data.creatorUid == request.auth.uid));
         }
         allow create: if entryKind() && joined(c) && validMetadata() && canAddEntry(request.resource.data);

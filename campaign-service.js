@@ -64,7 +64,9 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
           stops.push(()=>{for(const item of contentStops.values())item.stop();contentStops.clear();});
           // Privacy is paused: every campaign member reads every plot and note.
           const canRead = () => true;
+          // Clans are fixed (Crab … Imperial), so their notes have no parent document.
           const targetVisible = data => {
+            if(data.targetKind==='clans')return typeof data.targetId==='string'&&!!data.targetId;
             const target=catalogs[data.targetKind]?.get(data.targetId);
             return !!target && (data.targetKind!=='plots'||(target.creatorUid===data.targetCreatorUid&&canRead(target)));
           };

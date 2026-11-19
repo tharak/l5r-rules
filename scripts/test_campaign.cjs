@@ -379,7 +379,7 @@ test('map: members put PCs and NPCs under the clans and under each other; loops 
  onto('npcs:b',chip({trayToken:'npcs:a'}));onto('pcs:bob',chip({trayToken:'npcs:b'}));
  assert.equal([...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length,0,'nesting places nothing on the map');
  html=render();
- assert.match(html,/data-tray-clan="Crab"[^]*<small>3<\/small>[^]*Kuni Ayame[^]*map-tray-children[^]*Kuni Botan[^]*map-tray-children[^]*data-tray-token="pcs:bob"[^]*data-tray-clan="Crane"/,'Crab › Ayame › Botan › the PC');
+ assert.match(html,/data-tray-clan="Crab"[^]*map-tray-branch-title" aria-label="Crab: 3 under">3<[^]*Kuni Ayame[^]*map-tray-children[^]*Kuni Botan[^]*map-tray-children[^]*data-tray-token="pcs:bob"[^]*data-tray-clan="Crane"/,'Crab › Ayame › Botan › the PC');
  assert.doesNotMatch(html,/data-tray-group="People"|data-tray-group="PCs"/,'nobody is left at the top');
  onto('npcs:a',chip({trayToken:'pcs:bob'}));
  assert.equal(d.data.get('campaigns/c/tree/npcs:a').parentId,'Crab','no loops: a parent never goes under its own child');
@@ -393,6 +393,35 @@ test('map: members put PCs and NPCs under the clans and under each other; loops 
  onto('pcs:bob',{dataset:{},classList:{contains:c=>c==='map-tray-title',add(){},remove(){}}});
  assert.equal(d.data.has('campaigns/c/tree/pcs:bob'),false);
  assert.match(render(),/data-tray-group="PCs"[^]*pcs:bob/);
+});
+test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes and members, and people go into their family\'s clan once',async()=>{
+ const d=campaignCards();
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
+ d.data.set('campaigns/c/npcs/old',{name:'- Clã do Caranguejo',notes:''});
+ d.data.set('campaigns/c/npcs/a',{name:'Botan',notes:''});d.data.set('campaigns/c/tree/npcs:a',{parentKind:'npcs',parentId:'old',updatedAt:'1'});
+ d.data.set('campaigns/c/npcs/h',{name:'Doji Hayaku',notes:''});d.data.set('campaigns/c/npcs/s',{name:'Shiro Kitsuki',role:'O Castelo',notes:''});d.data.set('campaigns/c/npcs/x',{name:'Mario',notes:''});
+ d.data.set('campaigns/c/notes/w',{creatorUid:'gm',public:true,targetKind:'npcs',targetId:'old',title:'Wall',text:'The Wall holds',createdAt:'2026-10-01',updatedAt:'2026-10-01',revision:'r'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ render();
+ const copy=d.data.get('campaigns/c/notes/clan_w');
+ assert.equal(`${copy.targetKind}:${copy.targetId} ${copy.title} ${copy.text} ${copy.createdAt}`,'clans:Crab Wall The Wall holds 2026-10-01','the old clan NPC\'s note is copied, with its date');
+ assert.equal(d.data.get('campaigns/c/tree/npcs:a').parentId,'Crab','its member moves to the clan');
+ assert.equal(d.data.get('campaigns/c/tree/npcs:h').parentId,'Crane','Doji is a Crane family');
+ for(const id of ['old','s','x'])assert.equal(d.data.has(`campaigns/c/tree/npcs:${id}`),false,'the old clan, places and unknown families stay put');
+ // Once taken out or deleted by hand, nothing comes back.
+ d.data.delete('campaigns/c/tree/npcs:h');d.data.delete('campaigns/c/notes/clan_w');render();
+ assert.equal(d.data.has('campaigns/c/tree/npcs:h'),false);assert.equal(d.data.has('campaigns/c/notes/clan_w'),false);
+ d.data.set('campaigns/c/notes/clan_w',copy);
+ let html=render();
+ assert.match(html,/data-tray-clan="Crab"[^>]*>[^]*?<\/button><button type="button" class="map-tray-note map-tray-note-clans[^"]*" data-tray-token="clans:Crab:clan_w"/,'the clan\'s notes follow it in the tray');
+ await d.click('clan-open','Crab');html=render();
+ assert.match(html,/campaign-clan-popup[^]*Crab[^]*data-id="npcs:a"[^]*data-campaign="note-new" data-id="clans:Crab"[^]*The Wall holds/,'the clan panel: members, journal and + Entry');
+ d.store.uid='alice';render();await d.click('clan-open','Crab');assert.match(render(),/data-campaign="note-new" data-id="clans:Crab"/,'any member adds entries');
+ await d.click('clan-popup-close');assert.doesNotMatch(render(),/campaign-clan-popup/);
+ const drag=dragOnMap(d,'');drag(trayToken('clans:Crab:clan_w'),[10,500],[100,100]);
+ const pin=[...d.data.entries()].find(([k])=>k.startsWith('campaigns/c/timeline/'))[1];
+ assert.equal(`${pin.kind}:${pin.targetId}:${pin.noteId}`,'clans:Crab:clan_w','a clan note goes on the map');
+ assert.match(render(),/timeline-pin timeline-pin-clans timeline-pin-note/);
 });
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
