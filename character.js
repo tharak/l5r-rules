@@ -385,7 +385,7 @@
   function renderTravelingPack(pack) {
     const full=pack.count>=pack.picks;
     const boxes=pack.options.map(option=>{const weight=option.counts || 1, checked=pack.items.includes(option.name);
-      return UI.checkbox({label:`${option.name}${weight>1?` (counts as ${weight})`:''}`,labelAttrs:{class:'creator-pack-item'},attrs:{'data-pack-item':option.name,checked,disabled:!checked&&pack.count+weight>pack.picks}});}).join('');
+      return UI.checkbox({label:`${option.name}${weight>1?` (counts as ${weight})`:''}${option.price?` · ${option.price}`:''}`,labelAttrs:{class:'creator-pack-item'},attrs:{'data-pack-item':option.name,checked,disabled:!checked&&pack.count+weight>pack.picks}});}).join('');
     return `<details class="creator-wide creator-pack"${pack.count<pack.picks?' open':''}><summary>Traveling Pack items <small class="creator-pack-count${full?'':' creator-pack-count-short'}">${pack.count}/${pack.picks}</small>${pack.items.length?` <span class="creator-pack-summary">${escapeHtml(pack.items.join(', '))}</span>`:''}</summary><p class="creator-rule">Choose any ${pack.picks} items found in your Traveling Pack (Core Rulebook p. 207).</p><div class="creator-pack-grid">${boxes}</div></details>`;
   }
   function renderEquipment(data) {

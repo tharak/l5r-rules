@@ -523,185 +523,303 @@
   "picks": 10,
   "options": [
    {
-    "name": "Basket"
+    "name": "Basket",
+    "item": "Baskets",
+    "price": "1 to 5 zeni"
    },
    {
-    "name": "Blacksmith’s hammer"
+    "name": "Blacksmith’s hammer",
+    "item": "Blacksmith’s Hammer",
+    "price": "3 bu"
    },
    {
-    "name": "Blanket"
+    "name": "Blanket",
+    "item": "Blanket",
+    "price": "1 bu"
    },
    {
-    "name": "Bottle of bleach/dye"
+    "name": "Bottle of bleach/dye",
+    "item": "Bottle of Bleach/Dye",
+    "price": "1 bu"
    },
    {
-    "name": "Bottle of sake"
+    "name": "Bottle of sake",
+    "item": "Bottle of Sake",
+    "price": "1 bu"
    },
    {
-    "name": "Bottle of shochu"
+    "name": "Bottle of shochu",
+    "item": "Bottle of Shochu",
+    "price": "2 bu"
    },
    {
-    "name": "Bottle of water"
+    "name": "Bottle of water",
+    "item": "Bottle, Empty",
+    "price": "1 zeni"
    },
    {
-    "name": "Bucket"
+    "name": "Bucket",
+    "item": "Bucket",
+    "price": "1 zeni"
    },
    {
-    "name": "Candles (6)"
+    "name": "Candles (6)",
+    "item": "Candle",
+    "price": "6 bu (1 bu each)"
    },
    {
-    "name": "Chopsticks"
+    "name": "Chopsticks",
+    "item": "Chopsticks",
+    "price": "1 zeni"
    },
    {
-    "name": "Coin purse"
+    "name": "Coin purse",
+    "item": "Coin Purse",
+    "price": "3 zeni"
    },
    {
-    "name": "Cooking pot"
+    "name": "Cooking pot",
+    "item": "Pot, Iron",
+    "price": "15 zeni"
    },
    {
-    "name": "Daisho stand"
+    "name": "Daisho stand",
+    "item": "Daisho Stand",
+    "price": "1 koku"
    },
    {
-    "name": "Divination kit (kawaru coins)"
+    "name": "Divination kit (kawaru coins)",
+    "item": "Divination Kit",
+    "price": "1 bu"
    },
    {
-    "name": "Divination kit (yarrow sticks)"
+    "name": "Divination kit (yarrow sticks)",
+    "item": "Divination Kit",
+    "price": "1 bu"
    },
    {
-    "name": "Fan"
+    "name": "Fan",
+    "item": "Fan, Courtier’s",
+    "price": "40 zeni and up"
    },
    {
-    "name": "Fishing net or pole"
+    "name": "Fishing net or pole",
+    "item": "Fishing Kit",
+    "price": "10 zeni"
    },
    {
-    "name": "Flint and tinder"
+    "name": "Flint and tinder",
+    "item": "Flint and Steel",
+    "price": "1 zeni"
    },
    {
-    "name": "Grapple hook"
+    "name": "Grapple hook",
+    "item": "Grapple Hook",
+    "price": "1 bu"
    },
    {
-    "name": "Incense brazier"
+    "name": "Incense brazier",
+    "item": "Brazier",
+    "price": "1 bu"
    },
    {
-    "name": "Ink brush kit"
+    "name": "Ink brush kit",
+    "item": "Writing Box",
+    "price": "1 bu"
    },
    {
-    "name": "Jewelry or accessory"
+    "name": "Jewelry or accessory",
+    "item": "Netsuke",
+    "price": "1 bu"
    },
    {
-    "name": "Lantern"
+    "name": "Lantern",
+    "item": "Lanterns",
+    "price": "1 bu (paper), 4 bu (metal)"
    },
    {
-    "name": "Lucky cricket (in cage)"
+    "name": "Lucky cricket (in cage)",
+    "item": "Lucky Cricket",
+    "price": "4 bu"
    },
    {
-    "name": "Makeup kit"
+    "name": "Makeup kit",
+    "item": "Makeup Kit",
+    "price": "1 koku"
    },
    {
-    "name": "Mask"
+    "name": "Mask",
+    "item": "Mask",
+    "price": "3 bu"
    },
    {
-    "name": "Miniature go or shogi set"
+    "name": "Miniature go or shogi set",
+    "item": "Games, Traveling",
+    "price": "1 bu and up"
    },
    {
-    "name": "Mortar and pestle"
+    "name": "Mortar and pestle",
+    "item": "Mortar & Pestle",
+    "price": "2 bu"
    },
    {
-    "name": "Musical instrument"
+    "name": "Musical instrument",
+    "item": "Musical Instruments",
+    "price": "1 to 5 bu"
    },
    {
-    "name": "Parchment and charcoal (10)"
+    "name": "Parchment and charcoal (10)",
+    "item": "Parchment & Charcoal",
+    "price": "3 zeni"
    },
    {
-    "name": "Perfume"
+    "name": "Perfume",
+    "item": "Perfume",
+    "price": "2 bu per small bottle"
    },
    {
-    "name": "Personal seal or chop"
+    "name": "Personal seal or chop",
+    "item": "Personal Seal or Chop",
+    "price": "4 bu"
    },
    {
     "name": "Pet (dog, cat, monkey, songbird)",
-    "counts": 2
+    "counts": 2,
+    "item": "Pet",
+    "price": "1 koku"
    },
    {
-    "name": "Pillow book"
+    "name": "Pillow book",
+    "item": "Pillow Book",
+    "price": "3 zeni to 1 koku"
    },
    {
-    "name": "Rope (50’)"
+    "name": "Rope (50’)",
+    "item": "Rope",
+    "price": "250 zeni (5 zeni per foot)"
    },
    {
-    "name": "Sake cup"
+    "name": "Sake cup",
+    "item": "Sake Cup",
+    "price": "1 bu"
    },
    {
-    "name": "Set of dice"
+    "name": "Set of dice",
+    "item": "Dice and Dice Cup",
+    "price": "25 zeni"
    },
    {
-    "name": "Shovel"
+    "name": "Shovel",
+    "item": "Shovel",
+    "price": "5 zeni"
    },
    {
-    "name": "Small back banner"
+    "name": "Small back banner",
+    "item": "Small Back Banner",
+    "price": "1 koku"
    },
    {
-    "name": "Small folding stool"
+    "name": "Small folding stool",
+    "item": "Small Folding Stool",
+    "price": "3 bu"
    },
    {
-    "name": "Small hand mirror"
+    "name": "Small hand mirror",
+    "item": "Mirrors",
+    "price": "3 bu to 2 koku"
    },
    {
-    "name": "Small knife (non-combat)"
+    "name": "Small knife (non-combat)",
+    "item": "Small Knife",
+    "price": "5 zeni"
    },
    {
-    "name": "Small statue"
+    "name": "Small statue",
+    "item": "Small Statue of Fortune/Ancestor",
+    "price": "1 koku"
    },
    {
-    "name": "Small tent"
+    "name": "Small tent",
+    "item": "Tent, Small",
+    "price": "1 koku"
    },
    {
-    "name": "Smoking pipe"
+    "name": "Smoking pipe",
+    "item": "Kiseru",
+    "price": "3 zeni"
    },
    {
-    "name": "Snowshoes"
+    "name": "Snowshoes",
+    "item": "Snow Shoes",
+    "price": "2 bu"
    },
    {
-    "name": "Spare kimono and sandals"
+    "name": "Spare kimono and sandals",
+    "item": "Kimono",
+    "price": "1 bu and up + 50 zeni"
    },
    {
-    "name": "Spices"
+    "name": "Spices",
+    "item": "Spices",
+    "price": "1 to 5 bu for small bottle"
    },
    {
     "name": "Straw cloak"
    },
    {
-    "name": "Sweets"
+    "name": "Sweets",
+    "item": "Sweets",
+    "price": "1 bu for 4 servings"
    },
    {
-    "name": "Tatami mat"
+    "name": "Tatami mat",
+    "item": "Tatami Mat",
+    "price": "2 zeni"
    },
    {
-    "name": "Tattoo needles"
+    "name": "Tattoo needles",
+    "item": "Tattoo Needles",
+    "price": "1 bu per set"
    },
    {
-    "name": "Tea set"
+    "name": "Tea set",
+    "item": "Tea Set",
+    "price": "1 koku"
    },
    {
-    "name": "Vial of paint"
+    "name": "Vial of paint",
+    "item": "War Paint, Vial",
+    "price": "3 bu"
    },
    {
-    "name": "Walking stick"
+    "name": "Walking stick",
+    "item": "Walking Stick",
+    "price": "1 zeni"
    },
    {
-    "name": "Week’s rations"
+    "name": "Week’s rations",
+    "item": "Traveling Rations",
+    "price": "5 zeni per meal"
    },
    {
-    "name": "Whetstone"
+    "name": "Whetstone",
+    "item": "Whetstone",
+    "price": "1 zeni"
    },
    {
-    "name": "Wicker umbrella"
+    "name": "Wicker umbrella",
+    "item": "Umbrella",
+    "price": "2 bu"
    },
    {
-    "name": "Wide-brimmed straw hat"
+    "name": "Wide-brimmed straw hat",
+    "item": "Wide-brimmed Straw Hat",
+    "price": "1 zeni"
    },
    {
-    "name": "Wig"
+    "name": "Wig",
+    "item": "Wig",
+    "price": "1 bu each"
    }
   ]
  }

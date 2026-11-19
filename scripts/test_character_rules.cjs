@@ -586,6 +586,7 @@ test('public flags default to private and older notes move once into a private j
 test('Core pp. 205-207: miscellaneous equipment is in the catalog; a Traveling Pack holds any ten listed items, a pet counting as two',()=>{
  assert.equal(C.item('Tea Set',catalog).price,'1 koku');assert.equal(C.item('Utaku War Horse',catalog).category,'Horses');assert.equal(C.item('Kimono',catalog).category,'Clothing & Accessories');
  assert.equal(catalog.travelingPack.picks,10);assert.equal(catalog.travelingPack.options.length,60);
+ for(const o of catalog.travelingPack.options)if(o.item)assert.ok(C.item(o.item,catalog),`${o.name} links to ${o.item}`);
  const s=starting();let d=calc(s);
  assert.ok(d.school.equipment.some(e=>/^traveling pack$/i.test(e.name)),'the Hida Bushi outfit has a Traveling Pack');
  assert.ok(d.travelingPack.present);assert.equal(d.travelingPack.count,0);

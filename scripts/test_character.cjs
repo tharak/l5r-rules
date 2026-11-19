@@ -967,7 +967,8 @@ test('the Traveling Pack offers its book list; ten picks, a pet as two; misc equ
   const c=await character();c.school('Crab','Hida Bushi');
   let html=sectionHtml(c,'equipment');
   assert.match(html,/creator-pack" open><summary>Traveling Pack items <small class="creator-pack-count creator-pack-count-short">0\/10<\/small>/);
-  assert.match(html,/data-pack-item="Pet \(dog, cat, monkey, songbird\)"[^>]*>Pet \(dog, cat, monkey, songbird\) \(counts as 2\)/);
+  assert.match(html,/data-pack-item="Pet \(dog, cat, monkey, songbird\)"[^>]*>Pet \(dog, cat, monkey, songbird\) \(counts as 2\) · 1 koku/);
+  assert.match(html,/>Candles \(6\) · 6 bu \(1 bu each\)</);assert.match(html,/>Smoking pipe · 3 zeni</);assert.match(html,/>Straw cloak</,'no book price, none shown');
   assert.match(html,/<option value="Tea Set"[^>]*>Tea Set · 1 koku<\/option>/);assert.match(html,/Clothing &amp; Accessories|Clothing & Accessories/);assert.match(html,/Utaku War Horse · 250 koku/);
   const names=(await c.data()).derived.travelingPack.options.map(o=>o.name).filter(n=>!n.startsWith('Pet'));
   for(const name of names.slice(0,8))c.change({packItem:name},'on',{checked:true});
