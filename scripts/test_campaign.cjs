@@ -425,6 +425,20 @@ test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes a
  assert.equal(`${pin.kind}:${pin.targetId}:${pin.noteId}`,'clans:Crab:clan_w','a clan note goes on the map');
  assert.match(render(),/timeline-pin timeline-pin-clans timeline-pin-note timeline-pin-movable has-clan" data-pin-id="[^"]+" style="[^"]*--clan:#4b6a88"/,'and its pin takes the clan\'s colour');
 });
+test('map: the Rokugan map is never loaded (it is the page background); the GM\'s map shows once loaded',async()=>{
+ const d=campaignCards();let finish,fail;const cache=new Map();
+ d.window.MediaLibrary={cachedSrc:id=>cache.get(id)||'',imageSrc:id=>new Promise((ok,no)=>{finish=()=>{cache.set(id,'data:image/webp;base64,AAAA');ok();};fail=no;})};
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm',mapId:'m1'});
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ let html=render();
+ assert.match(html,/timeline-map-loading/);assert.doesNotMatch(html,/rokugan-map/);
+ finish();await new Promise(r=>setTimeout(r));
+ html=render();assert.doesNotMatch(html,/timeline-map-loading|rokugan-map/);assert.match(html,/data-timeline-map><img src="[^"]*"/);
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm',mapId:'m2'});render();fail(new Error('gone'));await new Promise(r=>setTimeout(r));
+ html=render();assert.doesNotMatch(html,/rokugan-map|timeline-map-loading/);assert.match(html,/timeline-map timeline-map-blank" data-timeline-map>/,'a failed picture leaves the empty frame');
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});html=render();
+ assert.doesNotMatch(html,/rokugan-map/);assert.match(html,/timeline-map-blank" data-timeline-map>/,'no map chosen: the empty frame');
+});
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});

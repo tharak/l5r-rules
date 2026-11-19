@@ -482,7 +482,7 @@
     // Folding the groups reaches pins under the tray; a pin dropped on the tray is taken off the map.
     const tray = !groups ? '' : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}${groups}</div>`;
     const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
-    const map = `<div class="timeline-stage">${tray}${mapActions}<div class="timeline-map" data-timeline-map><img src="${e(UI.imageLink(mapSrc()))}" alt="Campaign map" draggable="false">${pinHtml}</div></div>`;
+    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapActions}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}${renderClanPopup(numbers,kids)}`;
   }
   // A clan's panel: its mon and name, who is in it, and its journal (any member adds entries).
@@ -498,15 +498,20 @@
     if (!note || !target) return '';
     return `<div class="timeline-popup-backdrop" data-campaign="note-popup-close"></div><div class="timeline-popup" role="dialog" aria-modal="true" aria-labelledby="timeline-popup-title" tabindex="-1"><header>${target.image ? `<img src="${UI.imageLink(target.image)}" alt="">` : ''}<div><h3 id="timeline-popup-title"><span class="creator-journal-number">#${note.number}</span> ${e(note.title)}</h3><small>${e(target.name)} · ${e(note.author)}${note.date ? ` · ${e(day(note.date))}` : ''}</small></div></header><p class="entry-text">${e(note.text)}</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:(note.kind === 'clans' ? button('clan-open','Open clan',note.targetId) : button('entry-open',`Open ${note.kind === 'pcs' ? 'PC' : 'NPC'}`,`${note.kind}:${note.targetId}`))+(pin && canMovePin(pin) ? button('pin-remove','Remove pin',pin.id) : '')+button('note-popup-close','Close')})}</div>`;
   }
-  // The campaign map: a media library picture the GM chose, else the map of Rokugan.
-  const loadingMaps = new Set();
+  // The campaign map: a media library picture the GM chose. Without one (or if it fails to load)
+  // the map is an empty frame the shape of the old Rokugan map, so the page's own Rokugan
+  // background shows through and pins keep their places. While the campaign or its picture
+  // loads, the frame shows "Loading map…" and no pins.
+  const loadingMaps = new Set(), failedMaps = new Set();
   function mapSrc() {
-    const id = store().get(`campaigns/${active}`)?.mapId;
-    if (!id || !window.MediaLibrary) return 'public/assets/rokugan-map.webp';
+    const campaign = store().get(`campaigns/${active}`);
+    if (!campaign) return {loading:true};
+    const id = campaign.mapId;
+    if (!id || !window.MediaLibrary || failedMaps.has(id)) return {};
     const src = window.MediaLibrary.cachedSrc(id);
-    if (src) return src;
-    if (!loadingMaps.has(id)) { loadingMaps.add(id); window.MediaLibrary.imageSrc(id).then(() => changed()).catch(() => {}); }
-    return 'public/assets/rokugan-map.webp';
+    if (src) return {src};
+    if (!loadingMaps.has(id)) { loadingMaps.add(id); window.MediaLibrary.imageSrc(id).then(() => changed()).catch(() => { failedMaps.add(id); changed(); }); }
+    return {loading:true};
   }
   // The full entry behind a timeline event, in an overlay dialog.
   // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).

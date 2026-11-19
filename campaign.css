@@ -76,6 +76,8 @@
 /* Timeline selectors float over the map's top-left corner. */
 .timeline-stage{position:relative;margin-top:10px}
 .timeline-stage .timeline-map{margin-top:0;isolation:isolate}
+.timeline-map-blank{aspect-ratio:1600/2320;background:transparent}
+.timeline-map-loading{display:grid;place-items:center;color:var(--muted)}
 .timeline-stage>.timeline-pin-controls{position:absolute;top:8px;left:8px;z-index:2;margin:0;max-width:min(440px,55%);max-height:calc(100% - 16px);overflow:auto;padding:8px;border:1px solid var(--line);border-radius:3px;background:#fffbf2ee;box-shadow:0 4px 14px #0003;cursor:default}
 @media(max-width:700px){.timeline-stage>.timeline-pin-controls{position:static;max-width:none;max-height:none;border-width:0 0 1px;border-radius:0;box-shadow:none}}
 /* The timeline map spans the whole window width. */
