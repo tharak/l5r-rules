@@ -382,11 +382,19 @@
 
   // The Traveling Pack's contents (Core p. 207): any ten items from its list, a pet counting as
   // two. Shown once, under the first Traveling Pack in the outfit.
+  // Prices in zeni (Core: 1 koku = 5 bu = 50 zeni, 1 bu = 10 zeni), for sorting: the first
+  // amount of each "+" part counts, so "1 to 5 bu" is 1 bu; no price sorts last.
+  const ZENI={koku:50,bu:10,zeni:1};
+  const priceInZeni=price=>{const parts=String(price||'').split('+').map(part=>part.match(/(\d+(?:\.\d+)?)\s*(?:to\s*\d+\s*|-\s*\d+\s*)?(koku|bu|zeni)/i)).filter(Boolean);
+    return parts.length?parts.reduce((sum,m)=>sum+Number(m[1])*ZENI[m[2].toLowerCase()],0):Infinity;};
+  let packSort=(()=>{try{return localStorage.getItem('l5r-rules-pack-sort')==='price'?'price':'name';}catch{return 'name';}})();
   function renderTravelingPack(pack) {
     const full=pack.count>=pack.picks;
-    const boxes=pack.options.map(option=>{const weight=option.counts || 1, checked=pack.items.includes(option.name);
+    const sorted=[...pack.options].sort(packSort==='price'?(a,b)=>priceInZeni(a.price)-priceInZeni(b.price)||a.name.localeCompare(b.name):(a,b)=>a.name.localeCompare(b.name));
+    const order=UI.field({label:'Order',kind:'select',attrs:{'data-pack-sort':true},optionsHtml:option('name','A–Z',packSort==='name')+option('price','Price, cheapest first',packSort==='price')});
+    const boxes=sorted.map(option=>{const weight=option.counts || 1, checked=pack.items.includes(option.name);
       return UI.checkbox({label:`${option.name}${weight>1?` (counts as ${weight})`:''}${option.price?` · ${option.price}`:''}`,labelAttrs:{class:'creator-pack-item'},attrs:{'data-pack-item':option.name,checked,disabled:!checked&&pack.count+weight>pack.picks}});}).join('');
-    return `<details class="creator-wide creator-pack"${pack.count<pack.picks?' open':''}><summary>Traveling Pack items <small class="creator-pack-count${full?'':' creator-pack-count-short'}">${pack.count}/${pack.picks}</small>${pack.items.length?` <span class="creator-pack-summary">${escapeHtml(pack.items.join(', '))}</span>`:''}</summary><p class="creator-rule">Choose any ${pack.picks} items found in your Traveling Pack (Core Rulebook p. 207).</p><div class="creator-pack-grid">${boxes}</div></details>`;
+    return `<details class="creator-wide creator-pack"${pack.count<pack.picks?' open':''}><summary>Traveling Pack items <small class="creator-pack-count${full?'':' creator-pack-count-short'}">${pack.count}/${pack.picks}</small>${pack.items.length?` <span class="creator-pack-summary">${escapeHtml(pack.items.join(', '))}</span>`:''}</summary><div class="creator-pack-head"><p class="creator-rule">Choose any ${pack.picks} items found in your Traveling Pack (Core Rulebook p. 207).</p>${order}</div><div class="creator-pack-grid">${boxes}</div></details>`;
   }
   function renderEquipment(data) {
     const firstPack = data.travelingPack?.present ? data.equipment.find(entry => /^travell?ing pack$/i.test(String(entry.name).trim())) : null;
@@ -1193,6 +1201,10 @@
     }
     else if (event.target.dataset.choiceIndex !== undefined) sheet.schoolChoices[Number(event.target.dataset.choiceIndex)] = event.target.value.trim();
     else if (event.target.dataset.equipmentChoice !== undefined) sheet.equipmentChoices[Number(event.target.dataset.equipmentChoice)] = event.target.value.trim();
+    else if (event.target.dataset.packSort !== undefined) {
+      packSort=event.target.value==='price'?'price':'name';try{localStorage.setItem('l5r-rules-pack-sort',packSort);}catch{}
+      render();return;
+    }
     else if (event.target.dataset.packItem !== undefined) {
       const name=event.target.dataset.packItem, chosen=(sheet.travelingPack||[]).filter(item=>item!==name);
       sheet.travelingPack=event.target.checked?[...chosen,name]:chosen;

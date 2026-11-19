@@ -979,6 +979,12 @@ test('the Traveling Pack offers its book list; ten picks, a pet as two; misc equ
   assert.match(html,new RegExp(`data-pack-item="${names[9]}" disabled`),'a full pack disables the rest');
   c.change({packItem:names[0]},'on',{checked:false});
   assert.equal((await c.data()).derived.travelingPack.count,9);
+  html=sectionHtml(c,'equipment');assert.ok(html.indexOf('>Basket ·')<html.indexOf('>Wig ·'),'A–Z by default');
+  c.change({packSort:''},'price');html=sectionHtml(c,'equipment');
+  assert.match(html,/<option value="price" selected/);
+  const at=name=>html.indexOf(`data-pack-item="${name}"`);
+  assert.ok(at('Bucket')<at('Coin purse')&&at('Coin purse')<at('Blanket')&&at('Blanket')<at('Tea set')&&at('Tea set')<at('Candles (6)')&&at('Candles (6)')<at('Straw cloak'),'cheapest first (zeni < bu < koku), no price last');
+  c.change({packSort:''},'name');
   c.inputs['#new-equipment']={value:'Tea Set'};c.click({action:'add-equipment'});
   assert.match(sectionHtml(c,'equipment'),/<strong>Tea Set<\/strong><small>Personal equipment · 1 koku<\/small>/);
 });
