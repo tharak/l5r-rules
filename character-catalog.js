@@ -93,7 +93,7 @@
   const schools = catalog => catalog.clans.flatMap(clan => clan.schools);
   const school = (id,catalog) => [...schools(catalog), ...(catalog.training || [])].find(s => `${s.slug}#${s.anchor}` === id);
   const ability = (id,catalog) => catalog.abilities?.find(a => a.id === id);
-  const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
+  const item = (value,catalog) => [...(catalog.weapons || []),...(catalog.armors || []),...(catalog.items || [])].find(a => a.id === value || a.name.toLowerCase() === String(value).toLowerCase());
   // Clan mons live in public/assets/clans/<source>/<clan>.webp (sources in ATTRIBUTION.md).
   // A clan uses the highest-priority source that has its mon: the official site, then
   // l5r.wiki, then Shin-Ian's mandala, then l5r.fandom.com. Add a file to a source by

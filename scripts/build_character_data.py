@@ -531,6 +531,12 @@ for kind, entries in [('weapon',weapons),('armor',armors)]:
         entry.update(id=f"{kind}:{entry['name']}", kind=kind, slug='equipment')
         if kind == 'armor': entry['tn'] = entry['tn'][0] if isinstance(entry['tn'],list) else entry['tn']
 
+# Core Rulebook pp. 205-207: miscellaneous equipment, clothing, horses and the Traveling Pack's
+# ten picks, transcribed in scripts/core_misc_equipment.json (the wiki has only weapons and armor).
+misc = json.loads((ROOT/'scripts/core_misc_equipment.json').read_text(encoding='utf-8'))
+items = [{**entry, 'id': f"item:{entry['name']}", 'kind': 'item', 'slug': 'equipment'} for entry in misc['items']]
+traveling_pack = misc['travelingPack']
+
 abilities = []
 for slug in ['universal-spells','air-spells','earth-spells','fire-spells','water-spells','void-spells','multi-elemental-spells','maho','dragon-spells']:
     abilities += powers_for(slug, 'spell')
@@ -545,6 +551,7 @@ for ability in abilities:
                 holder['schools'] = holder['schools'].replace('Daidoji Bushi', 'Daidoji Iron Warrior')
 result = {'version': 2, 'clans': clans, 'skills': skills, 'advantages': advantages,
           'disadvantages': disadvantages, 'ancestors': inline_for('ancestors','ancestor'),
-          'abilities': abilities, 'training': training, 'weapons': weapons, 'armors': armors}
+          'abilities': abilities, 'training': training, 'weapons': weapons, 'armors': armors,
+          'items': items, 'travelingPack': traveling_pack}
 (ROOT/'public/character-data.json').write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
 print(f"{len(clans)} clans, {sum(len(c['schools']) for c in clans)} starting schools, {len(training)} paths/advanced schools, {len(abilities)} abilities")

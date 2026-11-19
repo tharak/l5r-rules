@@ -583,3 +583,18 @@ test('public flags default to private and older notes move once into a private j
  const kept=R.normalize({journal:[{id:'a',text:'Hello',createdAt:'2026-11-01',public:true},{id:'bad id!',text:'x'},{id:'b'}]});
  assert.deepEqual(plain(kept.journal),[{id:'a',title:'',text:'Hello',createdAt:'2026-11-01',updatedAt:'2026-11-01',public:true}]);
 });
+test('Core pp. 205-207: miscellaneous equipment is in the catalog; a Traveling Pack holds any ten listed items, a pet counting as two',()=>{
+ assert.equal(C.item('Tea Set',catalog).price,'1 koku');assert.equal(C.item('Utaku War Horse',catalog).category,'Horses');assert.equal(C.item('Kimono',catalog).category,'Clothing & Accessories');
+ assert.equal(catalog.travelingPack.picks,10);assert.equal(catalog.travelingPack.options.length,60);
+ const s=starting();let d=calc(s);
+ assert.ok(d.school.equipment.some(e=>/^traveling pack$/i.test(e.name)),'the Hida Bushi outfit has a Traveling Pack');
+ assert.ok(d.travelingPack.present);assert.equal(d.travelingPack.count,0);
+ const packIssue=d=>d.violations.find(i=>i.code==='equipment:traveling-pack');
+ assert.match(packIssue(d).message,/Choose 10 Traveling Pack items \(0\/10\)/);
+ const names=catalog.travelingPack.options.map(o=>o.name).filter(n=>!n.startsWith('Pet'));
+ d=calc(change(s,x=>{x.travelingPack=[...names.slice(0,8),'Pet (dog, cat, monkey, songbird)','Not on the list',names[0]];}));
+ assert.equal(d.travelingPack.count,10,'eight items, a pet as two; duplicates and unknown items do not count');assert.equal(packIssue(d),undefined);
+ d=calc(change(s,x=>{x.travelingPack=names.slice(0,11);}));assert.match(packIssue(d).message,/\(11\/10\)/);
+ assert.equal(R.resetSection({...s,travelingPack:names.slice(0,3)},'story',catalog).travelingPack.length,0,'resetting Story & equipment empties the pack');
+ d=calc(change(s,x=>{x.school='';x.equipment=[{id:'p',name:'Traveling Pack'}];}));assert.ok(d.travelingPack.present,'a personal Traveling Pack also asks for its items');
+});

@@ -32,7 +32,7 @@ async function character(saved,preferences = {}) {
   for (const file of ['ui-components.js','routes.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
-  const change = (dataset,value) => root.onchange({target:{dataset,value}});
+  const change = (dataset,value,extra={}) => root.onchange({target:{dataset,value,...extra}});
   const click = dataset => root.onclick({target:{closest:() => ({dataset})}});
   return {
     root, inputs, change, click, window, document, context,
@@ -961,6 +961,25 @@ test('specific choice is shown only for parameterized options and variants',asyn
   assert.match(html,/Specific choice for Ally/);
   assert.match(html,/Specific choice for Consumed/);
   assert.equal((await (await c.reload()).data()).character.advantages[0].selection,'Legacy detail');
+});
+
+test('the Traveling Pack offers its book list; ten picks, a pet as two; misc equipment is in the Add picker with prices',async()=>{
+  const c=await character();c.school('Crab','Hida Bushi');
+  let html=sectionHtml(c,'equipment');
+  assert.match(html,/creator-pack" open><summary>Traveling Pack items <small class="creator-pack-count creator-pack-count-short">0\/10<\/small>/);
+  assert.match(html,/data-pack-item="Pet \(dog, cat, monkey, songbird\)"[^>]*>Pet \(dog, cat, monkey, songbird\) \(counts as 2\)/);
+  assert.match(html,/<option value="Tea Set"[^>]*>Tea Set · 1 koku<\/option>/);assert.match(html,/Clothing &amp; Accessories|Clothing & Accessories/);assert.match(html,/Utaku War Horse · 250 koku/);
+  const names=(await c.data()).derived.travelingPack.options.map(o=>o.name).filter(n=>!n.startsWith('Pet'));
+  for(const name of names.slice(0,8))c.change({packItem:name},'on',{checked:true});
+  c.change({packItem:'Pet (dog, cat, monkey, songbird)'},'on',{checked:true});
+  let d=(await c.data()).derived;assert.equal(d.travelingPack.count,10);assert.ok(!d.violations.some(v=>v.code==='equipment:traveling-pack'));
+  html=sectionHtml(c,'equipment');
+  assert.match(html,/creator-pack"><summary>Traveling Pack items <small class="creator-pack-count">10\/10<\/small> <span class="creator-pack-summary">Basket, /,'full: folded, with the list in the summary');
+  assert.match(html,new RegExp(`data-pack-item="${names[9]}" disabled`),'a full pack disables the rest');
+  c.change({packItem:names[0]},'on',{checked:false});
+  assert.equal((await c.data()).derived.travelingPack.count,9);
+  c.inputs['#new-equipment']={value:'Tea Set'};c.click({action:'add-equipment'});
+  assert.match(sectionHtml(c,'equipment'),/<strong>Tea Set<\/strong><small>Personal equipment · 1 koku<\/small>/);
 });
 
 test('separate equipment list preserves saved gear and money without equipped controls',async()=>{

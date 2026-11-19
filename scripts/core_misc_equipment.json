@@ -1,0 +1,708 @@
+{
+ "source": "Legend of the Five Rings 4th Edition Core Rulebook, Book of Fire, pp. 205-207 (Miscellaneous Equipment, Horses, Clothing & Accessories, The Traveling Pack)",
+ "items": [
+  {
+   "name": "Backpack",
+   "category": "Miscellaneous",
+   "description": "Rokugani backpacks are built upon wicker frames, making them fairly rigid.",
+   "price": "3 zeni"
+  },
+  {
+   "name": "Ball, Kemari",
+   "category": "Miscellaneous",
+   "description": "A leather ball used to play kemari, a popular game.",
+   "price": "5 zeni"
+  },
+  {
+   "name": "Baskets",
+   "category": "Miscellaneous",
+   "description": "The most common container, crafted from wicker. Sometimes worn as hats.",
+   "price": "1 to 5 zeni"
+  },
+  {
+   "name": "Blacksmith’s Hammer",
+   "category": "Miscellaneous",
+   "description": "Necessary for an armorer or weaponsmith to craft.",
+   "price": "3 bu"
+  },
+  {
+   "name": "Blanket",
+   "category": "Miscellaneous",
+   "description": "A coarse blanket appropriate for travel, often used stacked for warmth.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Bottle of Bleach/Dye",
+   "category": "Miscellaneous",
+   "description": "Used primarily for clothes-making and hair coloration.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Bottle of Sake",
+   "category": "Miscellaneous",
+   "description": "Rice wine, a very popular beverage among bushi.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Bottle of Shochu",
+   "category": "Miscellaneous",
+   "description": "A very strong, distilled alcoholic beverage.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Bottle, Empty",
+   "category": "Miscellaneous",
+   "description": "Clay or occasionally imported glass, used for storing liquids for travel.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Books and Scrolls",
+   "category": "Miscellaneous",
+   "description": "Sturdy records used for journals and recording new information.",
+   "price": "1-10 bu"
+  },
+  {
+   "name": "Bowyer’s Kit",
+   "category": "Miscellaneous",
+   "description": "Used for maintenance of bow and arrows.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Brazier",
+   "category": "Miscellaneous",
+   "description": "Vessel for holding burning substances or for heating liquids.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Bucket",
+   "category": "Miscellaneous",
+   "description": "A metal vessel with a handle, primarily for toting water.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Candle",
+   "category": "Miscellaneous",
+   "description": "A simple, hand-dipped candle.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Chest",
+   "category": "Miscellaneous",
+   "description": "Wooden chest with a lock for storing precious items.",
+   "price": "2 bu (wood), 8 bu (metal)"
+  },
+  {
+   "name": "Chopsticks",
+   "category": "Miscellaneous",
+   "description": "Eating utensils.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Cloth, Silk Bolt",
+   "category": "Miscellaneous",
+   "description": "Used for mending, protective wrapping, etc.",
+   "price": "2 koku"
+  },
+  {
+   "name": "Coin Purse",
+   "category": "Miscellaneous",
+   "description": "A small, easily concealed bag.",
+   "price": "3 zeni"
+  },
+  {
+   "name": "Daisho Stand",
+   "category": "Miscellaneous",
+   "description": "Easily disassembled and carried, this is a stand for displaying one’s daisho and tanto.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Dice and Dice Cup",
+   "category": "Miscellaneous",
+   "description": "Used primarily for gambling.",
+   "price": "25 zeni"
+  },
+  {
+   "name": "Divination Kit",
+   "category": "Miscellaneous",
+   "description": "Sets of coins or carved sticks used for divining.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Finger of Jade",
+   "category": "Miscellaneous",
+   "description": "Rare, and used to ward off the Shadowlands.",
+   "price": "1 koku if it can be found at all"
+  },
+  {
+   "name": "Fishing Kit",
+   "category": "Miscellaneous",
+   "description": "Consists of a hook, strong string, a small net, and a cleaning knife.",
+   "price": "10 zeni"
+  },
+  {
+   "name": "Flint and Steel",
+   "category": "Miscellaneous",
+   "description": "Useful for creating sparks and lighting fires.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Furoshiki Sack",
+   "category": "Miscellaneous",
+   "description": "A sturdy silken bag with a drawstring.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Games, Traveling",
+   "category": "Miscellaneous",
+   "description": "Small sets of go, shogi, or other games.",
+   "price": "1 bu and up"
+  },
+  {
+   "name": "Grapple Hook",
+   "category": "Miscellaneous",
+   "description": "An iron hook meant to be attached to a rope for climbing.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Kiseru",
+   "category": "Miscellaneous",
+   "description": "A simple smoking pipe.",
+   "price": "3 zeni"
+  },
+  {
+   "name": "Kubi Bukuro",
+   "category": "Miscellaneous",
+   "description": "A net bag for holding and displaying the severed head of an enemy.",
+   "price": "2 zeni"
+  },
+  {
+   "name": "Lanterns",
+   "category": "Miscellaneous",
+   "description": "Used for decoration and illumination.",
+   "price": "1 bu (paper), 4 bu (metal)"
+  },
+  {
+   "name": "Lantern Oil",
+   "category": "Miscellaneous",
+   "description": "A flask with two hours of oil.",
+   "price": "3 zeni per flask"
+  },
+  {
+   "name": "Lucky Cricket",
+   "category": "Miscellaneous",
+   "description": "A small cricket in a cage.",
+   "price": "4 bu"
+  },
+  {
+   "name": "Medicine Kit",
+   "category": "Miscellaneous",
+   "description": "Needle and thread, cloth bandages, herbal disinfectants (10 uses).",
+   "price": "1 bu and up"
+  },
+  {
+   "name": "Mirrors",
+   "category": "Miscellaneous",
+   "description": "Glass or metal, polished to a high sheen.",
+   "price": "3 bu to 2 koku"
+  },
+  {
+   "name": "Mortar & Pestle",
+   "category": "Miscellaneous",
+   "description": "Used to grind and mix ingredients.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Musical Instruments",
+   "category": "Miscellaneous",
+   "description": "Common samples include the samisen, biwa, flute, and drum.",
+   "price": "1 to 5 bu"
+  },
+  {
+   "name": "Palanquin",
+   "category": "Miscellaneous",
+   "description": "Elaborate personal carriage, carried by servants.",
+   "price": "10 koku"
+  },
+  {
+   "name": "Paper",
+   "category": "Miscellaneous",
+   "description": "Ideal for writing for scrolls or “books.”",
+   "price": "1 bu per 5 sheets"
+  },
+  {
+   "name": "Parchment & Charcoal",
+   "category": "Miscellaneous",
+   "description": "Cheaper alternative to brush and ink.",
+   "price": "3 zeni for 10 of each"
+  },
+  {
+   "name": "Personal Seal or Chop",
+   "category": "Miscellaneous",
+   "description": "Used to sign formal documents and verify identities.",
+   "price": "4 bu"
+  },
+  {
+   "name": "Pet",
+   "category": "Miscellaneous",
+   "description": "Dog, cat, songbird, monkey, or others. Incapable of combat.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Pillow Book",
+   "category": "Miscellaneous",
+   "description": "Small, loosely bound book about romance, adventure, or poetry.",
+   "price": "3 zeni to 1 koku"
+  },
+  {
+   "name": "Pot, Iron",
+   "category": "Miscellaneous",
+   "description": "Used for cooking while traveling.",
+   "price": "15 zeni"
+  },
+  {
+   "name": "Quiver",
+   "category": "Miscellaneous",
+   "description": "Cloth satchel for arrows (holds up to 60).",
+   "price": "20 zeni"
+  },
+  {
+   "name": "Rope",
+   "category": "Miscellaneous",
+   "description": "Varying quality made of hemp, hair, or silk.",
+   "price": "5 zeni per foot of reasonable quality rope"
+  },
+  {
+   "name": "Sake Cup",
+   "category": "Miscellaneous",
+   "description": "Guests often bring their own cup to events.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Shovel",
+   "category": "Miscellaneous",
+   "description": "A simple digging tool.",
+   "price": "5 zeni"
+  },
+  {
+   "name": "Small Back Banner",
+   "category": "Miscellaneous",
+   "description": "Identify name, rank, family, and Clan.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Small Folding Stool",
+   "category": "Miscellaneous",
+   "description": "Carried by soldiers to conserve strength.",
+   "price": "3 bu"
+  },
+  {
+   "name": "Small Knife",
+   "category": "Miscellaneous",
+   "description": "Used for carving or personal grooming.",
+   "price": "5 zeni"
+  },
+  {
+   "name": "Small Painting or Sculpture",
+   "category": "Miscellaneous",
+   "description": "Carried for sentiment or gifts.",
+   "price": "3 bu"
+  },
+  {
+   "name": "Small Statue of Fortune/Ancestor",
+   "category": "Miscellaneous",
+   "description": "Carried for sentimental reasons or luck.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Spices",
+   "category": "Miscellaneous",
+   "description": "Used to add flavor to food while traveling, or for barter.",
+   "price": "1 to 5 bu for small bottle"
+  },
+  {
+   "name": "Sweets",
+   "category": "Miscellaneous",
+   "description": "Popular snacks include small cakes, candies, buns, or honeyed rice.",
+   "price": "1 bu for 4 servings"
+  },
+  {
+   "name": "Tatami Mat",
+   "category": "Miscellaneous",
+   "description": "Used for sitting or sleeping on the ground or floor.",
+   "price": "2 zeni"
+  },
+  {
+   "name": "Tattoo Needles",
+   "category": "Miscellaneous",
+   "description": "Made of steel or bamboo.",
+   "price": "1 bu per set"
+  },
+  {
+   "name": "Tea Set",
+   "category": "Miscellaneous",
+   "description": "Necessary to perform the sacred tea ceremony.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Tent, Chomchog",
+   "category": "Miscellaneous",
+   "description": "A large and elaborate tent favored by the Unicorn.",
+   "price": "20 koku"
+  },
+  {
+   "name": "Tent, Small",
+   "category": "Miscellaneous",
+   "description": "Suitable for two people.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Tent, Yurt",
+   "category": "Miscellaneous",
+   "description": "Smaller than the chomchog but still larger than average, favored by the Unicorn.",
+   "price": "10 koku"
+  },
+  {
+   "name": "Traveling Rations",
+   "category": "Miscellaneous",
+   "description": "Dried rice or fish, wrapped in paper.",
+   "price": "5 zeni per meal"
+  },
+  {
+   "name": "Umbrella",
+   "category": "Miscellaneous",
+   "description": "Made of wicker and silk to hold off the elements.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Walking Stick",
+   "category": "Miscellaneous",
+   "description": "A simple cane to aid in walking. Not suitable for a weapon.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Whetstone",
+   "category": "Miscellaneous",
+   "description": "Used to sharpen weapons, but not the katana or wakizashi.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "Writing Box",
+   "category": "Miscellaneous",
+   "description": "The sumi-e box, contains brushes, ink stones, a water bowl, and sand.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Cap, Courtier’s",
+   "category": "Clothing & Accessories",
+   "description": "Peaked cap popular among courtiers and bureaucrats.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Fan, Courtier’s",
+   "category": "Clothing & Accessories",
+   "description": "Paper fan with customized patterns.",
+   "price": "40 zeni and up"
+  },
+  {
+   "name": "Hakama",
+   "category": "Clothing & Accessories",
+   "description": "Knee-length trousers.",
+   "price": "75 zeni"
+  },
+  {
+   "name": "Haori",
+   "category": "Clothing & Accessories",
+   "description": "Jacket-like garment worn over a kimono.",
+   "price": "25 zeni"
+  },
+  {
+   "name": "Kataginu",
+   "category": "Clothing & Accessories",
+   "description": "Vest-like garment worn over kimono to emphasize shoulders.",
+   "price": "40 zeni"
+  },
+  {
+   "name": "Kimono",
+   "category": "Clothing & Accessories",
+   "description": "The basic robe worn by all samurai. Comes with belt/sash (obi).",
+   "price": "1 bu and up"
+  },
+  {
+   "name": "Makeup Kit",
+   "category": "Clothing & Accessories",
+   "description": "Face powders and paints.",
+   "price": "1 koku"
+  },
+  {
+   "name": "Mask",
+   "category": "Clothing & Accessories",
+   "description": "Vary from silk to metal (mempo). Often intricately patterned.",
+   "price": "3 bu"
+  },
+  {
+   "name": "Netsuke",
+   "category": "Clothing & Accessories",
+   "description": "Jewelry such as earring, ring, bracelet, etc.",
+   "price": "1 bu"
+  },
+  {
+   "name": "Obi Pouch",
+   "category": "Clothing & Accessories",
+   "description": "A small pouch that fastens to the belt.",
+   "price": "25 zeni"
+  },
+  {
+   "name": "Perfume",
+   "category": "Clothing & Accessories",
+   "description": "Made from various herbs and common substances.",
+   "price": "2 bu per small bottle"
+  },
+  {
+   "name": "Sandals",
+   "category": "Clothing & Accessories",
+   "description": "The simplest and most common form of footwear.",
+   "price": "50 zeni"
+  },
+  {
+   "name": "Snow Shoes",
+   "category": "Clothing & Accessories",
+   "description": "Wide-framed shoes to prevent sinking in the snow.",
+   "price": "2 bu"
+  },
+  {
+   "name": "Traveling Cloak",
+   "category": "Clothing & Accessories",
+   "description": "Thick coat worn over clothes while traveling.",
+   "price": "75 zeni"
+  },
+  {
+   "name": "Wide-brimmed Straw Hat",
+   "category": "Clothing & Accessories",
+   "description": "Used for protecting the face from the sun.",
+   "price": "1 zeni"
+  },
+  {
+   "name": "War Paint, Vial",
+   "category": "Clothing & Accessories",
+   "description": "Popular among Crab, Unicorn, and Lion warriors.",
+   "price": "3 bu"
+  },
+  {
+   "name": "Wig",
+   "category": "Clothing & Accessories",
+   "description": "Used for disguise or to gain attention in court.",
+   "price": "1 bu each"
+  },
+  {
+   "name": "Rokugani Pony",
+   "category": "Horses",
+   "description": "All horses require roughly a koku of upkeep per month in terms of feeding, stabling, etc. Rules and abilities for horses are provided in the Book of Void.",
+   "price": "25 koku"
+  },
+  {
+   "name": "Gaijin Riding Horse",
+   "category": "Horses",
+   "description": "All horses require roughly a koku of upkeep per month in terms of feeding, stabling, etc. Rules and abilities for horses are provided in the Book of Void.",
+   "price": "75 koku"
+  },
+  {
+   "name": "Utaku War Horse",
+   "category": "Horses",
+   "description": "This is a minimum, and possession of one of these horses by an outsider is usually considered an affront to the honor of the Unicorn Clan, most likely resulting in duels. All horses require roughly a koku of upkeep per month.",
+   "price": "250 koku"
+  },
+  {
+   "name": "Traveling Pack",
+   "category": "Miscellaneous",
+   "description": "A traveling bag, often called a furoshiki, filled with various items the individual might be interested in. When creating a character, select any ten of the listed items that are found within the Traveling Pack.",
+   "price": ""
+  }
+ ],
+ "travelingPack": {
+  "source": "Legend of the Five Rings 4th Edition Core Rulebook, Book of Fire, p. 207",
+  "picks": 10,
+  "options": [
+   {
+    "name": "Basket"
+   },
+   {
+    "name": "Blacksmith’s hammer"
+   },
+   {
+    "name": "Blanket"
+   },
+   {
+    "name": "Bottle of bleach/dye"
+   },
+   {
+    "name": "Bottle of sake"
+   },
+   {
+    "name": "Bottle of shochu"
+   },
+   {
+    "name": "Bottle of water"
+   },
+   {
+    "name": "Bucket"
+   },
+   {
+    "name": "Candles (6)"
+   },
+   {
+    "name": "Chopsticks"
+   },
+   {
+    "name": "Coin purse"
+   },
+   {
+    "name": "Cooking pot"
+   },
+   {
+    "name": "Daisho stand"
+   },
+   {
+    "name": "Divination kit (kawaru coins)"
+   },
+   {
+    "name": "Divination kit (yarrow sticks)"
+   },
+   {
+    "name": "Fan"
+   },
+   {
+    "name": "Fishing net or pole"
+   },
+   {
+    "name": "Flint and tinder"
+   },
+   {
+    "name": "Grapple hook"
+   },
+   {
+    "name": "Incense brazier"
+   },
+   {
+    "name": "Ink brush kit"
+   },
+   {
+    "name": "Jewelry or accessory"
+   },
+   {
+    "name": "Lantern"
+   },
+   {
+    "name": "Lucky cricket (in cage)"
+   },
+   {
+    "name": "Makeup kit"
+   },
+   {
+    "name": "Mask"
+   },
+   {
+    "name": "Miniature go or shogi set"
+   },
+   {
+    "name": "Mortar and pestle"
+   },
+   {
+    "name": "Musical instrument"
+   },
+   {
+    "name": "Parchment and charcoal (10)"
+   },
+   {
+    "name": "Perfume"
+   },
+   {
+    "name": "Personal seal or chop"
+   },
+   {
+    "name": "Pet (dog, cat, monkey, songbird)",
+    "counts": 2
+   },
+   {
+    "name": "Pillow book"
+   },
+   {
+    "name": "Rope (50’)"
+   },
+   {
+    "name": "Sake cup"
+   },
+   {
+    "name": "Set of dice"
+   },
+   {
+    "name": "Shovel"
+   },
+   {
+    "name": "Small back banner"
+   },
+   {
+    "name": "Small folding stool"
+   },
+   {
+    "name": "Small hand mirror"
+   },
+   {
+    "name": "Small knife (non-combat)"
+   },
+   {
+    "name": "Small statue"
+   },
+   {
+    "name": "Small tent"
+   },
+   {
+    "name": "Smoking pipe"
+   },
+   {
+    "name": "Snowshoes"
+   },
+   {
+    "name": "Spare kimono and sandals"
+   },
+   {
+    "name": "Spices"
+   },
+   {
+    "name": "Straw cloak"
+   },
+   {
+    "name": "Sweets"
+   },
+   {
+    "name": "Tatami mat"
+   },
+   {
+    "name": "Tattoo needles"
+   },
+   {
+    "name": "Tea set"
+   },
+   {
+    "name": "Vial of paint"
+   },
+   {
+    "name": "Walking stick"
+   },
+   {
+    "name": "Week’s rations"
+   },
+   {
+    "name": "Whetstone"
+   },
+   {
+    "name": "Wicker umbrella"
+   },
+   {
+    "name": "Wide-brimmed straw hat"
+   },
+   {
+    "name": "Wig"
+   }
+  ]
+ }
+}

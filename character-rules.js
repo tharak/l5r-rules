@@ -31,7 +31,7 @@
     s.startingXP = integer(input.startingXP ?? input.progression?.baseline?.startingXP ?? 40);
     for (const key of ['name','clan','family','familyTrait','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
     for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions']) s[key] = {...input[key]};
-    for (const key of ['schoolChoices','equipmentChoices','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
+    for (const key of ['schoolChoices','equipmentChoices','travelingPack','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
     // The old per-section visibility map is replaced by per-item Public flags.
     delete s.visibility;
     s.status = input.status ?? (['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1); s.glory = input.glory ?? 1; s.honor = input.honor ?? null; s.taint = input.taint ?? 0; s.woundsTaken=integer(input.woundsTaken);
@@ -298,6 +298,8 @@
     const trained=(pattern,rank=1)=>d.techniques.some(t=>pattern.test(t.school) && (t.rank || 1)===rank);
     const outfit=(school?.equipment || []).map((e,i)=>({name:e.choice?s.equipmentChoices[i]?.trim() || e.name:e.name,source:'school',choice:e.choice,pending:e.choice&&!s.equipmentChoices[i]?.trim(),index:i,key:`school:${i}`}));
     d.equipment=[...outfit,...s.equipment.map((e,i)=>({...e,source:'personal',index:i,key:e.id}))].map(e=>({...e,item:C.item(e.catalogId || e.name,catalog),equipped:!!s.equipped[e.key]}));
+    // Core p. 207: a Traveling Pack holds any ten items from its list (a pet counts as two).
+    d.travelingPack=travelingPack(s,d.equipment,catalog);
     // Daisho is two weapons, rather than an opaque equipment string.
     for(const e of [...d.equipment])if(/^daisho$/i.test(e.name))for(const name of ['Katana','Wakizashi'])d.equipment.push({...e,name,key:`${e.key}:${name}`,item:C.item(name,catalog),equipped:!!s.equipped[`${e.key}:${name}`]});
     d.money=s.money || school?.money || {};
@@ -393,6 +395,7 @@
       if(d.skillChoiceErrors[i])issue(`school-choice:${i}`,d.skillChoiceErrors[i]);
     }
     for(const e of d.equipment)if(e.pending)issue(`equipment:${e.key}`,`Choose equipment: ${e.name}.`);
+    if(d.travelingPack.present && d.travelingPack.count!==d.travelingPack.picks)issue('equipment:traveling-pack',`Choose ${d.travelingPack.picks} Traveling Pack items (${d.travelingPack.count}/${d.travelingPack.picks}).`);
     if(armor.length>1)issue('armor','Equip only one suit of armor.');
     for(const [key,a] of Object.entries(s.equipped))if(a && key!=='arrow' && !d.equipment.some(e=>e.key===key))issue(`equipment-missing:${key}`,'An equipped item is no longer in your outfit.');
     const counts={kiho:0,tattoo:0,spell:0},spellCounts={};
@@ -493,6 +496,14 @@
     s.progression.history.push({id:`award-${Date.now()}-${s.progression.history.length}`,at:new Date().toISOString(),kind:'award',amount:number(amount),label:'XP award / correction',explanation:String(explanation).trim()});
     return s;
   }
+  // The Traveling Pack (Core p. 207): whether the outfit has one, the chosen items still on its
+  // list (each once), and how many picks they use.
+  const PACK_NAME=/^travell?ing pack$/i;
+  function travelingPack(s,equipment,catalog) {
+    const rule=catalog?.travelingPack || {picks:10,options:[]}, options=new Map((rule.options || []).map(o=>[o.name,o.counts || 1]));
+    const items=[...new Set((s.travelingPack || []).filter(name=>options.has(name)))];
+    return {present:equipment.some(e=>PACK_NAME.test(String(e.name || '').trim())),picks:rule.picks || 10,options:rule.options || [],items,count:items.reduce((sum,name)=>sum+options.get(name),0)};
+  }
   function resetSection(input,section,catalog) {
     const s=normalize(input);
     const exceptionPrefixes={identity:['name','clan','family','school','different-school','imperial','training','affinity','second-deficiency','chosen-art','weapon-focus','fudoist-choice','kiho-element'],traits:['rank:trait:'],skills:['rank:skill:','skill-subtype:','emphases:','school-choice:'],options:['advantages','disadvantages','size','multiple-schools','option-choice:','ancestor:','cost:','shinmaki-grant'],abilities:['ability:','kiho-grants','kiho-purchases','kiho-mystical','tattoo-grants','spell-grants','spell-elements','spell-wards'],story:['equipment:','equipment-missing:','armor','modifiers'],summary:['xp','modifiers']};
@@ -506,7 +517,7 @@
       Object.assign(s,{advantages:[],disadvantages:[],ancestors:[]});
       if(/Shinmaki/i.test(C.school(s.school,catalog)?.name || ''))s.disadvantages.push({id:'school-grant-disturbing-countenance',name:'Disturbing Countenance',cost:0,free:true,grantSchool:s.school});
     } else if(section==='abilities')s.abilities=[];
-    else if(section==='story')Object.assign(s,{concept:'',notes:'',heritage:'',equipmentChoices:[],equipment:[],equipped:{},money:null,honor:null,glory:1,status:['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1,taint:0,woundsTaken:0,purchases:[],modifiers:{},modifierReason:''});
+    else if(section==='story')Object.assign(s,{concept:'',notes:'',heritage:'',equipmentChoices:[],travelingPack:[],equipment:[],equipped:{},money:null,honor:null,glory:1,status:['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1,taint:0,woundsTaken:0,purchases:[],modifiers:{},modifierReason:''});
     else if(section==='summary')Object.assign(s,{startingXP:40,woundsTaken:0,modifiers:{},modifierReason:''});
     s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
     return s;
