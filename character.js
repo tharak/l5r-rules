@@ -394,7 +394,11 @@
     const order=UI.field({label:'Order',kind:'select',attrs:{'data-pack-sort':true},optionsHtml:option('name','A–Z',packSort==='name')+option('price','Price, cheapest first',packSort==='price')});
     const boxes=sorted.map(option=>{const weight=option.counts || 1, checked=pack.items.includes(option.name);
       return UI.checkbox({label:`${option.name}${weight>1?` (counts as ${weight})`:''}${option.price?` · ${option.price}`:''}`,labelAttrs:{class:'creator-pack-item'},attrs:{'data-pack-item':option.name,checked,disabled:!checked&&pack.count+weight>pack.picks}});}).join('');
-    return `<details class="creator-wide creator-pack"${pack.count<pack.picks?' open':''}><summary>Traveling Pack items <small class="creator-pack-count${full?'':' creator-pack-count-short'}">${pack.count}/${pack.picks}</small>${pack.items.length?` <span class="creator-pack-summary">${escapeHtml(pack.items.join(', '))}</span>`:''}</summary><div class="creator-pack-head"><p class="creator-rule">Choose any ${pack.picks} items found in your Traveling Pack (Core Rulebook p. 207).</p>${order}</div><div class="creator-pack-grid">${boxes}</div></details>`;
+    // Once all ten are chosen they are listed, each with its price and a Public box (shown on
+    // the shared character page); the checklist folds under "Change items".
+    const priceOf=new Map(pack.options.map(o=>[o.name,o.price || '']));
+    const list=full?`<ul class="creator-wide creator-pack-list">${[...pack.items].sort((a,b)=>a.localeCompare(b)).map(name=>`<li class="creator-pack-chosen"><span>${escapeHtml(name)}</span>${priceOf.get(name)?`<small>${escapeHtml(priceOf.get(name))}</small>`:''}${publicToggle(`${name} is public`,{'data-pack-public':name},pack.publicItems.includes(name))}</li>`).join('')}</ul>`:'';
+    return `${list}<details class="creator-wide creator-pack"${pack.count<pack.picks?' open':''}><summary>${full?'Change items':'Traveling Pack items'} <small class="creator-pack-count${full?'':' creator-pack-count-short'}">${pack.count}/${pack.picks}</small>${!full&&pack.items.length?` <span class="creator-pack-summary">${escapeHtml(pack.items.join(', '))}</span>`:''}</summary><div class="creator-pack-head"><p class="creator-rule">Choose any ${pack.picks} items found in your Traveling Pack (Core Rulebook p. 207).</p>${order}</div><div class="creator-pack-grid">${boxes}</div></details>`;
   }
   function renderEquipment(data) {
     const firstPack = data.travelingPack?.present ? data.equipment.find(entry => /^travell?ing pack$/i.test(String(entry.name).trim())) : null;
@@ -1208,6 +1212,11 @@
     else if (event.target.dataset.packItem !== undefined) {
       const name=event.target.dataset.packItem, chosen=(sheet.travelingPack||[]).filter(item=>item!==name);
       sheet.travelingPack=event.target.checked?[...chosen,name]:chosen;
+      if(!event.target.checked&&sheet.packPublic)delete sheet.packPublic[name];
+    }
+    else if (event.target.dataset.packPublic !== undefined) {
+      const name=event.target.dataset.packPublic;sheet.packPublic={...(sheet.packPublic||{})};
+      if(event.target.checked)sheet.packPublic[name]=true;else delete sheet.packPublic[name];
     }
     else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name])delete entry.customCost;commitEdit();return;}}
     else if (event.target.dataset.kind) {

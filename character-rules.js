@@ -30,7 +30,7 @@
     delete s.continuousEditor;
     s.startingXP = integer(input.startingXP ?? input.progression?.baseline?.startingXP ?? 40);
     for (const key of ['name','clan','family','familyTrait','school','concept','notes','heritage','modifierReason']) s[key] ??= '';
-    for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions']) s[key] = {...input[key]};
+    for (const key of ['traitBuys','skills','skillTraits','emphases','legacyEmphases','equipped','modifiers','schoolDecisions','packPublic']) s[key] = {...input[key]};
     for (const key of ['schoolChoices','equipmentChoices','travelingPack','equipment','advantages','disadvantages','purchases','abilities','ancestors','training','exceptions']) s[key] = (Array.isArray(input[key]) ? input[key] : []).map((e,i) => typeof e === 'object' && e ? {...e,id:e.id || `legacy-${key}-${i}`} : e);
     // The old per-section visibility map is replaced by per-item Public flags.
     delete s.visibility;
@@ -502,7 +502,8 @@
   function travelingPack(s,equipment,catalog) {
     const rule=catalog?.travelingPack || {picks:10,options:[]}, options=new Map((rule.options || []).map(o=>[o.name,o.counts || 1]));
     const items=[...new Set((s.travelingPack || []).filter(name=>options.has(name)))];
-    return {present:equipment.some(e=>PACK_NAME.test(String(e.name || '').trim())),picks:rule.picks || 10,options:rule.options || [],items,count:items.reduce((sum,name)=>sum+options.get(name),0)};
+    return {present:equipment.some(e=>PACK_NAME.test(String(e.name || '').trim())),picks:rule.picks || 10,options:rule.options || [],items,count:items.reduce((sum,name)=>sum+options.get(name),0),
+      publicItems:items.filter(name=>s.packPublic?.[name])};
   }
   function resetSection(input,section,catalog) {
     const s=normalize(input);
@@ -517,7 +518,7 @@
       Object.assign(s,{advantages:[],disadvantages:[],ancestors:[]});
       if(/Shinmaki/i.test(C.school(s.school,catalog)?.name || ''))s.disadvantages.push({id:'school-grant-disturbing-countenance',name:'Disturbing Countenance',cost:0,free:true,grantSchool:s.school});
     } else if(section==='abilities')s.abilities=[];
-    else if(section==='story')Object.assign(s,{concept:'',notes:'',heritage:'',equipmentChoices:[],travelingPack:[],equipment:[],equipped:{},money:null,honor:null,glory:1,status:['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1,taint:0,woundsTaken:0,purchases:[],modifiers:{},modifierReason:''});
+    else if(section==='story')Object.assign(s,{concept:'',notes:'',heritage:'',equipmentChoices:[],travelingPack:[],packPublic:{},equipment:[],equipped:{},money:null,honor:null,glory:1,status:['Ronin','Brotherhood of Shinsei'].includes(s.clan)?0:1,taint:0,woundsTaken:0,purchases:[],modifiers:{},modifierReason:''});
     else if(section==='summary')Object.assign(s,{startingXP:40,woundsTaken:0,modifiers:{},modifierReason:''});
     s.exceptions=s.exceptions.filter(e=>!exceptionPrefixes[section].some(prefix=>String(e.code).startsWith(prefix)));
     return s;

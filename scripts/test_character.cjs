@@ -975,10 +975,17 @@ test('the Traveling Pack offers its book list; ten picks, a pet as two; misc equ
   c.change({packItem:'Pet (dog, cat, monkey, songbird)'},'on',{checked:true});
   let d=(await c.data()).derived;assert.equal(d.travelingPack.count,10);assert.ok(!d.violations.some(v=>v.code==='equipment:traveling-pack'));
   html=sectionHtml(c,'equipment');
-  assert.match(html,/creator-pack"><summary>Traveling Pack items <small class="creator-pack-count">10\/10<\/small> <span class="creator-pack-summary">Basket, /,'full: folded, with the list in the summary');
+  assert.match(html,/<ul class="creator-wide creator-pack-list"><li class="creator-pack-chosen"><span>Basket<\/span><small>1 to 5 zeni<\/small><label class="ui-checkbox creator-check creator-public-check"><input type="checkbox" data-pack-public="Basket"/,'ten chosen: listed with price and a Public box');
+  assert.equal((html.match(/class="creator-pack-chosen"/g)||[]).length,9,'nine items (the pet counts twice)');
+  assert.match(html,/creator-pack"><summary>Change items <small class="creator-pack-count">10\/10<\/small><\/summary>/,'the checklist folds under Change items');
+  c.change({packPublic:'Basket'},'on',{checked:true});
+  d=(await c.data()).derived;assert.equal(d.travelingPack.publicItems.join(),'Basket');
+  assert.match(sectionHtml(c,'equipment'),/data-pack-public="Basket"[^>]*checked/);
   assert.match(html,new RegExp(`data-pack-item="${names[9]}" disabled`),'a full pack disables the rest');
   c.change({packItem:names[0]},'on',{checked:false});
   assert.equal((await c.data()).derived.travelingPack.count,9);
+  assert.equal((await c.data()).character.packPublic.Basket,undefined,'an item taken out is no longer public');
+  assert.doesNotMatch(sectionHtml(c,'equipment'),/creator-pack-list/,'the list shows only with all ten');
   html=sectionHtml(c,'equipment');assert.ok(html.indexOf('>Basket ·')<html.indexOf('>Wig ·'),'A–Z by default');
   c.change({packSort:''},'price');html=sectionHtml(c,'equipment');
   assert.match(html,/<option value="price" selected/);

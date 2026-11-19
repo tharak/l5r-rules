@@ -597,5 +597,8 @@ test('Core pp. 205-207: miscellaneous equipment is in the catalog; a Traveling P
  assert.equal(d.travelingPack.count,10,'eight items, a pet as two; duplicates and unknown items do not count');assert.equal(packIssue(d),undefined);
  d=calc(change(s,x=>{x.travelingPack=names.slice(0,11);}));assert.match(packIssue(d).message,/\(11\/10\)/);
  assert.equal(R.resetSection({...s,travelingPack:names.slice(0,3)},'story',catalog).travelingPack.length,0,'resetting Story & equipment empties the pack');
+ d=calc(change(s,x=>{x.travelingPack=names.slice(0,10);x.packPublic={[names[1]]:true,'Not chosen':true};}));
+ assert.equal(d.travelingPack.publicItems.join(),names[1],'only chosen items ticked Public are public');
+ assert.ok(S.profile(change(s,x=>{x.travelingPack=names.slice(0,10);x.packPublic={[names[1]]:true};}),d).gear.includes(names[1]),'and the shared page lists them with what the character carries');
  d=calc(change(s,x=>{x.school='';x.equipment=[{id:'p',name:'Traveling Pack'}];}));assert.ok(d.travelingPack.present,'a personal Traveling Pack also asks for its items');
 });

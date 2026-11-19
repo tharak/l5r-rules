@@ -1,7 +1,7 @@
 (() => {
   // What other players and anyone with a character's link can see. Always public: name,
   // picture, clan, family, school, Insight Rank and equipped weapons/armour. Honor, Glory,
-  // Status, Taint, advantages, disadvantages and journal entries appear only when ticked
+  // Status, Taint, advantages, disadvantages, Traveling Pack items and journal entries appear only when ticked
   // Public. The GM reads the full sheet instead.
   const STATS = ['honor','glory','status','taint'];
   const option = entry => ({name:entry.name,selection:entry.selection || ''});
@@ -12,7 +12,7 @@
     family:s.family || '',
     school:d.school?.name || '',
     insightRank:d.insightRank,
-    gear:d.equipment.filter(e => e.equipped && ['weapon','armor'].includes(e.item?.kind)).map(e => e.name),
+    gear:[...d.equipment.filter(e => e.equipped && ['weapon','armor'].includes(e.item?.kind)).map(e => e.name),...(d.travelingPack?.publicItems || [])],
     stats:Object.fromEntries(STATS.filter(key => s.publicStats?.[key]).map(key => [key,Number(d[key] ?? s[key]) || 0])),
     advantages:d.advantages.filter(a => a.public).map(option),
     disadvantages:d.disadvantages.filter(a => a.public).map(option),
