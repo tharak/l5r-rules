@@ -423,7 +423,7 @@
   const CLANS = ['Crab','Crane','Dragon','Lion','Mantis','Phoenix','Scorpion','Unicorn','Imperial'];
   const clanName = clan => clan === 'Imperial' ? 'Imperial Families' : clan;
   // Each clan's colour, used on its members' map pins, tray names and note numbers.
-  const CLAN_COLORS = {Crab:'#4b6a88',Crane:'#5aa9d6',Dragon:'#3e9a4f',Lion:'#d9a514',Mantis:'#1f8f8f',Phoenix:'#e06a1b',Scorpion:'#b3202a',Unicorn:'#7d4aa6',Imperial:'#1f5e3a'};
+  const CLAN_COLORS = {Crab:'#4b6a88',Crane:'#5aa9d6',Dragon:'#3e9a4f',Lion:'#d9a514',Mantis:'#1f8f8f',Phoenix:'#e06a1b',Scorpion:'#b3202a',Unicorn:'#7d4aa6',Imperial:'#b5862a'};
   const treeLinks = () => new Map(store().list(path('tree','')).filter(t => t && ['pcs','npcs','clans'].includes(t.parentKind) && t.parentId).map(t => [t.id,`${t.parentKind}:${t.parentId}`]));
   function treeParents(existing) {
     const links = new Map([...treeLinks()].filter(([key,parent]) => existing.has(key) && existing.has(parent) && key !== parent)), parents = new Map();
