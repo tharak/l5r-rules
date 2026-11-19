@@ -213,6 +213,10 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .map-tray .ui-field{margin:0}
 .map-tray-group{display:block}
 .map-tray-root-body{display:grid;gap:6px;margin:4px 0 0 8px}
+.map-tray-title,.map-tray-branch-title{list-style:none}
+.map-tray-title::-webkit-details-marker,.map-tray-branch-title::-webkit-details-marker{display:none}
+.map-tray-title::before,.map-tray-branch-title::before{content:'+';display:inline-block;width:1.1em;margin-right:2px;border:1px solid currentColor;border-radius:3px;font-size:10px;font-weight:700;line-height:1.1em;text-align:center}
+details[open]>.map-tray-title::before,details[open]>.map-tray-branch-title::before{content:'−'}
 .map-tray-group-body{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px}
 .map-tray-title{display:block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);cursor:pointer}
 .map-tray-title small{font-weight:400}
