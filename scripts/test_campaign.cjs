@@ -337,6 +337,10 @@ test('map: notes are numbered oldest first; characters and their note numbers dr
  d.documentListeners.toggle({target:{dataset:{trayGroup:'People'},open:false}});
  assert.match(render(),/<details class="map-tray-group" data-tray-group="People">/);
  d.documentListeners.toggle({target:{dataset:{trayGroup:'People'},open:true}});
+ assert.match(render(),/<details class="map-tray-group map-tray-root" data-tray-group="Campaign" open><summary[^>]*>Campaign <small>\d+<\/small><\/summary><div class="map-tray-root-body">[^]*data-tray-group="Clans"[^]*data-tray-group="People"[^]*data-tray-group="Places"[^]*<\/details><\/div><\/details><\/div>/,'Campaign holds every group');
+ d.documentListeners.toggle({target:{dataset:{trayGroup:'Campaign'},open:false}});
+ assert.match(render(),/data-tray-group="Campaign">/,'one click folds them all, and it stays folded');
+ d.documentListeners.toggle({target:{dataset:{trayGroup:'Campaign'},open:true}});
  // A drop over the tray takes the pin off the map.
  const pinsBefore=[...d.data.keys()].filter(k=>k.startsWith('campaigns/c/timeline/')).length;
  const query=d.doc.querySelector;d.doc.querySelector=selector=>selector==='.map-tray'?{getBoundingClientRect:()=>({left:0,top:0,right:200,bottom:300})}:query(selector);
