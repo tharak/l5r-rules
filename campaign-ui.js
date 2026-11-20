@@ -417,6 +417,24 @@
   const cellSize = () => cellOf(mapList().find(m => m.id === activeMapId()));
   let previewCell = null;
   const hexRatio = () => (previewCell ?? cellSize()) / 100;
+  // Zoom: the map grows inside a scrolling frame (100%–400%), kept on this device. The frame's
+  // scroll position survives redraws; a zoom keeps the point under the pointer (or the centre) still.
+  const ZOOM_MIN = 1, ZOOM_MAX = 4;
+  let mapZoom = 1, mapScroll = {left:0,top:0}, zoomAnchor = null;
+  try { mapZoom = Math.min(ZOOM_MAX,Math.max(ZOOM_MIN,Number(localStorage.getItem('l5r-rules-map-zoom')) || 1)); } catch {}
+  const mapViewport = () => document.querySelector('[data-map-viewport]');
+  function setZoom(next,clientX,clientY) {
+    next = Math.min(ZOOM_MAX,Math.max(ZOOM_MIN,Math.round(next * 100) / 100));
+    if (next === mapZoom) return;
+    const vp = mapViewport();
+    if (vp && vp.scrollWidth) {
+      const r = vp.getBoundingClientRect(), ax = (clientX ?? r.left + vp.clientWidth / 2) - r.left, ay = (clientY ?? r.top + Math.min(vp.clientHeight,window.innerHeight - Math.max(0,r.top)) / 2) - r.top;
+      zoomAnchor = {ax,ay,fx:(vp.scrollLeft + ax) / vp.scrollWidth,fy:(vp.scrollTop + ay) / vp.scrollHeight};
+    }
+    mapZoom = next;
+    try { localStorage.setItem('l5r-rules-map-zoom',String(mapZoom)); } catch {}
+    changed();
+  }
   // The tray (left) and the GM's map panel (right) each fold away (remembered on this device).
   let trayHidden = false, mapsHidden = false;
   try { trayHidden = localStorage.getItem('l5r-rules-map-tray-hidden') === '1'; mapsHidden = localStorage.getItem('l5r-rules-map-panel-hidden') === '1'; } catch {}
@@ -510,7 +528,7 @@
     const mapsPanel = !isGM ? '' : `<div class="timeline-pin-controls map-panel${mapsHidden ? ' map-tray-hidden' : ''}" aria-label="Maps"><div class="map-panel-head">${mapsHidden ? '' : `<details class="map-tray-group" data-tray-group="Maps"${trayClosed.has('Maps') ? '' : ' open'}><summary class="map-tray-title">Maps <small>${maps.length}</small></summary><div class="map-tray-maps">${mapRows}${button('map-add','Add Map')}${cellSlider}</div></details>`}${foldButton('maps-toggle',mapsHidden,'maps','▸','◂')}</div></div>`;
     const campaignGroup = !groups ? '' : `${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}<details class="map-tray-group map-tray-root" data-tray-group="Campaign"${trayClosed.has('Campaign') ? '' : ' open'}><summary class="map-tray-title" title="Fold or open everything; drop a name here to take it out of its clan or parent">Campaign <small>${items.length}</small></summary><div class="map-tray-root-body">${groups}</div></details>`;
     const tray = !campaignGroup ? '' : `<div class="timeline-pin-controls map-tray${trayHidden ? ' map-tray-hidden' : ''}" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${foldButton('tray-toggle',trayHidden,'tray','◂','▸')}${trayHidden ? '' : campaignGroup}</div>`;
-    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapsPanel}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
+    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapsPanel}<div class="timeline-frame"><div class="map-zoom" role="group" aria-label="Zoom">${UI.button({text:'−',variant:'quiet',size:'compact',attrs:{'data-campaign':'zoom-out','aria-label':'Zoom out',title:'Zoom out (Ctrl + scroll)',disabled:mapZoom <= ZOOM_MIN}})}${UI.button({text:`${Math.round(mapZoom * 100)}%`,variant:'quiet',size:'compact',attrs:{'data-campaign':'zoom-reset','aria-label':'Zoom back to 100%',title:'Back to 100%',disabled:mapZoom === 1}})}${UI.button({text:'+',variant:'quiet',size:'compact',attrs:{'data-campaign':'zoom-in','aria-label':'Zoom in',title:'Zoom in (Ctrl + scroll)',disabled:mapZoom >= ZOOM_MAX}})}</div><div class="timeline-viewport${mapZoom > 1 ? ' timeline-zoomed' : ''}" data-map-viewport>${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map${mapZoom > 1 ? ` style="width:${mapZoom * 100}%"` : ''}>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div></div></div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}${renderClanPopup(numbers,kids)}`;
   }
   // A clan's panel: its mon and name, who is in it, and its journal (any member adds entries).
@@ -798,11 +816,13 @@
     const width = document.documentElement.clientWidth, height = window.innerHeight;
     document.documentElement.style.setProperty('--page-width',`${width}px`);
     if (!layer || !map) return;
-    const box = map.getBoundingClientRect(), pad = 28;
-    const html = box.bottom <= 0 || box.top >= height ? '' : [...map.querySelectorAll('.timeline-pin')].map(pin => {
+    // The visible part of the map: the window, and the zoom frame when the map is larger than it.
+    const frame = (mapViewport() || map).getBoundingClientRect(), pad = 28;
+    const left = Math.max(0,frame.left), right = Math.min(width,frame.right), top = Math.max(0,frame.top), bottom = Math.min(height,frame.bottom);
+    const html = bottom - top < 2 * pad || right - left < 2 * pad ? '' : [...map.querySelectorAll('.timeline-pin')].map(pin => {
       const r = pin.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-      if (x >= 0 && x <= width && y >= 0 && y <= height) return '';
-      const cx = Math.min(width - pad,Math.max(pad,x)), cy = Math.min(height - pad,Math.max(pad,y));
+      if (x >= left && x <= right && y >= top && y <= bottom) return '';
+      const cx = Math.min(right - pad,Math.max(left + pad,x)), cy = Math.min(bottom - pad,Math.max(top + pad,y));
       const angle = Math.round(Math.atan2(y - cy,x - cx) * 180 / Math.PI);
       const image = pin.querySelector('img')?.getAttribute('src');
       const kind = [...pin.classList].find(name => name.startsWith('timeline-pin-') && name !== 'timeline-pin-open')?.slice(13) || '';
@@ -813,8 +833,17 @@
   }
   const schedulePinArrows = () => { if (!arrowFrame) arrowFrame = requestAnimationFrame(updatePinArrows); };
   window.addEventListener('scroll',schedulePinArrows,{passive:true});
+  // The zoom frame scrolls too: remember where, and move the arrows.
+  document.addEventListener('scroll',event=>{if(event.target?.dataset?.mapViewport!==undefined){mapScroll={left:event.target.scrollLeft,top:event.target.scrollTop};schedulePinArrows();}},{capture:true,passive:true});
+  // Ctrl/⌘ + scroll wheel (and a trackpad pinch) zooms around the pointer.
+  document.addEventListener('wheel',event=>{if(!(event.ctrlKey||event.metaKey)||!event.target?.closest?.('[data-map-viewport]'))return;event.preventDefault();setZoom(mapZoom*(event.deltaY<0?1.25:0.8),event.clientX,event.clientY);},{passive:false});
   window.addEventListener('resize',schedulePinArrows);
   function mountEditor() {
+    const vp = mapViewport();
+    if (vp) {
+      if (zoomAnchor) { const a = zoomAnchor; zoomAnchor = null; vp.scrollLeft = a.fx * vp.scrollWidth - a.ax; vp.scrollTop = a.fy * vp.scrollHeight - a.ay; mapScroll = {left:vp.scrollLeft,top:vp.scrollTop}; }
+      else if (vp.scrollLeft !== mapScroll.left || vp.scrollTop !== mapScroll.top) { vp.scrollLeft = mapScroll.left; vp.scrollTop = mapScroll.top; }
+    }
     schedulePinArrows();
     const mapImage = document.querySelector('.timeline-map>img');
     if (mapImage && !mapImage.complete) mapImage.addEventListener('load',schedulePinArrows,{once:true});
@@ -980,6 +1009,9 @@
         const file=await window.MediaLibrary?.pickFile('Choose an image'), picture=file && await UI.readPortrait(file);
         if (picture) addEntryImage(id,picture);
       }
+      else if (action==='zoom-in') setZoom(mapZoom*1.25);
+      else if (action==='zoom-out') setZoom(mapZoom/1.25);
+      else if (action==='zoom-reset') setZoom(1);
       else if (action==='tray-toggle') {trayHidden=!trayHidden;try{localStorage.setItem('l5r-rules-map-tray-hidden',trayHidden?'1':'0');}catch{}}
       else if (action==='maps-toggle') {mapsHidden=!mapsHidden;try{localStorage.setItem('l5r-rules-map-panel-hidden',mapsHidden?'1':'0');}catch{}}
       else if (action==='map-add'||action==='map-show'||action==='map-remove') {
@@ -1126,7 +1158,7 @@
   });
   document.addEventListener('click',event=>{if(swallowClick){event.preventDefault();event.stopPropagation();swallowClick=false;}},true);
   document.addEventListener('click',event=>{const b=event.target.closest('[data-campaign]');
-    if(b?.dataset.campaign==='timeline-arrow'){const pin=document.querySelector(`.timeline-pin[data-pin-id="${CSS.escape(b.dataset.id)}"]`);if(pin){const r=pin.getBoundingClientRect();window.scrollTo({top:window.scrollY+r.top+r.height/2-window.innerHeight/2,left:window.scrollX+r.left+r.width/2-document.documentElement.clientWidth/2,behavior:'smooth'});}return;}
+    if(b?.dataset.campaign==='timeline-arrow'){const pin=document.querySelector(`.timeline-pin[data-pin-id="${CSS.escape(b.dataset.id)}"]`);if(pin)pin.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});return;}
     if(b)act(b.dataset.campaign,b.dataset.id);});
   // A new NPC keeps its picture in the draft until saved; an existing NPC saves it at once.
   function setNPCPortrait(url) {

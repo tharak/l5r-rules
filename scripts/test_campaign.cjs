@@ -464,6 +464,19 @@ test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take
  // Players see no map list.
  d.store.uid='alice';assert.doesNotMatch(render(),/data-campaign="map-add"|data-map-cell/);
 });
+test('zoom: − 100% + grow the map inside a scrolling frame, from 100% to 400%, for everyone',async()=>{
+ const d=campaignCards();
+ d.window.MediaLibrary={cachedSrc:()=>'data:image/webp;base64,AAAA',imageSrc:async()=>{}};
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm',mapId:'m1'});d.store.uid='alice';
+ const render=()=>d.window.CampaignUI.render('campaigns/c');
+ let html=render();
+ assert.match(html,/class="timeline-frame"><div class="map-zoom"[^]*data-campaign="zoom-out"[^>]*disabled[^]*>100%<[^]*data-campaign="zoom-in"[^]*<div class="timeline-viewport" data-map-viewport><div class="timeline-map" data-timeline-map>/);
+ await d.click('zoom-in');html=render();
+ assert.match(html,/timeline-viewport timeline-zoomed" data-map-viewport><div class="timeline-map" data-timeline-map style="width:125%">/);assert.match(html,/>125%</);
+ for(let i=0;i<10;i++)await d.click('zoom-in');
+ html=render();assert.match(html,/width:400%/);assert.match(html,/data-campaign="zoom-in"[^>]*disabled/);
+ await d.click('zoom-reset');html=render();assert.doesNotMatch(html,/timeline-zoomed|style="width/);
+});
 test('map: the Rokugan map is never loaded (it is the page background); the GM\'s map shows once loaded',async()=>{
  const d=campaignCards();let finish,fail;const cache=new Map();
  d.window.MediaLibrary={cachedSrc:id=>cache.get(id)||'',imageSrc:id=>new Promise((ok,no)=>{finish=()=>{cache.set(id,'data:image/webp;base64,AAAA');ok();};fail=no;})};
