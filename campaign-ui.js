@@ -545,7 +545,7 @@
     // A player who joined but has no PC here yet is invisible to the others until they add one.
     const noPC = !gm() && !store().list(path('pcs','')).some(pc => pc.ownerUid === store().uid);
     const rows = [
-      ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Add your character with <strong>+ PC</strong> so the GM and the other players see you.</span>${button('pc-picker','+ PC')}</div>`] : []),
+      ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Create your character so the GM and the other players see you (or link one you already have with <strong>+ PC</strong>).</span>${button('pc-create','Create PC')}</div>`] : []),
       ...mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`),
       ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
     ];

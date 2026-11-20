@@ -454,7 +454,7 @@ test('players who joined show for the GM beside the invite link, with their PCs 
  const html=render();
  assert.match(html,/campaign-players"><h4>Players <small>2<\/small><\/h4><ul><li[^>]*><span><strong>Alice<\/strong> <small>joined · no PC yet<\/small>[^]*<strong>Bob<\/strong> <small>[^<]+<\/small>[^]*<strong>Carol<\/strong> <small>asks to join<\/small>[^]*data-campaign="request-approve" data-id="carol"/);
  const a=campaignCards();a.store.uid='alice';a.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});a.data.set('campaigns/c/members/alice',{displayName:'Alice'});
- assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Add your character with <strong>\+ PC<\/strong>/);
+ assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Create your character[^]*data-campaign="pc-create"[^>]*>Create PC</);
  a.data.set('campaigns/c/pcs/q',{ownerUid:'alice',characterId:'x'});assert.doesNotMatch(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign/);
 });
 test('an invite link joins at once when signed in; signed out it says so, and warns inside app browsers where Google sign-in fails',async()=>{
