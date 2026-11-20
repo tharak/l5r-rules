@@ -541,7 +541,7 @@
   // for the GM, requests to join from people who opened a link without an invitation.
   function renderOffers() {
     const mine = transfers.filter(t => t.toUid === store().uid && t.status === 'offered' && t.campaignId === active);
-    const requests = gm() ? store().list(path('requests','')) : [];
+    const requests = gm() ? openRequests() : [];
     // A player who joined but has no PC here yet is invisible to the others until they add one.
     const noPC = !gm() && !store().list(path('pcs','')).some(pc => pc.ownerUid === store().uid);
     const rows = [
@@ -553,8 +553,30 @@
   }
   // Opened a campaign link without being a member: name the campaign (from the public lookup) and
   // offer to ask the GM for an invitation; once approved, a Join button appears.
-  let lookup = {segment:'',state:'',campaign:null}, myRequest = {campaignId:'',data:null,stop:null};
+  let lookup = {segment:'',state:'',campaign:null};
   const published = new Map();
+  // Your own request to join each campaign you are not in. Once the GM approves it, you join at
+  // once (no button to press); the campaign then appears among yours.
+  let requestsBackend = null;
+  const myRequests = new Map();
+  function myRequest(c) {
+    const backend = store().backend;
+    if (requestsBackend !== backend) { for (const r of myRequests.values()) r.stop?.(); myRequests.clear(); requestsBackend = backend; }
+    if (!myRequests.has(c)) {
+      const entry = {data:null,loaded:false,joining:false,error:'',stop:null};
+      myRequests.set(c,entry);
+      entry.stop = backend?.watchRequest?.(c,data => {
+        if (myRequests.get(c) !== entry) return;
+        entry.data = data; entry.loaded = true;
+        if (data?.inviteToken && !entry.joining && !store().get(`campaigns/${c}`)) {
+          entry.joining = true; entry.error = '';
+          backend.join(data.inviteToken).catch(err => { entry.joining = false; entry.error = err.code === 'permission-denied' ? 'Could not join: the approval was withdrawn or the invitation replaced. Ask again.' : `Could not join: ${err.message}`; changed(); });
+        }
+        changed();
+      }) || null;
+    }
+    return myRequests.get(c);
+  }
   function notInvited(segment) {
     const backend = store().backend;
     if (lookup.segment !== segment) {
@@ -562,12 +584,8 @@
       (backend?.lookupCampaign?.(segment) || Promise.resolve(null)).then(found => { if (lookup.segment === segment) { lookup = {segment,state:found?'found':'missing',campaign:found}; changed(); } });
     }
     const found = lookup.campaign, title = found?.title;
-    if (found && myRequest.campaignId !== found.campaignId) {
-      myRequest.stop?.();
-      myRequest = {campaignId:found.campaignId,data:null,stop:backend?.watchRequest?.(found.campaignId,data => { if (myRequest.campaignId === found.campaignId) { myRequest.data = data; changed(); } })};
-    }
-    const request = found && myRequest.campaignId === found.campaignId ? myRequest.data : null;
-    const action = !found ? '' : request?.inviteToken ? `<p>Your request was approved.</p>${button('join','Join campaign',request.inviteToken)}`
+    const mine = found ? myRequest(found.campaignId) : null, request = mine?.data;
+    const action = !found ? '' : request?.inviteToken ? (mine.error ? `<p>${e(mine.error)}</p>${button('join','Join campaign',request.inviteToken)}` : '<p>Your request was approved · joining the campaign…</p>')
       : request ? `<p class="campaign-invite-note">Request sent · waiting for the GM.</p>${button('request-withdraw','Withdraw request',found.campaignId)}`
       : button('request-invite','Ask to be invited',found.campaignId);
     if (lookup.state === 'loading') return '<div class="workspace"><p class="campaign-invite-note">Looking up the campaign…</p></div>';
@@ -612,10 +630,20 @@
   const renderInvitePopup = () => '';
   // Who is in the campaign (for the GM, beside the invite link): each player who joined and the
   // PCs they linked, "no PC yet" until they add one with + PC, and anyone asking to join.
+  // Requests from people not yet in the campaign (a joined player's request is removed as stale).
+  const staleRequests = new Set();
+  function openRequests() {
+    const members = new Set(store().list(path('members','')).map(m => m.id));
+    return store().list(path('requests','')).filter(r => {
+      if (!members.has(r.id)) return true;
+      if (!staleRequests.has(active+'/'+r.id)) { staleRequests.add(active+'/'+r.id); store().backend?.answerRequest?.(active,r.id,false).catch(()=>{}); }
+      return false;
+    });
+  }
   function playersSection(pcs) {
     const campaign = store().get(`campaigns/${active}`);
     const members = store().list(path('members','')).filter(m => m.id !== campaign?.gmUid).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
-    const requests = store().list(path('requests',''));
+    const requests = openRequests();
     const rows = members.map(m => { const theirs = pcs.filter(pc => pc.ownerUid === m.id).map(pc => label(pc));
       return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong> <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span></li>`; })
       .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}</li>`));
@@ -1190,7 +1218,11 @@
     for (const c of store().list('campaigns/')) if (c.gmUid === store().uid && published.get(c.id) !== c.title) { published.set(c.id,c.title); backend?.publishDirectory?.(c.id,c.title).catch(()=>{}); }
     const mine = new Set(store().list('campaigns/').map(c => c.id));
     return directory.list.filter(d => d.campaignId && !mine.has(d.campaignId)).sort((a,b) => (a.title || '').localeCompare(b.title || ''))
-      .map(d => UI.card({attrs:{'class':'panel campaign-card campaign-card-other'},href:'#/campaigns/'+encodeURIComponent(`${window.Routes?.slugify(d.title || 'campaign') || 'campaign'}-${d.campaignId.slice(0,8)}`),bodyHtml:`<h2>${e(d.title || 'Campaign')}</h2><p class="campaign-card-role">Not joined · ask to be invited</p>`})).join('');
+      .map(d => UI.card({attrs:{'class':'panel campaign-card campaign-card-other'},href:'#/campaigns/'+encodeURIComponent(`${window.Routes?.slugify(d.title || 'campaign') || 'campaign'}-${d.campaignId.slice(0,8)}`),bodyHtml:`<h2>${e(d.title || 'Campaign')}</h2><p class="campaign-card-role">${otherState(d.campaignId)}</p>`})).join('');
+  }
+  function otherState(c) {
+    const r = myRequest(c);
+    return r.data?.inviteToken ? (r.error ? 'Approved · could not join, open to retry' : 'Approved · joining…') : r.data ? 'Request sent · waiting for the GM' : 'Not joined · ask to be invited';
   }
   function homeCampaigns() {
     if (!store().uid) return {signedIn:false,html:button('sign-in','Sign in with Google')};

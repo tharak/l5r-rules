@@ -178,7 +178,9 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     async join(token) {
       const invite = await this.invitation(token), c = invite.campaignId;
       // gmUid is copied from the invitation's campaign by rules; the invite includes no member data.
-      if (await get(indexPath(c))) {await this.syncPlayerName(c);return c;}
+      // A request to join is answered once you are in; remove it so the GM no longer sees it.
+      const dropRequest = () => sdk.deleteDoc(ref(`campaigns/${c}/requests/${uid}`)).catch(()=>{});
+      if (await get(indexPath(c))) {await this.syncPlayerName(c);await dropRequest();return c;}
       const membershipId = crypto.randomUUID();
       await sdk.runTransaction(db,async transaction=>{
         const invitation = await transaction.get(ref(`invites/${token}`));
@@ -188,6 +190,7 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
         transaction.set(ref(memberPath(c)),membership);
         transaction.set(ref(indexPath(c)),{gmUid,membershipId});
       });
+      await dropRequest();
       return c;
     },
     async link(c,id) {

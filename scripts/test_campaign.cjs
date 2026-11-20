@@ -755,7 +755,7 @@ test('PC handover: the owner offers to a member; the member accepts into their a
  for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
  assert.deepEqual(calls,[['write','campaigns/c/pcs/p1',null],['remove','isamu'],['drop','t1']]);
 });
-test('a link to a campaign you are not in: "You were not invited to the campaign X", ask to be invited, then join once approved',async()=>{
+test('a link to a campaign you are not in: "You were not invited to the campaign X", ask to be invited, then joined automatically once approved',async()=>{
  const d=campaignCards();
  let watchCb=null;const calls=[];
  Object.assign(d.store,{ready:true});
@@ -763,6 +763,7 @@ test('a link to a campaign you are not in: "You were not invited to the campaign
   lookupCampaign:async seg=>seg.endsWith('-b8cd98e4')?{campaignId:'b8cd98e4-5ba6',title:'O Silêncio do Crisântemo'}:null,
   watchRequest:(c,cb)=>{watchCb=cb;return()=>{};},
   requestInvite:async c=>calls.push(['request',c]),
+  join:async token=>{calls.push(['join',token]);return 'b8cd98e4-5ba6';},
   watchTransfers:()=>()=>{},
  });
  const render=slug=>d.window.CampaignUI.render(slug);
@@ -775,7 +776,9 @@ test('a link to a campaign you are not in: "You were not invited to the campaign
  watchCb({displayName:'Alice',createdAt:'now'});
  assert.match(render('campaigns/o-silencio-do-crisantemo-b8cd98e4'),/Request sent · waiting for the GM/);
  watchCb({displayName:'Alice',createdAt:'now',inviteToken:'tok9'});
- assert.match(render('campaigns/o-silencio-do-crisantemo-b8cd98e4'),/Your request was approved[^]*data-campaign="join" data-id="tok9"/);
+ assert.match(render('campaigns/o-silencio-do-crisantemo-b8cd98e4'),/Your request was approved · joining the campaign…/);
+ assert.deepEqual(calls,[['request','b8cd98e4-5ba6'],['join','tok9']]);
+ watchCb({displayName:'Alice',createdAt:'now',inviteToken:'tok9'});assert.equal(calls.length,2,'joins once');
  // An unknown link still says so, without a request button.
  render('campaigns/unknown-zzzzzzzz');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
  html=render('campaigns/unknown-zzzzzzzz');
