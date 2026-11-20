@@ -401,12 +401,32 @@
     if (kind === 'clans') return CLANS.includes(id) ? {name:clanName(id),image:window.CharacterCatalog?.clanMon(id) || '',clan:true} : null;
     return null;
   };
+  // Maps: the GM keeps a list of media library pictures (each with its title and hex cell size)
+  // and picks the one shown. An older campaign's single map becomes the first in the list. Each
+  // pin belongs to one map; a pin from before there were several belongs to the first map.
+  const DEFAULT_CELL = 100 / 64; // a hex's radius, in percent of the map's width
+  function mapList(c = store().get(`campaigns/${active}`)) {
+    if (!c) return [];
+    const list = (Array.isArray(c.maps) ? c.maps : []).filter(m => m && typeof m.id === 'string' && m.id).map(m => ({...m}));
+    if (c.mapId && !list.some(m => m.id === c.mapId)) list.unshift({id:c.mapId});
+    return list;
+  }
+  const activeMapId = () => store().get(`campaigns/${active}`)?.mapId || '';
+  const pinMap = pin => pin.mapId || mapList()[0]?.id || '';
+  const cellOf = map => { const v = Number(map?.cell); return v >= 0.5 && v <= 6 ? v : DEFAULT_CELL; };
+  const cellSize = () => cellOf(mapList().find(m => m.id === activeMapId()));
+  let previewCell = null;
+  const hexRatio = () => (previewCell ?? cellSize()) / 100;
+  // The whole left panel folds away (remembered on this device).
+  let trayHidden = false;
+  try { trayHidden = localStorage.getItem('l5r-rules-map-tray-hidden') === '1'; } catch {}
   const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
   // Pins still pointing at an existing PC or NPC (and note); one per character or note. Older
   // pins from the session maps collapse into the latest one.
   function mapPins(numbers) {
     const seen = new Set();
-    return store().list(path('timeline','')).sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map(item => {
+    const shown = activeMapId();
+    return store().list(path('timeline','')).filter(item => pinMap(item) === shown).sort((a,b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).map(item => {
       const target = ['pcs','npcs','clans'].includes(item.kind) && pinTarget(item.kind,item.targetId);
       const key = item.noteId ? noteKey(item.kind,item.targetId,item.noteId) : `${item.kind}:${item.targetId}`, note = item.noteId ? numbers.get(key) : null;
       if (!target || (item.noteId && !note) || seen.has(key)) return null;
@@ -480,9 +500,13 @@
       +group('People',top.filter(i => i.kind === 'npcs' && !i.target.place),undefined,inGroup(i => i.kind === 'npcs' && !i.target.place))
       +group('Places',top.filter(i => i.kind === 'npcs' && i.target.place),undefined,inGroup(i => i.kind === 'npcs' && i.target.place));
     // Folding the groups reaches pins under the tray; a pin dropped on the tray is taken off the map.
-    const tray = !groups ? '' : `<div class="timeline-pin-controls map-tray" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}<details class="map-tray-group map-tray-root" data-tray-group="Campaign"${trayClosed.has('Campaign') ? '' : ' open'}><summary class="map-tray-title" title="Fold or open everything; drop a name here to take it out of its clan or parent">Campaign <small>${items.length}</small></summary><div class="map-tray-root-body">${groups}</div></details></div>`;
-    const mapActions = isGM ? `<div class="timeline-map-actions">${button('map-pick','Map')}</div>` : '';
-    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapActions}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
+    // The GM's maps: the cell size of the one shown, the list (pick one to show it) and Add Map.
+    const maps = mapList(), shown = activeMapId();
+    const mapsGroup = !isGM ? '' : `<details class="map-tray-group" data-tray-group="Maps"${trayClosed.has('Maps') ? '' : ' open'}><summary class="map-tray-title">Maps <small>${maps.length}</small></summary><div class="map-tray-maps">${shown ? `<label class="map-cell"><span>Cell size</span><input type="range" min="0.5" max="6" step="0.05" value="${cellSize()}" data-map-cell aria-label="Hex cell size"${busy ? ' disabled' : ''}></label>` : ''}${maps.length ? `<ul class="map-list">${maps.map(m => `<li${m.id === shown ? ' class="map-list-active"' : ''}>${UI.button({text:m.title || 'Map',variant:'quiet',size:'compact',attrs:{class:'map-list-show','data-campaign':'map-show','data-id':m.id,'aria-pressed':String(m.id === shown),disabled:busy}})}${UI.button({text:'✕',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-remove','data-id':m.id,'aria-label':`Remove ${m.title || 'map'} from the list`,title:'Remove from the list',disabled:busy}})}</li>`).join('')}</ul>` : ''}${button('map-add','Add Map')}</div></details>`;
+    const campaignGroup = !groups ? '' : `${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}<details class="map-tray-group map-tray-root" data-tray-group="Campaign"${trayClosed.has('Campaign') ? '' : ' open'}><summary class="map-tray-title" title="Fold or open everything; drop a name here to take it out of its clan or parent">Campaign <small>${items.length}</small></summary><div class="map-tray-root-body">${groups}</div></details>`;
+    const toggle = UI.button({text:trayHidden ? '▸' : '◂',variant:'quiet',size:'compact',attrs:{class:'map-tray-toggle','data-campaign':'tray-toggle','aria-expanded':String(!trayHidden),'aria-label':trayHidden ? 'Show the panel' : 'Hide the panel',title:trayHidden ? 'Show the panel' : 'Hide the panel'}});
+    const tray = !mapsGroup && !campaignGroup ? '' : `<div class="timeline-pin-controls map-tray${trayHidden ? ' map-tray-hidden' : ''}" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${toggle}${trayHidden ? '' : mapsGroup+campaignGroup}</div>`;
+    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}${renderClanPopup(numbers,kids)}`;
   }
   // A clan's panel: its mon and name, who is in it, and its journal (any member adds entries).
@@ -952,12 +976,25 @@
         const file=await window.MediaLibrary?.pickFile('Choose an image'), picture=file && await UI.readPortrait(file);
         if (picture) addEntryImage(id,picture);
       }
-      else if (action==='map-pick'||action==='map-reset') {
+      else if (action==='tray-toggle') {trayHidden=!trayHidden;try{localStorage.setItem('l5r-rules-map-tray-hidden',trayHidden?'1':'0');}catch{}}
+      else if (action==='map-add'||action==='map-show'||action==='map-remove') {
         if (!gm()) return;
-        const c=store().get(`campaigns/${active}`), mapId=action==='map-pick' ? await window.MediaLibrary?.pickId('Choose a map') : '';
-        if (action==='map-pick' && !mapId) return;
-        const {mapId:previous,...rest}=c;
-        store().queue(`campaigns/${active}`,mapId ? {...rest,mapId} : rest);
+        const c=store().get(`campaigns/${active}`); if (!c) return;
+        let maps=mapList(c), mapId=c.mapId||'';
+        if (action==='map-add') {
+          const picked=await window.MediaLibrary?.pickId('Add a map'); if (!picked) return;
+          const title=window.MediaLibrary.groups?.().flatMap(g=>g.items).find(item=>item.id===picked)?.title||`Map ${maps.length+1}`;
+          if (!maps.some(m=>m.id===picked)) { if (maps.length>=30) throw new Error('A campaign keeps up to 30 maps.'); maps.push({id:picked,title:String(title).slice(0,200),cell:DEFAULT_CELL}); }
+          mapId=picked;
+        } else if (action==='map-show') { if (!maps.some(m=>m.id===id)) return; mapId=id; }
+        else {
+          const gone=maps.find(m=>m.id===id); if (!gone || !window.confirm(`Remove ${gone.title||'this map'} from the list? Its pins are kept and come back if it is added again.`)) return;
+          // Older pins follow the first map; pin them to it before the list changes.
+          if (maps[0]?.id===id) for (const pin of store().list(path('timeline',''))) if (!pin.mapId) { const {id:pinId,...data}=pin; store().queue(path('timeline',pinId),{...data,mapId:id}); }
+          maps=maps.filter(m=>m.id!==id); if (mapId===id) mapId=maps[0]?.id||'';
+        }
+        const {mapId:_previous,maps:_maps,...rest}=c;
+        store().queue(`campaigns/${active}`,{...rest,maps,...(mapId?{mapId}:{})});
       }
       else if (action==='new-close') {if(!plotId)plotDraft=null;if(!sessionId)sessionDraft=null;if(!npcId)npcDraft=null;picking=false;}
       else if (action==='member-remove'||action==='leave') {
@@ -974,9 +1011,8 @@
   // Dragging a token: from the tray or from the map (yours, or any as GM). While dragging, a
   // hex grid covers the map and the hex under the pointer is outlined; the token lands on its
   // centre. Dropped off the map, a placed token is removed. A drag suppresses the click after it.
-  const HEX = 1/64; // a hex's radius, as a share of the map's width
   function snapHex(px,py,width) {
-    const r = width * HEX, w = Math.sqrt(3) * r, h = 1.5 * r, row0 = Math.round(py / h);
+    const r = width * hexRatio(), w = Math.sqrt(3) * r, h = 1.5 * r, row0 = Math.round(py / h);
     let best = null;
     for (let row = row0 - 1; row <= row0 + 1; row++) {
       const offset = Math.abs(row) % 2 ? w / 2 : 0, cx = Math.round((px - offset) / w) * w + offset, cy = row * h, d = (cx - px) ** 2 + (cy - py) ** 2;
@@ -987,11 +1023,11 @@
   const hexPath = (cx,cy,r) => 'M'+[0,1,2,3,4,5].map(i => { const a = Math.PI / 3 * i - Math.PI / 2; return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`; }).join('L')+'Z';
   function showHexes(map) {
     map.classList.add('timeline-map-dragging');
-    const width = map.clientWidth, r = width * HEX, w = Math.sqrt(3) * r, h = 1.5 * r;
+    const width = map.clientWidth, r = width * hexRatio(), w = Math.sqrt(3) * r, h = 1.5 * r;
     const svg = map.querySelector('.map-hexes');
-    if (svg && svg.dataset.width === String(width)) return svg;
+    if (svg && svg.dataset.width === `${width}:${r}`) return svg;
     svg?.remove();
-    map.insertAdjacentHTML('beforeend',`<svg class="map-hexes" data-width="${width}" aria-hidden="true"><defs><pattern id="map-hex-grid" width="${w}" height="${2 * h}" patternUnits="userSpaceOnUse"><path d="${[[0,0],[w,0],[w / 2,h],[0,2 * h],[w,2 * h]].map(([x,y]) => hexPath(x,y,r)).join('')}"/></pattern></defs><rect width="100%" height="100%" fill="url(#map-hex-grid)"/><path class="map-hex-target" d=""/></svg>`);
+    map.insertAdjacentHTML('beforeend',`<svg class="map-hexes" data-width="${width}:${r}" aria-hidden="true"><defs><pattern id="map-hex-grid" width="${w}" height="${2 * h}" patternUnits="userSpaceOnUse"><path d="${[[0,0],[w,0],[w / 2,h],[0,2 * h],[w,2 * h]].map(([x,y]) => hexPath(x,y,r)).join('')}"/></pattern></defs><rect width="100%" height="100%" fill="url(#map-hex-grid)"/><path class="map-hex-target" d=""/></svg>`);
     return map.querySelector('.map-hexes');
   }
   let drag=null, swallowClick=false;
@@ -1047,8 +1083,24 @@
     const inside=!overTray&&px>=0&&py>=0&&px<=rect.width&&py<=rect.height;
     const hex=inside&&snapHex(px,py,rect.width);
     drag.at=hex?{x:Math.min(100,Math.max(0,Math.round(hex.x/rect.width*1000)/10)),y:Math.min(100,Math.max(0,Math.round(hex.y/rect.height*1000)/10))}:null;
-    svg?.querySelector('.map-hex-target')?.setAttribute('d',hex?hexPath(hex.x,hex.y,rect.width*HEX):'');
+    svg?.querySelector('.map-hex-target')?.setAttribute('d',hex?hexPath(hex.x,hex.y,rect.width*hexRatio()):'');
     drag.ghost.classList.toggle('map-drag-ghost-off',!hex);
+  });
+  // Cell size: sliding shows the hex grid at the new size; letting go saves it for the shown map.
+  document.addEventListener('input',event=>{
+    if(event.target?.dataset?.mapCell===undefined)return;
+    previewCell=Number(event.target.value);
+    const map=mapElement();if(map&&!drag){map.querySelector('.map-hexes')?.remove();showHexes(map);}
+  });
+  document.addEventListener('change',event=>{
+    if(event.target?.dataset?.mapCell===undefined)return;
+    const c=store().get(`campaigns/${active}`),shown=activeMapId(),value=Math.round(Number(event.target.value)*100)/100;
+    previewCell=null;event.target.blur?.();
+    if(!gm()||!c||!shown||!(value>=0.5&&value<=6)){changed();return;}
+    const {maps:_maps,...rest}=c;
+    store().queue(`campaigns/${active}`,{...rest,maps:mapList(c).map(m=>m.id===shown?{...m,cell:value}:m)});
+    if(!drag){const map=mapElement();map?.classList.remove('timeline-map-dragging');map?.querySelector('.map-hexes')?.remove();}
+    changed();
   });
   document.addEventListener('pointercancel',endDrag);
   document.addEventListener('pointerup',()=>{
@@ -1063,7 +1115,7 @@
       else if(store().get(link))store().queue(link,null);
     } else if(done.at){
       const {id,target:_t,note:_n,key:_k,sessionId:_s,noteId:_o,...previous}=done.item||{};
-      store().queue(path('timeline',id||crypto.randomUUID()),{...previous,kind,targetId,...(noteId?{noteId}:{}),x:done.at.x,y:done.at.y,createdAt:previous.createdAt||now,updatedAt:now,creatorUid:previous.creatorUid||store().uid});
+      store().queue(path('timeline',id||crypto.randomUUID()),{...previous,kind,targetId,...(noteId?{noteId}:{}),...(activeMapId()?{mapId:activeMapId()}:{}),x:done.at.x,y:done.at.y,createdAt:previous.createdAt||now,updatedAt:now,creatorUid:previous.creatorUid||store().uid});
     } else if(done.item?.id) store().queue(path('timeline',done.item.id),null);
     changed();
   });

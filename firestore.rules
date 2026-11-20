@@ -101,9 +101,10 @@ service cloud.firestore {
         && request.resource.data.gmUid == request.auth.uid && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200
         && getAfter(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid)).data.gmUid == request.auth.uid;
-      // The GM edits the title and which PCs/NPCs appear on the timeline picker.
-      // The GM edits the title, the timeline picker, and the map (a media library picture).
-      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden','mapId'])
+      // The GM edits the title, the timeline picker, the shown map (a media library picture) and
+      // the list of maps to choose from (each with its title and hex cell size).
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','timelineHidden','mapId','maps'])
+        && (!('maps' in request.resource.data) || (request.resource.data.maps is list && request.resource.data.maps.size() <= 30))
         && (!('timelineHidden' in request.resource.data) || (request.resource.data.timelineHidden is list && request.resource.data.timelineHidden.size() <= 1000))
         && (!('mapId' in request.resource.data) || (request.resource.data.mapId is string && request.resource.data.mapId.size() <= 80))
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
@@ -166,7 +167,8 @@ service cloud.firestore {
         allow read: if joined(c);
         allow create, update: if joined(c)
           && (gm(c) || (placedBy(request.resource.data) == request.auth.uid && (resource == null || placedBy(resource.data) == request.auth.uid)))
-          && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','x','y','createdAt','updatedAt','creatorUid'])
+          && request.resource.data.keys().hasOnly(['sessionId','kind','targetId','noteId','mapId','x','y','createdAt','updatedAt','creatorUid'])
+          && (!('mapId' in request.resource.data) || (request.resource.data.mapId is string && request.resource.data.mapId.size() <= 80))
           && request.resource.data.kind in ['pcs','npcs','clans']
           && (!('sessionId' in request.resource.data) || (request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 80))
           && request.resource.data.targetId is string && request.resource.data.targetId.size() <= 80

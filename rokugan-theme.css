@@ -385,5 +385,4 @@
   .library-dialog header h2 { margin: 0 auto 0 0; font: 22px var(--serif); }
   .library-dialog-body { display: grid; gap: 18px; padding: 16px 18px; max-height: calc(90vh - 130px); overflow: auto; }
   .library-home-tile img { width: 44px; height: 44px; flex: none; border-radius: 4px; object-fit: cover; }
-  .timeline-map-actions { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 6px; }
 }
