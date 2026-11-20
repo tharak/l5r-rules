@@ -35,7 +35,13 @@ try {
   ]);
   const emulatorMode = ['localhost','127.0.0.1'].includes(location.hostname) && new URLSearchParams(location.search).has('emulators');
   const app = appSDK.initializeApp(emulatorMode ? {...firebaseConfig,projectId:'demo-l5r-rules'} : firebaseConfig);
-  const auth = authSDK.getAuth(app), db = dbSDK.getFirestore(app);
+  const auth = authSDK.getAuth(app);
+  // Firestore keeps a copy on this device (shared by open tabs), so reopening a page within about
+  // 30 minutes reads only what changed instead of every document again (the free plan allows
+  // 50,000 reads a day). Live updates are unchanged. Signing out clears the copy.
+  let db;
+  try { db = emulatorMode ? dbSDK.getFirestore(app) : dbSDK.initializeFirestore(app,{localCache:dbSDK.persistentLocalCache({tabManager:dbSDK.persistentMultipleTabManager()})}); }
+  catch (error) { console.warn('Firestore device cache unavailable',error); db = dbSDK.getFirestore(app); }
   const provider = new authSDK.GoogleAuthProvider();
   provider.setCustomParameters({prompt:'select_account'});
   // Emulator connections are opt-in and restricted to local development origins.
@@ -95,7 +101,12 @@ try {
   });
   logout.addEventListener('click', async () => {
     busy = true; update();
-    try { await authSDK.signOut(auth); location.reload(); }
+    try {
+      await authSDK.signOut(auth);
+      // Remove the campaign and character data cached on this device (another open tab keeps it).
+      try { await dbSDK.terminate(db); await dbSDK.clearIndexedDbPersistence(db); } catch (error) { console.warn('Could not clear the device cache',error); }
+      location.reload();
+    }
     catch (error) { showError(error); }
     finally { busy = false; login.disabled = logout.disabled = copy.disabled = false; }
   });
