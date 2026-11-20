@@ -417,9 +417,9 @@
   const cellSize = () => cellOf(mapList().find(m => m.id === activeMapId()));
   let previewCell = null;
   const hexRatio = () => (previewCell ?? cellSize()) / 100;
-  // The whole left panel folds away (remembered on this device).
-  let trayHidden = false;
-  try { trayHidden = localStorage.getItem('l5r-rules-map-tray-hidden') === '1'; } catch {}
+  // The tray (left) and the GM's map panel (right) each fold away (remembered on this device).
+  let trayHidden = false, mapsHidden = false;
+  try { trayHidden = localStorage.getItem('l5r-rules-map-tray-hidden') === '1'; mapsHidden = localStorage.getItem('l5r-rules-map-panel-hidden') === '1'; } catch {}
   const newestFirst = (a,b) => (b.createdAt || b.updatedAt || '').localeCompare(a.createdAt || a.updatedAt || '');
   // Pins still pointing at an existing PC or NPC (and note); one per character or note. Older
   // pins from the session maps collapse into the latest one.
@@ -502,11 +502,11 @@
     // Folding the groups reaches pins under the tray; a pin dropped on the tray is taken off the map.
     // The GM's maps: the cell size of the one shown, the list (pick one to show it) and Add Map.
     const maps = mapList(), shown = activeMapId();
-    const mapsGroup = !isGM ? '' : `<details class="map-tray-group" data-tray-group="Maps"${trayClosed.has('Maps') ? '' : ' open'}><summary class="map-tray-title">Maps <small>${maps.length}</small></summary><div class="map-tray-maps">${shown ? `<label class="map-cell"><span>Cell size</span><input type="range" min="0.5" max="6" step="0.05" value="${cellSize()}" data-map-cell aria-label="Hex cell size"${busy ? ' disabled' : ''}></label>` : ''}${maps.length ? `<ul class="map-list">${maps.map(m => `<li${m.id === shown ? ' class="map-list-active"' : ''}>${UI.button({text:m.title || 'Map',variant:'quiet',size:'compact',attrs:{class:'map-list-show','data-campaign':'map-show','data-id':m.id,'aria-pressed':String(m.id === shown),disabled:busy}})}${UI.button({text:'✕',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-remove','data-id':m.id,'aria-label':`Remove ${m.title || 'map'} from the list`,title:'Remove from the list',disabled:busy}})}</li>`).join('')}</ul>` : ''}${button('map-add','Add Map')}</div></details>`;
+    const foldButton = (action,hidden,name,open,closed) => UI.button({text:hidden ? closed : open,variant:'quiet',size:'compact',attrs:{class:'map-tray-toggle','data-campaign':action,'aria-expanded':String(!hidden),'aria-label':`${hidden ? 'Show' : 'Hide'} the ${name}`,title:`${hidden ? 'Show' : 'Hide'} the ${name}`}});
+    const mapsPanel = !isGM ? '' : `<div class="timeline-pin-controls map-panel${mapsHidden ? ' map-tray-hidden' : ''}" aria-label="Maps"><div class="map-panel-head">${mapsHidden ? '' : `<span class="map-tray-title">Maps <small>${maps.length}</small></span>`}${foldButton('maps-toggle',mapsHidden,'maps','▸','◂')}</div>${mapsHidden ? '' : `<div class="map-tray-maps">${shown ? `<label class="map-cell"><span>Cell size</span><input type="range" min="0.5" max="6" step="0.05" value="${cellSize()}" data-map-cell aria-label="Hex cell size"${busy ? ' disabled' : ''}></label>` : ''}${maps.length ? `<ul class="map-list">${maps.map(m => `<li${m.id === shown ? ' class="map-list-active"' : ''}>${UI.button({text:m.title || 'Map',variant:'quiet',size:'compact',attrs:{class:'map-list-show','data-campaign':'map-show','data-id':m.id,'aria-pressed':String(m.id === shown),disabled:busy}})}${UI.button({text:'✕',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-remove','data-id':m.id,'aria-label':`Remove ${m.title || 'map'} from the list`,title:'Remove from the list',disabled:busy}})}</li>`).join('')}</ul>` : ''}${button('map-add','Add Map')}</div>`}</div>`;
     const campaignGroup = !groups ? '' : `${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}<details class="map-tray-group map-tray-root" data-tray-group="Campaign"${trayClosed.has('Campaign') ? '' : ' open'}><summary class="map-tray-title" title="Fold or open everything; drop a name here to take it out of its clan or parent">Campaign <small>${items.length}</small></summary><div class="map-tray-root-body">${groups}</div></details>`;
-    const toggle = UI.button({text:trayHidden ? '▸' : '◂',variant:'quiet',size:'compact',attrs:{class:'map-tray-toggle','data-campaign':'tray-toggle','aria-expanded':String(!trayHidden),'aria-label':trayHidden ? 'Show the panel' : 'Hide the panel',title:trayHidden ? 'Show the panel' : 'Hide the panel'}});
-    const tray = !mapsGroup && !campaignGroup ? '' : `<div class="timeline-pin-controls map-tray${trayHidden ? ' map-tray-hidden' : ''}" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${toggle}${trayHidden ? '' : mapsGroup+campaignGroup}</div>`;
-    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
+    const tray = !campaignGroup ? '' : `<div class="timeline-pin-controls map-tray${trayHidden ? ' map-tray-hidden' : ''}" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${foldButton('tray-toggle',trayHidden,'tray','◂','▸')}${trayHidden ? '' : campaignGroup}</div>`;
+    const mapView = mapSrc(), map = `<div class="timeline-stage">${tray}${mapsPanel}${mapView.loading ? '<div class="timeline-map timeline-map-blank timeline-map-loading" aria-busy="true"><span>Loading map…</span></div>' : `<div class="timeline-map${mapView.src ? '' : ' timeline-map-blank'}" data-timeline-map>${mapView.src ? `<img src="${e(UI.imageLink(mapView.src))}" alt="Campaign map" draggable="false">` : ''}${pinHtml}</div>`}</div>`;
     return `<div class="timeline"><article class="timeline-detail">${map}<div class="timeline-arrows"></div></article></div>${renderNotePopup(numbers)}${renderClanPopup(numbers,kids)}`;
   }
   // A clan's panel: its mon and name, who is in it, and its journal (any member adds entries).
@@ -977,6 +977,7 @@
         if (picture) addEntryImage(id,picture);
       }
       else if (action==='tray-toggle') {trayHidden=!trayHidden;try{localStorage.setItem('l5r-rules-map-tray-hidden',trayHidden?'1':'0');}catch{}}
+      else if (action==='maps-toggle') {mapsHidden=!mapsHidden;try{localStorage.setItem('l5r-rules-map-panel-hidden',mapsHidden?'1':'0');}catch{}}
       else if (action==='map-add'||action==='map-show'||action==='map-remove') {
         if (!gm()) return;
         const c=store().get(`campaigns/${active}`); if (!c) return;
@@ -1079,7 +1080,7 @@
     }
     const svg=showHexes(map),rect=map.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top;
     // Over the tray counts as off the map (dropping there takes a pin off), so nothing hides under it.
-    const tray=document.querySelector('.map-tray')?.getBoundingClientRect?.(),overTray=!!tray&&event.clientX>=tray.left&&event.clientX<=tray.right&&event.clientY>=tray.top&&event.clientY<=tray.bottom;
+    const over=panel=>{const r=document.querySelector(panel)?.getBoundingClientRect?.();return !!r&&event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom;},overTray=over('.map-tray')||over('.map-panel');
     const inside=!overTray&&px>=0&&py>=0&&px<=rect.width&&py<=rect.height;
     const hex=inside&&snapHex(px,py,rect.width);
     drag.at=hex?{x:Math.min(100,Math.max(0,Math.round(hex.x/rect.width*1000)/10)),y:Math.min(100,Math.max(0,Math.round(hex.y/rect.height*1000)/10))}:null;

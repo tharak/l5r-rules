@@ -429,7 +429,7 @@ test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes a
  assert.equal(`${pin.kind}:${pin.targetId}:${pin.noteId}`,'clans:Crab:clan_w','a clan note goes on the map');
  assert.match(render(),/timeline-pin timeline-pin-clans timeline-pin-note timeline-pin-movable has-clan" data-pin-id="[^"]+" style="[^"]*--clan:#4b6a88"/,'and its pin takes the clan\'s colour');
 });
-test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take it off); each keeps its own pins and cell size; the panel folds',async()=>{
+test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take it off); each keeps its own pins and cell size; the panel at the right folds',async()=>{
  const d=campaignCards();
  d.window.MediaLibrary={cachedSrc:id=>'data:image/webp;base64,'+id,imageSrc:async()=>{},pickId:async()=>'m2',groups:()=>[{items:[{id:'m2',title:'Kyuden Doji'}]}]};
  d.window.confirm=()=>true;
@@ -439,7 +439,7 @@ test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take
  const render=()=>d.window.CampaignUI.render('campaigns/c'),settle=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
  let html=render();
  assert.doesNotMatch(html,/data-campaign="map-pick"/,'no Map button');
- assert.match(html,/Maps <small>1<\/small>[^]*data-map-cell[^]*map-list-active[^]*data-campaign="map-show" data-id="m1"[^]*data-campaign="map-add"[^>]*>Add Map</);
+ assert.match(html,/map-tray"[^]*<div class="timeline-pin-controls map-panel" aria-label="Maps">[^]*Maps <small>1<\/small>[^]*data-map-cell[^]*map-list-active[^]*data-campaign="map-show" data-id="m1"[^]*data-campaign="map-add"[^>]*>Add Map</);
  assert.match(html,/data-pin-id="old"/,'an older pin belongs to the first map');
  await d.click('map-add');await settle();
  let c=d.data.get('campaigns/c');
@@ -454,10 +454,13 @@ test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take
  c=d.data.get('campaigns/c');assert.equal(c.mapId,'m2');assert.equal(c.maps.map(m=>m.id).join(),'m2');
  assert.equal(d.data.get('campaigns/c/timeline/old').mapId,'m1');
  html=render();assert.doesNotMatch(html,/data-pin-id="old"/);assert.match(html,/data-pin-id="new"/);
- // The whole panel folds.
- await d.click('tray-toggle');html=render();
- assert.match(html,/map-tray map-tray-hidden[^]*data-campaign="tray-toggle"[^>]*aria-expanded="false"/);assert.doesNotMatch(html,/data-campaign="map-add"/);
- await d.click('tray-toggle');assert.match(render(),/data-campaign="map-add"/);
+ // The map panel (right) and the tray (left) each fold on their own.
+ await d.click('maps-toggle');html=render();
+ assert.match(html,/map-panel map-tray-hidden[^]*data-campaign="maps-toggle"[^>]*aria-expanded="false"/);assert.doesNotMatch(html,/data-campaign="map-add"/);
+ assert.match(html,/data-campaign="tray-toggle"[^>]*aria-expanded="true"/,'the tray stays open');
+ await d.click('maps-toggle');assert.match(render(),/data-campaign="map-add"/);
+ await d.click('tray-toggle');html=render();assert.match(html,/map-tray map-tray-hidden/);assert.match(html,/data-campaign="map-add"/);
+ await d.click('tray-toggle');
  // Players see no map list.
  d.store.uid='alice';assert.doesNotMatch(render(),/data-campaign="map-add"|data-map-cell/);
 });
