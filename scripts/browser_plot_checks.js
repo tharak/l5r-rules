@@ -16,7 +16,7 @@ async page => {
   const saved=p=>p.waitForFunction(()=>CampaignStorage.status==='Saved to campaign');
   const plot=async(p,title,text)=>{
     await p.getByRole('button',{name:'Plots',exact:true}).click();
-    await p.getByRole('button',{name:'+ Plot',exact:true}).click();
+    await p.getByRole('button',{name:'Add Plot',exact:true}).click();
     check(await p.locator('[data-entry-field="public"]').count()===0,'Paused plot privacy control is still shown');
     await p.locator('[data-entry-field="title"]').fill(title);
     await p.locator('[data-entry-field="text"]').fill(text);
@@ -25,7 +25,7 @@ async page => {
     return p.evaluate(title=>CampaignStorage.list('campaigns/'+location.hash.split('/')[2]+'/plots/').find(p=>p.title===title).id,title);
   };
   const note=async(p,text)=>{
-    await p.getByRole('button',{name:'+ Note',exact:true}).click();
+    await p.getByRole('button',{name:'Add Note',exact:true}).click();
     check(await p.locator('[data-entry-kind="note"][data-entry-field="public"]').count()===0,'Paused note privacy control is still shown');
     await p.locator('[data-entry-kind="note"][data-entry-field="text"]').fill(text);
     await p.getByRole('button',{name:'Save note',exact:true}).click();await saved(p);

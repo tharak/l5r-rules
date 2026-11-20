@@ -256,7 +256,7 @@
     });
     const nav = strip && ordered.length > 1 ? `<nav class="creator-journal-nav" aria-label="Jump to entry">${ordered.map((entry,i) => { const n = String(entry.number || i+1); return button({text:n,variant:'quiet',size:'compact',attrs:{'data-journal-jump':entry.id,title:entryTitle(entry),'aria-label':`Entry ${n}: ${entryTitle(entry)}`}}); }).join('')}</nav>` : '';
     const list = strip && items.length ? `${nav}<div class="creator-journal-strip">${items.join('')}</div>` : items.join('');
-    const head = heading || (canAdd && !draft) ? `<div class="creator-journal-head">${heading ? `<h3>${escape(heading)}</h3>` : '<span></span>'}${canAdd && !draft ? button({text:'+ Entry',attrs:control('new','')}) : ''}</div>` : '';
+    const head = heading || (canAdd && !draft) ? `<div class="creator-journal-head">${heading ? `<h3>${escape(heading)}</h3>` : '<span></span>'}${canAdd && !draft ? button({text:'Add Entry',attrs:control('new','')}) : ''}</div>` : '';
     return `<div class="creator-journal">${head}${editor}${list || (draft || !emptyText ? '' : `<div class="creator-empty">${escape(emptyText)}</div>`)}</div>`;
   }
   const field_ = (...args) => field(...args);

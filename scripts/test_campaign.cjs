@@ -211,8 +211,8 @@ test('the GM adds and removes session images from the library; session and plot 
  d.window.UI.readPortrait=async()=>picture;
  const render=()=>d.window.CampaignUI.render('campaigns/c');
  let view=render();await d.click('section','sessions');view=render();
- assert.match(view,/class="[^"]*campaign-actions[^"]*"[^>]*>[^]*?data-campaign="session-open"[^]*?data-campaign="note-new" data-id="sessions:s"[^>]*>\+ Entry</,'Edit and + Entry share one row');
- assert.doesNotMatch(view,/data-campaign="session-delete"/,'Delete only while editing');assert.doesNotMatch(view,/creator-journal-head/,'no second + Entry in the journal');
+ assert.match(view,/class="[^"]*campaign-actions[^"]*"[^>]*>[^]*?data-campaign="session-open"[^]*?data-campaign="note-new" data-id="sessions:s"[^>]*>\Add Entry</,'Edit and Add Entry share one row');
+ assert.doesNotMatch(view,/data-campaign="session-delete"/,'Delete only while editing');assert.doesNotMatch(view,/creator-journal-head/,'no second Add Entry in the journal');
  await d.click('session-open','s');
  assert.match(render(),/data-campaign="session-delete"/);
  d.window.MediaLibrary={pickFile:async()=>({type:'image/png'})};
@@ -299,7 +299,7 @@ test('map: notes are numbered oldest first; characters and their note numbers dr
  note('a','sessions','s1','We arrive','2026-11-01');note('b','npcs','n','Carries a letter','2026-11-02');note('c','npcs','k','The gate is shut','2026-11-03');note('d','npcs','n','Flees north','2026-11-04');
  html=render();
  assert.ok(html.indexOf('Second session')<html.indexOf('First session'),'sessions newest first on the map head');
- assert.match(html,/map-head[^]*data-campaign="npc-new"[^]*data-campaign="pc-picker"/,'+ NPC and + PC sit on the map');
+ assert.match(html,/map-head[^]*data-campaign="npc-new"[^]*data-campaign="pc-picker"/,'Add NPC and Add PC sit on the map');
  assert.doesNotMatch(html,/timeline-session|timeline-list/,'no session picker for pins');
  assert.match(html,/data-tray-token="npcs:n"[^]*?data-tray-token="npcs:n:b"[^>]*>2<[^]*?data-tray-token="npcs:n:d"[^>]*>4</,'each character is followed by its note numbers');
  assert.match(html,/aria-label="Places"[^]*data-tray-token="npcs:k:c"[^>]*>3</);
@@ -421,7 +421,7 @@ test('map: clans keep notes; the GM\'s older "- clan" NPCs pass on their notes a
  assert.match(html,/map-tray-token map-tray-npcs has-clan" style="--clan:#4b6a88" data-tray-token="npcs:a"/,'a member takes the clan\'s colour');
  assert.match(html,/map-tray-token map-tray-npcs" data-tray-token="npcs:x"/,'without a clan, the usual NPC colour');
  await d.click('clan-open','Crab');html=render();
- assert.match(html,/campaign-clan-popup[^]*Crab[^]*data-id="npcs:a"[^]*data-campaign="note-new" data-id="clans:Crab"[^]*The Wall holds/,'the clan panel: members, journal and + Entry');
+ assert.match(html,/campaign-clan-popup[^]*Crab[^]*data-id="npcs:a"[^]*data-campaign="note-new" data-id="clans:Crab"[^]*The Wall holds/,'the clan panel: members, journal and Add Entry');
  d.store.uid='alice';render();await d.click('clan-open','Crab');assert.match(render(),/data-campaign="note-new" data-id="clans:Crab"/,'any member adds entries');
  await d.click('clan-popup-close');assert.doesNotMatch(render(),/campaign-clan-popup/);
  const drag=dragOnMap(d,'');drag(trayToken('clans:Crab:clan_w'),[10,500],[100,100]);
@@ -443,7 +443,7 @@ test('map: the Rokugan map is never loaded (it is the page background); the GM\'
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});html=render();
  assert.doesNotMatch(html,/rokugan-map/);assert.match(html,/timeline-map-blank" data-timeline-map>/,'no map chosen: the empty frame');
 });
-test('players who joined show for the GM in the + PC popup, with their PCs or "no PC yet"; a player without a PC is told to add one',async()=>{
+test('players who joined show for the GM in the Add PC popup, with their PCs or "no PC yet"; a player without a PC is told to add one',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/c/members/gm',{displayName:'GM'});
  d.data.set('campaigns/c/members/alice',{displayName:'Alice'});d.data.set('campaigns/c/members/bob',{displayName:'Bob'});
@@ -579,7 +579,7 @@ test('session, plot and NPC descriptions become their first journal entry; entri
  assert.match(html,/<h4 class="creator-journal-title">Arrival<\/h4>/);
  assert.match(html,/<h4 class="creator-journal-title">We met at the inn.<\/h4>/,'untitled entries use their first line');
 });
-test('start page row: campaign cards, + Campaign, or Sign in',()=>{
+test('start page row: campaign cards, Add Campaign, or Sign in',()=>{
  const d=campaignCards();
  const routes={window:{}};vm.runInNewContext(fs.readFileSync('routes.js','utf8'),routes);d.window.Routes=routes.window.Routes;
  d.data.set('campaigns/camp1234',{title:'Emerald Dawn',gmUid:'gm'});
@@ -588,7 +588,7 @@ test('start page row: campaign cards, + Campaign, or Sign in',()=>{
  d.store.uid='';
  assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
 });
-test('the + PC popup has no invite link: the GM sees the players and requests instead',async()=>{
+test('the Add PC popup has no invite link: the GM sees the players and requests instead',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  let invited=0;Object.assign(d.store.backend,{get:async()=>null,invitation:async()=>({}),invite:async()=>{invited++;return 'tok123';},revoke:async()=>{}});
@@ -599,7 +599,7 @@ test('the + PC popup has no invite link: the GM sees the players and requests in
  assert.doesNotMatch(popup,/Invite players|#\/invite\/|invite-copy|data-campaign="revoke"/);
  assert.equal(invited,0,'opening the popup makes no invite link');
 });
-test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close button discards the draft',async()=>{
+test('Add Plot, Add NPC and Add PC open their form in a popup, not inline; the close button discards the draft',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
@@ -613,7 +613,7 @@ test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close b
   assert.doesNotMatch(render(),/campaign-popup/,`${title} closes`);
  }
 });
-test('+ Plot and + Session share one form: a title and a first entry; saving makes the item, then that entry as its first note',async()=>{
+test('Add Plot and Add Session share one form: a title and a first entry; saving makes the item, then that entry as its first note',async()=>{
  for(const [kind,single,uid] of [['plots','plot','alice'],['sessions','session','gm']]){
   const d=campaignCards();
   d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.store.uid=uid;
@@ -637,7 +637,7 @@ test('+ Plot and + Session share one form: a title and a first entry; saving mak
   assert.match(html,new RegExp(`data-campaign="${single}-delete" data-id="${id}"`),'Delete while editing');
  }
 });
-test('PC and NPC panels have no Remove; the + PC and + NPC popups edit the list instead',async()=>{
+test('PC and NPC panels have no Remove; the Add PC and Add NPC popups edit the list instead',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
  d.data.set('campaigns/c/members/alice',{displayName:'Alice'});

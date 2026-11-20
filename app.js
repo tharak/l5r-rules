@@ -247,14 +247,14 @@ function renderHome() {
   const books = bookSections().map(book => `<a class="home-tile home-book" href="${pageHref(book.slug)}" aria-label="${esc(book.title)}"${UI.tileArtStyle(BOOK_RINGS[book.slug] ? `public/assets/rings/${BOOK_RINGS[book.slug]}.webp` : '')}>${bookMark(book.slug)}<span><strong>${esc(ringName(book.slug) || book.title)}</strong></span></a>`);
   return `<div class="workspace home"><h1 class="visually-hidden">l5r-rules</h1>${
     row('Campaigns','',campaigns.html,campaigns.create || '')}${
-    row('Characters','',pcs.join(''),UI.button({text:'+ PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${
+    row('Characters','',pcs.join(''),UI.button({text:'Add PC',size:'compact',attrs:{'data-dashboard':'new','aria-label':'Create PC'}}))}${
     row('Books','',books.join(''),'<a class="home-row-link" href="#/all-pages">All pages</a>')}${
     window.CampaignStorage?.uid ? row('Library','#/library',window.MediaLibrary.homeTiles()) : ''}</div>`;
 }
 
 function renderCharacters() {
   const characters = window.CharacterBuilder.list();
-  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'+ PC',attrs:{'data-dashboard':'new','aria-label':'Create PC'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2><button type="button" class="character-open" data-dashboard="open" data-id="${esc(c.id)}">${esc(c.name || 'Unnamed PC')}</button></h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
+  return `<div class="workspace">${UI.sectionHeading({title:'Characters',level:1,actionsHtml:UI.button({text:'Add PC',attrs:{'data-dashboard':'new','aria-label':'Create PC'}})})}<div class="character-list">${characters.map(c => UI.card({attrs:{'class':'character-tile'},bodyHtml:`${characterAvatar(c)}<div class="character-info"><h2><button type="button" class="character-open" data-dashboard="open" data-id="${esc(c.id)}">${esc(c.name || 'Unnamed PC')}</button></h2><p>${esc([c.clan,c.family].filter(Boolean).join(' · '))}</p></div>${UI.actionRow({attrs:{'class':'character-actions'},bodyHtml:`${UI.button({text:'Delete',variant:'secondary',attrs:{'data-dashboard':'remove','data-id':c.id}})}`})}`})).join('') || '<p>No personal PCs yet. Create a PC to start.</p>'}</div></div>`;
 }
 
 function renderArticle(page) {

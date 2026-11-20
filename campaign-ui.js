@@ -179,7 +179,7 @@
     const attrs = key => ({'data-entry-field':key,'data-entry-kind':kind});
     return UI.recordEditor({attrs:{class:'entry-editor','data-entry-editor':kind},fields:[
       {label:kind==='plot'?'Plot title':'Session title',value:draft.title,attrs:{...attrs('title'),maxlength:200}},
-      // A new one can start its journal at once; later entries come from "+ Entry".
+      // A new one can start its journal at once; later entries come from "Add Entry".
       ...(!editingId?[{label:'First entry',kind:'textarea',value:draft.firstEntry||'',attrs:{...attrs('firstEntry'),rows:6,maxlength:20000,placeholder:`What is this ${name} about?`}}]:[]),
     ],extraHtml:gallery(draft.images,{kind,editable:true}),actionsHtml:button(kind+'-save',`Save ${name}`,'',!String(draft.title||'').trim())+button(kind+'-cancel','Cancel')+(editingId?button(kind+'-delete',`Delete ${name}`,editingId):'')});
   }
@@ -300,7 +300,7 @@
     return false;
   }
   // Sessions, plots and NPCs use the same journal as characters (UI.journal): titled entries.
-  // addInRow: "+ Entry" sits in the panel's own button row (entryActions) instead of the journal head.
+  // addInRow: "Add Entry" sits in the panel's own button row (entryActions) instead of the journal head.
   function notesFor(kind,id,{addInRow = false} = {}) {
     const notes=store().list(path('notes','')).filter(n=>n.targetKind===kind&&n.targetId===id);
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
@@ -312,10 +312,10 @@
     const field=name=>({'data-entry-field':name,'data-entry-kind':'note'});
     return `<div class="campaign-notes" data-note-target-kind="${kind}" data-note-target-id="${e(id)}">${UI.journal({entries,draft:drafting?{...noteDraft,id:noteId}:null,canAdd,control,field})}</div>`;
   }
-  // A session's or plot's panel: Edit and "+ Entry" in one row (Delete shows while editing).
+  // A session's or plot's panel: Edit and "Add Entry" in one row (Delete shows while editing).
   function entryActions(kind,id,editHtml) {
     const drafting=noteTarget?.kind===kind&&noteTarget?.id===id&&noteDraft;
-    const add=canAddEntry(kind,id)&&!drafting?UI.button({text:'+ Entry',attrs:{'data-campaign':'note-new','data-id':`${kind}:${id}`,disabled:busy}}):'';
+    const add=canAddEntry(kind,id)&&!drafting?UI.button({text:'Add Entry',attrs:{'data-campaign':'note-new','data-id':`${kind}:${id}`,disabled:busy}}):'';
     return editHtml||add?UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:editHtml+add}):'';
   }
   function renderPlots(plots) {
@@ -324,7 +324,7 @@
     const list = [...plots].sort(byNewest).map(plot => entry(`plots:${plot.id}`,`${entryTitle(plot.title || 'Untitled plot',`${e(entryAuthor(plot))}${plot.updatedAt?` · ${day(plot.updatedAt)}`:''}`)}${isUnread(active,'plots',plot) ? unreadMark : ''}`,
       plotDraft && plotId === plot.id ? entryEditor('plot',plotDraft)
         : `<article class="campaign-plot">${gallery(plot.images)}${readStatus('plots',plot)}${entryActions('plots',plot.id,entryOwner(plot) ? button('plot-edit','Edit plot',plot.id) : '')}${notesFor('plots',plot.id,{addInRow:true})}</article>`)).join('');
-    return `${sectionBar('Plots')}${fresh}<div class="campaign-entries">${addTile(button('plot-new','+ Plot'))}${list || ''}</div>`;
+    return `${sectionBar('Plots')}${fresh}<div class="campaign-entries">${addTile(button('plot-new','Add Plot'))}${list || ''}</div>`;
   }
   // Sessions, plots, NPCs and PCs are lists of collapsible entries; remember which are open
   // across re-renders (toggle events do not bubble, so listen in the capture phase).
@@ -517,7 +517,7 @@
   // The + buttons open their form in the same popup as Invite (new plot, new NPC, add a PC).
   const popup = (id,title,bodyHtml,closeAction) => `<div class="timeline-popup-backdrop" data-campaign="${closeAction}"></div><div class="timeline-popup campaign-popup" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${e(title)}</h3></div>${button(closeAction,'✕')}</header>${bodyHtml}</div>`;
   const newOpen = () => (plotDraft && !plotId) || (sessionDraft && !sessionId) || (npcDraft && !npcId) || picking;
-  // "Edit list" in the + PC and + NPC popups: everything in the campaign, each with Remove.
+  // "Edit list" in the Add PC and Add NPC popups: everything in the campaign, each with Remove.
   // The GM removes any PC or NPC; a player removes only their own PCs. Removing a PC only
   // unlinks it (the sheet stays with its player); removing an NPC deletes it and its journal.
   function listEditor(kind,items) {
@@ -541,7 +541,7 @@
     // A player who joined but has no PC here yet is invisible to the others until they add one.
     const noPC = !gm() && !store().list(path('pcs','')).some(pc => pc.ownerUid === store().uid);
     const rows = [
-      ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Create your character so the GM and the other players see you (or link one you already have with <strong>+ PC</strong>).</span>${button('pc-create','Create PC')}</div>`] : []),
+      ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Create your character so the GM and the other players see you (or link one you already have with <strong>Add PC</strong>).</span>${button('pc-create','Create PC')}</div>`] : []),
       ...mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`),
       ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
     ];
@@ -616,8 +616,8 @@
       changed();
     }) || null;
   }
-  // Who is in the campaign (for the GM, in the + PC popup): each player who joined and the
-  // PCs they linked, "no PC yet" until they add one with + PC, and anyone asking to join.
+  // Who is in the campaign (for the GM, in the Add PC popup): each player who joined and the
+  // PCs they linked, "no PC yet" until they add one with Add PC, and anyone asking to join.
   // Requests from people not yet in the campaign (a joined player's request is removed as stale).
   const staleRequests = new Set();
   function openRequests() {
@@ -646,7 +646,7 @@
     const chip = (kind,item,title) => UI.button({text:title,variant:'quiet',size:'compact',attrs:{class:`map-head-${kind === 'plots' ? 'plot' : 'session'}`,'data-campaign':'entry-open','data-id':`${kind}:${item.id}`}});
     const sessionChips = [...sessions].sort(newestFirst).map(item => chip('sessions',item,item.title || 'Untitled session')).join('');
     const plotChips = [...plots].sort(byNewest).map(item => chip('plots',item,item.title || 'Untitled plot')).join('');
-    return `<div class="map-head">${isGM ? button('session-new','+ Session') : ''}${button('plot-new','+ Plot')}${isGM ? button('npc-new','+ NPC') : ''}${button('pc-picker','+ PC')}${sessionChips ? `<span class="map-head-plots" aria-label="Sessions">${sessionChips}</span>` : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
+    return `<div class="map-head">${isGM ? button('session-new','Add Session') : ''}${button('plot-new','Add Plot')}${isGM ? button('npc-new','Add NPC') : ''}${button('pc-picker','Add PC')}${sessionChips ? `<span class="map-head-plots" aria-label="Sessions">${sessionChips}</span>` : ''}${plotChips ? `<span class="map-head-plots" aria-label="Plots">${plotChips}</span>` : ''}</div>`;
   }
   // A pin is moved or removed by whoever placed it, or by the GM (older pins count as the GM's).
   const canMovePin = item => !!item && (gm() || (!!item.creatorUid && item.creatorUid === store().uid));
@@ -659,14 +659,14 @@
     const list = [...sessions].sort(byNewest).map(session => entry(`sessions:${session.id}`,`${entryTitle(session.title || 'Untitled session',day(session.updatedAt))}${isUnread(active,'sessions',session) ? unreadMark : ''}`,
       isGM && sessionDraft && sessionId === session.id ? entryEditor('session',sessionDraft)
         : `${gallery(session.images)}${readStatus('sessions',session)}${entryActions('sessions',session.id,isGM ? button('session-open','Edit',session.id) : '')}${notesFor('sessions',session.id,{addInRow:true})}`)).join('');
-    return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','+ Session'):'')}${list}</div>`;
+    return `${sectionBar('Sessions')}<div class="campaign-entries">${addTile(isGM?button('session-new','Add Session'):'')}${list}</div>`;
   }
   function renderNPCs(npcs,isGM) {
     const fresh = '';
     const list = [...npcs].sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(npc => entry(`npcs:${npc.id}`,UI.characterTileBody({portrait:npc.portrait,name:npc.name || 'Unnamed NPC',meta:npc.role || ''}),
       isGM && npcId === npc.id ? `${npcEditor(npcDraft || npc)}${notesFor('npcs',npc.id)}`
         : `<div class="campaign-npc">${UI.isPortrait(npc.portrait) ? `<img class="public-pc-picture" src="${UI.imageLink(npc.portrait)}" alt="Picture of ${e(npc.name || 'this NPC')}">` : ''}${npc.role ? `<p class="campaign-npc-role">${e(npc.role)}</p>` : ''}${npc.description ? `<p class="campaign-npc-description entry-text">${e(npc.description)}</p>` : ''}</div>${isGM ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('npc-open','Edit',npc.id)+unpinButton(`npcs:${npc.id}`)}) : unpinButton(`npcs:${npc.id}`) ? UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:unpinButton(`npcs:${npc.id}`)}) : ''}${notesFor('npcs',npc.id)}`,UI.tileArtStyle(UI.isPortrait(npc.portrait) ? npc.portrait : 'public/assets/l5r-mark.webp'))).join('');
-    return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','+ NPC'):'')}${list}</div>`;
+    return `${sectionBar('NPCs')}${fresh}<div class="campaign-entries">${addTile(isGM?button('npc-new','Add NPC'):'')}${list}</div>`;
   }
   // "Remove from map" for a character's token or one of its notes, when it is pinned and this
   // member may move it (their own pin, or any as GM).
@@ -694,7 +694,7 @@
         `${window.PublicCharacter ? window.PublicCharacter.page(withNumbers(pc,data),[],{compact:true}) : ''}${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:actions})}${notesFor('pcs',pc.id)}`,UI.clanTileStyle(profile?.clan || mine?.clan));
     }).join('');
     const picker = '';
-    return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(button('pc-picker','+ PC'))}${list}</div>${picker}`;
+    return `${sectionBar('PCs')}<div class="campaign-entries">${addTile(button('pc-picker','Add PC'))}${list}</div>${picker}`;
   }
   function render(slug) {
     renderAgain ||= () => {};
@@ -1174,7 +1174,7 @@
     if (!store().uid) return {signedIn:false,html:button('sign-in','Sign in with Google')};
     const campaigns = store().list('campaigns/');
     watchCardSheets(campaigns);
-    return {signedIn:true,html:campaigns.map(campaignCard).join('')+otherCampaigns(),create:button('create','+ Campaign')};
+    return {signedIn:true,html:campaigns.map(campaignCard).join('')+otherCampaigns(),create:button('create','Add Campaign')};
   }
   window.CampaignUI={render,refresh,mountEditor,homeCampaigns,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
 })();

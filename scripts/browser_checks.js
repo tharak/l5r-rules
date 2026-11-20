@@ -11,7 +11,7 @@ async page => {
   await page.getByRole('button',{name:'Create campaign',exact:true}).click();
   await page.locator('[data-campaign-field="title"]').waitFor();
   const campaignURL=page.url();
-  await page.getByRole('button',{name:'+ Session',exact:true}).click();
+  await page.getByRole('button',{name:'Add Session',exact:true}).click();
   await page.locator('[data-campaign-field="session-title"]').fill('Session One');
   const notes='\nLine one\n\n'+('A long session note. '.repeat(4000))+'\nLast line';
   await page.locator('[data-campaign-field="session-text"]').fill(notes);
@@ -30,12 +30,12 @@ async page => {
   check(await page.getByRole('button',{name:'Sessions',exact:true}).getAttribute('aria-pressed')==='true','Sessions not selected');
   await page.getByRole('button',{name:'NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="session-text"]').count()===0,'Sessions remain in NPC panel');
-  await page.getByRole('button',{name:'+NPC',exact:true}).click();
+  await page.getByRole('button',{name:'Add NPC',exact:true}).click();
   await page.locator('[data-campaign-field="npc-name"]').fill('Hidden NPC');
   await page.getByRole('button',{name:'Save NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="npc-name"]').count()===0,'NPC creation editor did not close');
   await page.getByRole('button',{name:'Hidden NPC',exact:true}).waitFor();
-  await page.getByRole('button',{name:'+NPC',exact:true}).click();
+  await page.getByRole('button',{name:'Add NPC',exact:true}).click();
   check(await page.locator('[data-campaign-field="npc-name"]').inputValue()==='','New NPC retained a previous name');
   check(await page.getByRole('button',{name:'Save NPC',exact:true}).isDisabled(),'Blank NPC can be saved');
   await page.locator('[data-campaign-field="npc-name"]').fill('Second NPC');
@@ -63,7 +63,7 @@ async page => {
     check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Campaign panel overflows at '+width);
   }
   await page.getByRole('button',{name:'PC',exact:true}).click();
-  await page.getByRole('button',{name:'+PC',exact:true}).click();
+  await page.getByRole('button',{name:'Add PC',exact:true}).click();
   await page.getByRole('button',{name:'Create PC',exact:true}).click();
   await page.locator('[data-field="name"]').waitFor();
   await page.locator('[data-field="name"]').fill('GM Personal PC');
@@ -79,7 +79,7 @@ async page => {
   check(await page.locator('[data-field="name"]').count()===0,'Saving personal PC did not close its editor');
   await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:'http://127.0.0.1:5000'});
   await page.getByRole('button',{name:'Invite link',exact:true}).waitFor();
-  check(await page.locator('.campaign-actions [data-campaign="pc-picker"] + [data-campaign="share-invite"]').count()===1,'Invite link is not beside +PC');
+  check(await page.locator('.campaign-actions [data-campaign="pc-picker"] + [data-campaign="share-invite"]').count()===1,'Invite link is not beside Add PC');
   await page.getByRole('button',{name:'Invite link',exact:true}).click();
   await page.getByText('Invite link copied.',{exact:true}).waitFor();
   const inviteURL=await page.evaluate(()=>navigator.clipboard.readText());
@@ -134,7 +134,7 @@ async page => {
   const ownerPC = await page.evaluate(()=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').find(pc=>pc.ownerUid===CampaignStorage.uid));
   check(ownerPC,'GM PC was not linked');
   await player.waitForFunction(()=>document.querySelector('#app').textContent.includes('GM Personal PC'));
-  await player.getByRole('button',{name:'+PC',exact:true}).click();
+  await player.getByRole('button',{name:'Add PC',exact:true}).click();
   await player.getByRole('button',{name:'Create PC',exact:true}).click();
   await player.locator('[data-field="name"]').waitFor();
   await player.locator('[data-field="name"]').fill('Player PC');

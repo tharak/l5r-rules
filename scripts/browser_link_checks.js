@@ -11,7 +11,7 @@ async page => {
     await page.locator('[data-campaign-field="title"]').waitFor();
     const url=page.url();
     await page.getByRole('button',{name:'PC',exact:true}).click();
-    await page.getByRole('button',{name:'+PC',exact:true}).click();
+    await page.getByRole('button',{name:'Add PC',exact:true}).click();
     await page.locator('[data-campaign="pc-link"][data-id="'+personalId+'"]').click();
     await page.waitForFunction(id=>CampaignStorage.list('campaigns/'+location.hash.slice(12)+'/pcs/').some(pc=>pc.characterId===id),personalId);
     return url;
