@@ -439,7 +439,7 @@ test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take
  const render=()=>d.window.CampaignUI.render('campaigns/c'),settle=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
  let html=render();
  assert.doesNotMatch(html,/data-campaign="map-pick"/,'no Map button');
- assert.match(html,/map-tray"[^]*<div class="timeline-pin-controls map-panel" aria-label="Maps">[^]*Maps <small>1<\/small>[^]*data-map-cell[^]*map-list-active[^]*data-campaign="map-show" data-id="m1"[^]*data-campaign="map-add"[^>]*>Add Map</);
+ assert.match(html,/map-tray"[^]*<div class="timeline-pin-controls map-panel" aria-label="Maps"><div class="map-panel-head"><details class="map-tray-group" data-tray-group="Maps" open><summary class="map-tray-title">Maps <small>1<\/small><\/summary><div class="map-tray-maps"><ul class="map-list"><li class="map-list-active">[^]*data-campaign="map-show" data-id="m1"[^]*data-campaign="map-add"[^>]*>Add Map<[^]*data-map-cell/,'Maps folds open to the list, then Add Map and the cell size');
  assert.match(html,/data-pin-id="old"/,'an older pin belongs to the first map');
  await d.click('map-add');await settle();
  let c=d.data.get('campaigns/c');
