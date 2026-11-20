@@ -233,6 +233,8 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       if (key.length !== 8) return null;
       return get(`campaignDirectory/${key}`).catch(() => null);
     },
+    // Every campaign's id and title, for the start page's list of campaigns to ask to join.
+    watchDirectory(receive) { return sdk.onSnapshot(sdk.collection(db,'campaignDirectory'),s=>receive(s.docs.map(d=>d.data())),()=>receive([])); },
     async requestInvite(c) { await sdk.setDoc(ref(`campaigns/${c}/requests/${uid}`),{displayName:playerName(),createdAt:new Date().toISOString()}); },
     async withdrawRequest(c) { await sdk.deleteDoc(ref(`campaigns/${c}/requests/${uid}`)); },
     watchRequest(c,receive) { return sdk.onSnapshot(ref(`campaigns/${c}/requests/${uid}`),s=>receive(s.exists()?s.data():null),()=>receive(null)); },

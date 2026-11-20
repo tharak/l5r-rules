@@ -249,7 +249,8 @@ test('campaign lookup and join requests: anyone signed in reads one lookup; only
  await assertSucceeds(setDoc(r(db('gm'),'campaignDirectory/abcdef12'),{campaignId:'abcdef12-x',title:'Lookup'}));
  await assertSucceeds(getDoc(r(db('stranger'),'campaignDirectory/abcdef12')));
  await assertFails(getDoc(r(db(),'campaignDirectory/abcdef12')),'signed in only');
- await assertFails(getDocs(collection(db('stranger'),'campaignDirectory')),'cannot be listed');
+ await assertSucceeds(getDocs(collection(db('stranger'),'campaignDirectory')));
+ await assertFails(getDocs(collection(db(),'campaignDirectory')),'listed when signed in only');
  await assertFails(getDoc(r(db('stranger'),'campaigns/abcdef12-x')),'the campaign itself stays private');
  await assertSucceeds(setDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/stranger'),{displayName:'Stranger',createdAt:'now'}));
  await assertFails(setDoc(r(db('stranger'),'campaigns/abcdef12-x/requests/other'),{displayName:'Forged',createdAt:'now'}));

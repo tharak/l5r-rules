@@ -328,9 +328,10 @@ service cloud.firestore {
     }
     // Campaign links carry the first 8 characters of the campaign id. This lookup lets someone who
     // is not a member see which campaign a link names (its id and title, nothing else) so they can
-    // ask to join. Only the GM writes it; it cannot be listed.
+    // ask to join. Only the GM writes it. Every signed-in user can list it: the start page shows
+    // every campaign, so anyone can open one and ask to be invited without a link.
     match /campaignDirectory/{key} {
-      allow get: if signed();
+      allow read: if signed();
       allow create, update: if signed() && key.size() == 8 && request.resource.data.keys().hasOnly(['campaignId','title'])
         && request.resource.data.campaignId is string && request.resource.data.campaignId.matches('^' + key + '.*')
         && gm(request.resource.data.campaignId)

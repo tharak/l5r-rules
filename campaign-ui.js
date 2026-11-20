@@ -706,7 +706,7 @@
       reset('');
       const campaigns = store().list('campaigns/');
       watchCardSheets(campaigns);
-      return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1><div class="campaign-toolbar">${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('') || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? UI.disclosure({attrs:{},titleHtml:`Retained drafts`,bodyHtml:`${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}`}) : ''}</div>`;
+      return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1><div class="campaign-toolbar">${button('create','Create campaign')}</div>${statusPanel()}<div class="campaign-list">${campaigns.map(campaignCard).join('')+otherCampaigns() || '<p>No campaigns yet.</p>'}</div>${Object.keys(store().drafts()).length ? UI.disclosure({attrs:{},titleHtml:`Retained drafts`,bodyHtml:`${Object.entries(store().drafts()).map(([path,data])=>`<h3>${e(path)}</h3><pre>${e(data?.text || data?.notes || JSON.stringify(data))}</pre>`).join('')}`}) : ''}</div>`;
     }
     const [campaignPart = '',routeSection = '',itemPart = ''] = slug.slice('campaigns/'.length).split('/');
     reset(resolveCampaign(campaignPart));
@@ -1176,11 +1176,27 @@
   });
   window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
   // Start page row: the campaign cards (or Sign in).
+  // Every campaign is listed for anyone signed in (from the public lookup: id and title only).
+  // One you are not in opens its page, where you ask to be invited.
+  let directory = {backend:null,list:[],stop:null};
+  function otherCampaigns() {
+    const backend = store().backend;
+    if (directory.backend !== backend) {
+      directory.stop?.();
+      directory = {backend,list:[],stop:null};
+      directory.stop = backend?.watchDirectory?.(list => { if (directory.backend === backend) { directory.list = list; changed(); } }) || null;
+    }
+    // The GM keeps the lookup current for each of their campaigns, so all of them are listed.
+    for (const c of store().list('campaigns/')) if (c.gmUid === store().uid && published.get(c.id) !== c.title) { published.set(c.id,c.title); backend?.publishDirectory?.(c.id,c.title).catch(()=>{}); }
+    const mine = new Set(store().list('campaigns/').map(c => c.id));
+    return directory.list.filter(d => d.campaignId && !mine.has(d.campaignId)).sort((a,b) => (a.title || '').localeCompare(b.title || ''))
+      .map(d => UI.card({attrs:{'class':'panel campaign-card campaign-card-other'},href:'#/campaigns/'+encodeURIComponent(`${window.Routes?.slugify(d.title || 'campaign') || 'campaign'}-${d.campaignId.slice(0,8)}`),bodyHtml:`<h2>${e(d.title || 'Campaign')}</h2><p class="campaign-card-role">Not joined · ask to be invited</p>`})).join('');
+  }
   function homeCampaigns() {
     if (!store().uid) return {signedIn:false,html:button('sign-in','Sign in with Google')};
     const campaigns = store().list('campaigns/');
     watchCardSheets(campaigns);
-    return {signedIn:true,html:campaigns.map(campaignCard).join(''),create:button('create','+ Campaign')};
+    return {signedIn:true,html:campaigns.map(campaignCard).join('')+otherCampaigns(),create:button('create','+ Campaign')};
   }
   window.CampaignUI={render,refresh,mountEditor,homeCampaigns,creatorReturn:()=>creatorCampaign?campaignHref(creatorCampaign,'pcs'):null};
 })();
