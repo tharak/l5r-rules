@@ -443,7 +443,7 @@ test('map: the Rokugan map is never loaded (it is the page background); the GM\'
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});html=render();
  assert.doesNotMatch(html,/rokugan-map/);assert.match(html,/timeline-map-blank" data-timeline-map>/,'no map chosen: the empty frame');
 });
-test('players who joined show for the GM beside the invite link, with their PCs or "no PC yet"; a player without a PC is told to add one',async()=>{
+test('players who joined show for the GM in the + PC popup, with their PCs or "no PC yet"; a player without a PC is told to add one',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});d.data.set('campaigns/c/members/gm',{displayName:'GM'});
  d.data.set('campaigns/c/members/alice',{displayName:'Alice'});d.data.set('campaigns/c/members/bob',{displayName:'Bob'});
@@ -457,18 +457,11 @@ test('players who joined show for the GM beside the invite link, with their PCs 
  assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Create your character[^]*data-campaign="pc-create"[^>]*>Create PC</);
  a.data.set('campaigns/c/pcs/q',{ownerUid:'alice',characterId:'x'});assert.doesNotMatch(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign/);
 });
-test('an invite link joins at once when signed in; signed out it says so, and warns inside app browsers where Google sign-in fails',async()=>{
- const d=campaignCards();let joined='';
- d.store.backend.invitation=async()=>({campaignId:'c'});d.store.backend.join=async token=>{joined=token;return 'c';};
- const render=slug=>d.window.CampaignUI.render(slug);
- render('invite/tok');for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r));
- assert.equal(joined,'tok','no Join button to miss');assert.equal(d.location.hash,'#/campaigns/c');
- const f=campaignCards();f.store.backend.invitation=async()=>({campaignId:'c'});f.store.backend.join=async()=>{throw Object.assign(new Error('x'),{code:'permission-denied'});};
- f.window.CampaignUI.render('invite/t2');for(let i=0;i<3;i++)await new Promise(r=>setTimeout(r));
- assert.match(f.window.CampaignUI.render('invite/t2'),/Could not join: the invitation was replaced or revoked[^]*data-campaign="join" data-id="t2"/,'a failed join explains itself and can be retried');
+test('old invite links no longer join: they point to the start page, signed in or out',()=>{
+ const d=campaignCards();let joined='';d.store.backend.join=async t=>{joined=t;return 'c';};
+ assert.match(d.window.CampaignUI.render('invite/tok'),/Invite links are no longer used[^]*href="#\/start"/);assert.equal(joined,'');
  const out=campaignCards();out.store.uid=null;
- assert.match(out.window.CampaignUI.render('invite/t3'),/You were invited to a campaign\. Sign in with Google and you join it straight away/);
- assert.doesNotMatch(out.window.CampaignUI.render('invite/t3'),/campaign-invite-warning/);
+ assert.match(out.window.CampaignUI.render('invite/t3'),/Invite links are no longer used/);
 });
 test('one campaign view: a row per kind, the add button as the first tile, no visible titles, no selector',()=>{
  const d=campaignCards();
@@ -595,27 +588,16 @@ test('start page row: campaign cards, + Campaign, or Sign in',()=>{
  d.store.uid='';
  assert.match(d.window.CampaignUI.homeCampaigns().html,/data-campaign="sign-in"/);
 });
-test('the + PC popup holds the invite link (GM): Copy link, Replace link, Revoke; no separate Invite button',async()=>{
+test('the + PC popup has no invite link: the GM sees the players and requests instead',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- Object.assign(d.store.backend,{get:async()=>null,invitation:async()=>({}),invite:async()=>'tok123',revoke:async()=>{}});
+ let invited=0;Object.assign(d.store.backend,{get:async()=>null,invitation:async()=>({}),invite:async()=>{invited++;return 'tok123';},revoke:async()=>{}});
  const render=()=>d.window.CampaignUI.render('campaigns/c');
- const settle=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
- assert.doesNotMatch(render(),/data-campaign="share-invite"/);
- await d.click('pc-picker');await settle();
- let html=render();
- const popup=html.split('<div class="timeline-popup campaign-popup"')[1] || '';
- assert.match(popup,/<h3 id="new-popup-title">Add a PC<\/h3>[^]*data-campaign="pc-create"[^]*<h4>Invite players<\/h4>/);
- assert.match(popup,/value="http:\/\/localhost\/#\/invite\/tok123"/);
- assert.match(popup,/data-campaign="invite-copy"[^>]*>Copy link</);
- assert.match(popup,/data-campaign="invite"[^>]*>Replace link</);assert.match(popup,/data-campaign="revoke"[^>]*>Revoke</);
- await d.click('revoke');await settle();
- assert.match(render(),/No active invite link\.[^]*data-campaign="invite"[^>]*>New link</);
- await d.click('new-close');
- assert.doesNotMatch(render(),/campaign-popup/);
- // A player's + PC popup has no invite section.
- d.store.uid='alice';render();await d.click('pc-picker');await settle();
- assert.doesNotMatch(render(),/Invite players/);
+ render();await d.click('pc-picker');for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));
+ const popup=render().split('<div class="timeline-popup campaign-popup"')[1] || '';
+ assert.match(popup,/<h3 id="new-popup-title">Add a PC<\/h3>[^]*data-campaign="pc-create"[^]*<h4>Players/);
+ assert.doesNotMatch(popup,/Invite players|#\/invite\/|invite-copy|data-campaign="revoke"/);
+ assert.equal(invited,0,'opening the popup makes no invite link');
 });
 test('+ Plot, + NPC and + PC open their form in a popup, not inline; the close button discards the draft',async()=>{
  const d=campaignCards();

@@ -2,12 +2,10 @@
   const UI = window.UI;
   const store = () => window.CampaignStorage;
   const e = UI.escape;
-  let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, invite = null, inviteLoaded = '', editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
+  let accountUid = null, active = '', section = 'timeline', sessionId = '', npcId = '', npcDraft = null, sheetId = '', picking = false, error = '', busy = false, editor = null, creatorCampaign = null, renderAgain, watchGeneration = 0;
   let plotId='', plotDraft=null, sessionDraft=null, noteId='', noteDraft=null, noteTarget=null, pcNotesId='';
   let timelineSession='', notePopup='', clanPopup='', focusPopup=false;
   const trayClosed=new Set();
-  // The GM's invite popup: the current invite link while it is open.
-  let inviteLink='', inviteCopied=false, pageLinkCopied=false;
   // Handovers: live PC offers to and from this account, and which handover popup is open
   // ('campaign' for the GM handover, or 'pc:<pcId>' for a PC offer).
   let transfers=[], transferPopup='', stopTransfers=null, transfersBackend=null;
@@ -54,8 +52,6 @@
   }
   // Apps that open links in their own browser (WhatsApp, Instagram, Facebook, Line, TikTok…),
   // where Google refuses to sign in.
-  const inAppBrowser = () => typeof navigator !== 'undefined' && /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|MicroMessenger|TikTok|musical_ly|Snapchat|Twitter|; wv\)/i.test(navigator.userAgent || '');
-  const inviteURL = token => location.href.split('#')[0]+'#/invite/'+token;
   const own = pc => pc.ownerUid === store().uid;
   const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
   const cardKey = pc => `${pc.ownerUid}/${pc.characterId}`;
@@ -139,7 +135,7 @@
     for (const stop of stops.values()) stop?.(); stops.clear(); sheets.clear();
     active = next; section = 'timeline'; sessionId = npcId = sheetId = ''; npcDraft = null; picking = false; editor = null; error = '';
     plotId=noteId=pcNotesId='';plotDraft=sessionDraft=noteDraft=noteTarget=null;
-    timelineSession='';notePopup='';clanPopup='';inviteLink='';inviteCopied=false;transferPopup='';
+    timelineSession='';notePopup='';clanPopup='';transferPopup='';
     appliedRoute='';pendingItem=null;scrollEntry='';
   }
   async function watch(pc,full=false) {
@@ -356,7 +352,7 @@
     if (transferPopup) { transferPopup = ''; changed(); return; }
     if (drag) { endDrag(); return; }
     if (notePopup) { notePopup = ''; changed(); return; }
-    if (newOpen()) { if (!plotId) plotDraft = null; if (!sessionId) sessionDraft = null; if (!npcId) npcDraft = null; picking = false; inviteLink = ''; inviteCopied = false; changed(); return; }
+    if (newOpen()) { if (!plotId) plotDraft = null; if (!sessionId) sessionDraft = null; if (!npcId) npcDraft = null; picking = false; changed(); return; }
     closeEntry(document.querySelector('.campaign-entry[open]'));
   });
   document.addEventListener('click',event => { if (event.target?.matches?.('.campaign-entry[open]')) closeEntry(event.target); });
@@ -534,7 +530,7 @@
     if (plotDraft && !plotId) return popup('new-popup-title','New plot',entryEditor('plot',plotDraft),'new-close');
     if (sessionDraft && !sessionId && gm()) return popup('new-popup-title','New session',entryEditor('session',sessionDraft),'new-close');
     if (npcDraft && !npcId && gm()) return popup('new-popup-title','New NPC',npcEditor(npcDraft)+listEditor('npcs',store().list(path('npcs',''))),'new-close');
-    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${listEditor('pcs',pcs)}${gm() ? playersSection(pcs)+inviteSection() : ''}`,'new-close');
+    if (picking) return popup('new-popup-title','Add a PC',`<div class="pc-picker">${window.CharacterBuilder.list().filter(personal=>!pcs.some(pc=>own(pc)&&pc.characterId===personal.id)).map(pc=>button('pc-link',pc.name||'Unnamed PC',pc.id)).join('')}${button('pc-create','Create PC')}</div>${listEditor('pcs',pcs)}${gm() ? playersSection(pcs) : ''}`,'new-close');
     return '';
   }
   // Offers made to you in this campaign (accept saves the PC to your account and links it), and,
@@ -589,13 +585,13 @@
       : request ? `<p class="campaign-invite-note">Request sent · waiting for the GM.</p>${button('request-withdraw','Withdraw request',found.campaignId)}`
       : button('request-invite','Ask to be invited',found.campaignId);
     if (lookup.state === 'loading') return '<div class="workspace"><p class="campaign-invite-note">Looking up the campaign…</p></div>';
-    return `<div class="workspace campaign-not-invited"><h1>You were not invited to ${title ? `the campaign <em>${e(title)}</em>` : 'this campaign'}</h1>${found ? '' : '<p class="campaign-invite-note">Ask its GM for an invite link.</p>'}${action}</div>`;
+    return `<div class="workspace campaign-not-invited"><h1>You were not invited to ${title ? `the campaign <em>${e(title)}</em>` : 'this campaign'}</h1>${found ? '' : '<p class="campaign-invite-note">Check the address, or find the campaign on the <a href="#/start">start page</a>.</p>'}${action}</div>`;
   }
   // Pick a member: the new GM, or who receives a PC.
   function renderTransferPopup(pcs) {
     if (!transferPopup) return '';
     const others = store().list(path('members','')).filter(m => m.id !== store().uid);
-    const list = others.length ? `<div class="campaign-transfer-list">${others.map(m => button(transferPopup === 'campaign' ? 'handover-to' : 'pc-transfer-to',m.displayName || 'Player',m.id)).join('')}</div>` : '<p class="campaign-invite-note">Invite another player first.</p>';
+    const list = others.length ? `<div class="campaign-transfer-list">${others.map(m => button(transferPopup === 'campaign' ? 'handover-to' : 'pc-transfer-to',m.displayName || 'Player',m.id)).join('')}</div>` : '<p class="campaign-invite-note">No other players yet.</p>';
     if (transferPopup === 'campaign') return gm() ? popup('transfer-popup-title','Hand over the campaign',`<p class="campaign-invite-note">The member you pick becomes GM at once. You stay in the campaign as a player.</p>${list}`,'transfer-close') : '';
     const pc = pcs.find(item => `pc:${item.id}` === transferPopup);
     return pc && own(pc) ? popup('transfer-popup-title',`Transfer ${label(pc)}`,`<p class="campaign-invite-note">They accept it into their account; then it leaves yours.</p>${list}`,'transfer-close') : '';
@@ -620,15 +616,7 @@
       changed();
     }) || null;
   }
-  // Invite settings (in the + PC popup): the link, Copy link, Replace link and Revoke.
-  function inviteSection() {
-    if (!inviteLink) return `<div class="campaign-invite"><h4>Invite players</h4><p class="campaign-invite-note">${busy ? 'Preparing the invite link…' : 'No active invite link.'}</p>${busy ? '' : button('invite','New link')}</div>`;
-    return `<div class="campaign-invite"><h4>Invite players</h4>
-      <div class="campaign-invite-link">${UI.field({attrs:{type:'text',readonly:true,value:inviteLink,'aria-label':'Invite link','data-invite-link':true}})}${UI.button({text:inviteCopied?'Copied':'Copy link',attrs:{'data-campaign':'invite-copy','data-id':'',disabled:busy}})}</div>
-      <p class="campaign-invite-note">Expires after seven days.</p>${UI.actionRow({attrs:{class:'campaign-actions'},bodyHtml:button('invite','Replace link')+button('revoke','Revoke')})}</div>`;
-  }
-  const renderInvitePopup = () => '';
-  // Who is in the campaign (for the GM, beside the invite link): each player who joined and the
+  // Who is in the campaign (for the GM, in the + PC popup): each player who joined and the
   // PCs they linked, "no PC yet" until they add one with + PC, and anyone asking to join.
   // Requests from people not yet in the campaign (a joined player's request is removed as stale).
   const staleRequests = new Set();
@@ -647,7 +635,7 @@
     const rows = members.map(m => { const theirs = pcs.filter(pc => pc.ownerUid === m.id).map(pc => label(pc));
       return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong> <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span></li>`; })
       .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}</li>`));
-    return `<div class="campaign-players"><h4>Players <small>${members.length}</small></h4>${rows.length ? `<ul>${rows.join('')}</ul>` : '<p class="campaign-invite-note">Nobody has joined yet. A player opens the invite link, signs in with Google and presses Join campaign.</p>'}</div>`;
+    return `<div class="campaign-players"><h4>Players <small>${members.length}</small></h4>${rows.length ? `<ul>${rows.join('')}</ul>` : '<p class="campaign-invite-note">Nobody has joined yet. Players find the campaign on the start page and ask to be invited; you approve them here or on the campaign page.</p>'}</div>`;
   }
   // Places are NPC records too: the GM ticks Place, and older records are guessed from the name (or a role like "O Castelo…" / "Onde…").
   const PLACE_WORDS = /(^|[^\p{L}])(shiro|kyuden|mura|toshi|koku|toi|jinja|dojo|village|vila|aldeia|cidade|city|castle|castelo|pal[aá]cio|palace|posto|templo|temple|santu[aá]rio|shrine|ponte|bridge|prov[ií]ncia|province|estrada|road|porto|port|floresta|forest|monte|mountain|rio|river|casa de ch[aá]|tea ?house)(?=$|[^\p{L}])/iu;
@@ -710,26 +698,12 @@
   }
   function render(slug) {
     renderAgain ||= () => {};
-    if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; inviteLoaded = ''; }
+    if (accountUid !== store().uid) { clearCardSheets(); active = '!'; reset(''); accountUid = store().uid; }
     if (slug !== 'campaigns') clearCardSheets();
     if (store().uid) watchTransfers();
-    if (!store().uid) { reset(''); return slug.startsWith('invite/')
-      ? `<div class="workspace"><h1>Campaign invitation</h1>${inAppBrowser() ? `<p class="campaign-invite-warning"><strong>Open this link in Chrome or Safari.</strong> It opened inside an app (WhatsApp, Instagram…), where Google does not allow signing in. Use the app's menu (⋮ or ···) → Open in browser, or copy the link and paste it there.</p>${button('invite-page-copy',pageLinkCopied ? 'Copied' : 'Copy link')}` : ''}<p>You were invited to a campaign. Sign in with Google and you join it straight away.</p>${button('sign-in','Sign in with Google')}</div>`
-      : `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
-    if (slug.startsWith('invite/')) {
-      reset(''); const token = slug.slice(7);
-      if (inviteLoaded !== token) {
-        inviteLoaded = token; invite = null; error = '';
-        const backend = store().backend;
-        // Signed in with a valid link: join at once (the link is the invitation); if joining
-        // fails, the error shows with a Join campaign button to try again.
-        backend.invitation(token).then(data=>{if(inviteLoaded===token && store().backend===backend){invite=data;changed();
-          return backend.join(token).then(c=>{if(inviteLoaded===token && store().backend===backend)location.hash='#/campaigns/'+c;})
-            .catch(err=>{if(inviteLoaded===token){error=err.code==='permission-denied'?'Could not join: the invitation was replaced or revoked. Ask the GM for a new link.':`Could not join: ${err.message}`;changed();}});}})
-          .catch(()=>{if(inviteLoaded===token){error='This invitation has expired or was revoked.';changed();}});
-      }
-      return `<div class="workspace"><h1>Campaign invitation</h1><p>${e(error || (invite ? 'Joining the campaign…' : 'Checking invitation…'))}</p>${invite&&error?button('join','Join campaign',token):''}<a href="#/campaigns">Campaigns</a></div>`;
-    }
+    // Invite links are gone: players find a campaign on the start page and ask to be invited.
+    if (slug.startsWith('invite/')) { reset(''); return '<div class="workspace"><h1>Invite links are no longer used</h1><p>Find the campaign on the <a href="#/start">start page</a> and ask to be invited; you join as soon as the GM approves.</p></div>'; }
+    if (!store().uid) { reset(''); return `<div class="workspace"><h1 class="visually-hidden">Campaigns</h1>${button('sign-in','Sign in with Google')}</div>`; }
     if (slug === 'campaigns') {
       reset('');
       const campaigns = store().list('campaigns/');
@@ -785,7 +759,7 @@
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="npcs">${renderNPCs(npcs,isGM)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="pcs">${renderPCs(pcs,isGM,invitation)}</section>
       <section class="campaign-row campaign-timeline-row" data-campaign-row="timeline">${UI.panel({attrs:{'class':'panel campaign-content'},bodyHtml:`<h2 class="visually-hidden">Timeline</h2>${renderMapHead(isGM,sessions,plots)}${renderTimeline(isGM,pcs,npcs)}`})}</section>
-      </div>${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${renderInvitePopup()}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
+      </div>${renderTransferPopup(pcs)}${renderNewPopup(pcs)}${selectedPC&&isGM&&!own(selectedPC)?'<div id="campaign-editor"></div>':''}</div>`;
   }
   // Pins scrolled out of view get an arrow at the window's edge pointing toward them;
   // clicking an arrow brings its pin into view. Arrows show only while the map is on screen.
@@ -836,21 +810,6 @@
     }
     renderPage();
   }
-  // The campaign's current invite link (reusing a still-valid one unless a fresh one is asked for).
-  async function loadInvite(backend,fresh) {
-    const campaign=active;
-    let token=fresh?null:(await backend.get(path('private','invitation')))?.token;
-    if (token) {
-      try {await backend.invitation(token);}
-      catch (err) {
-        if(err.code!=='permission-denied' && err.message!=='This invitation has expired or was revoked.')throw err;
-        token=null;
-      }
-    }
-    token ||= await backend.invite(campaign);
-    if(active!==campaign || store().backend!==backend || !gm())return;
-    inviteLink=inviteURL(token);inviteCopied=false;
-  }
   async function act(action,id) {
     if (busy) return;
     // Signed out: use the account menu's own sign-in (open the menu if it isn't ready yet).
@@ -863,7 +822,6 @@
         const title = window.prompt('Campaign title'); if (!title?.trim()) return;
         location.hash = '#/campaigns/'+await backend.create(title.trim().slice(0,200));
       } else if (action==='join') location.hash='#/campaigns/'+await backend.join(id);
-      else if (action==='invite-page-copy') {try{await navigator.clipboard.writeText(location.href);pageLinkCopied=true;}catch{}}
       else if (action==='entry-close') {openEntries.delete(id);go(campaignHref(active),false);}
       else if (action==='section') {if(SECTIONS.includes(id)){section=id;go(id==='timeline'&&timelineSession?campaignHref(active,'timeline','sessions',timelineSession):campaignHref(active,id));}}
       else if (action==='pc-notes') pcNotesId=pcNotesId===id?'':id;
@@ -938,8 +896,6 @@
       else if (action==='npc-delete') {const npc=store().get(path('npcs',id));if(gm()&&npc&&window.confirm(`Remove ${npc.name||'this NPC'} from the campaign? Its journal goes with it.`)){store().queue(path('npcs',id),null);if(store().get(path('tree',`npcs:${id}`)))store().queue(path('tree',`npcs:${id}`),null);store().flush();if(npcId===id){npcId='';npcDraft=null;}}}
       else if (action==='pc-picker') {
         picking=!picking;focusPopup=picking;
-        // The GM's + PC popup also holds the invite link, so players can be invited from it.
-        if (picking && gm()) { changed(); await loadInvite(backend,false); }
       }
       else if (action==='pc-link') {await backend.link(active,id);picking=false;}
       else if (action==='pc-create') {const campaign=active;const id=window.CharacterBuilder.create();await backend.link(campaign,id);picking=false;creatorCampaign=campaign;location.hash=window.CharacterBuilder.href(id);}
@@ -952,15 +908,6 @@
         else location.hash=`#/pc/${encodeURIComponent(pc.ownerUid)}/${encodeURIComponent(pc.characterId)}`;
       } else if (action==='pc-remove') {const pc=store().get(path('pcs',id));if(pc&&(gm()||own(pc))&&window.confirm(`Remove ${label({...pc,id})} from the campaign? The sheet stays with its player.`)){store().queue(path('pcs',id),null);if(store().get(path('tree',`pcs:${id}`)))store().queue(path('tree',`pcs:${id}`),null);store().flush();if(sheetId===id)sheetId='';}}
       else if (action==='close-sheet') {sheetId='';editor=null;}
-      else if (action==='share-invite'||action==='invite') {
-        if (!gm()) return;
-        await loadInvite(backend,action==='invite');
-      }
-      else if (action==='invite-copy') {
-        try { await navigator.clipboard.writeText(inviteLink); inviteCopied=true; }
-        catch { window.prompt('Copy this invite link:',inviteLink); }
-      }
-      else if (action==='invite-close') {inviteLink='';inviteCopied=false;}
       else if (action==='handover') {transferPopup='campaign';focusPopup=true;}
       else if (action==='pc-transfer') {transferPopup=`pc:${id}`;focusPopup=true;}
       else if (action==='transfer-close') transferPopup='';
@@ -1012,8 +959,7 @@
         const {mapId:previous,...rest}=c;
         store().queue(`campaigns/${active}`,mapId ? {...rest,mapId} : rest);
       }
-      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!sessionId)sessionDraft=null;if(!npcId)npcDraft=null;picking=false;inviteLink='';inviteCopied=false;}
-      else if (action==='revoke') {await backend.revoke(active);inviteLink='';inviteCopied=false;}
+      else if (action==='new-close') {if(!plotId)plotDraft=null;if(!sessionId)sessionDraft=null;if(!npcId)npcDraft=null;picking=false;}
       else if (action==='member-remove'||action==='leave') {
         if (!window.confirm(action==='leave'?'Leave this campaign?':'Remove this member and their PC associations?'))return;
         await backend.removeMember(active,action==='leave'?store().uid:id);
@@ -1202,7 +1148,7 @@
     if (event.relatedTarget?.closest('[data-campaign]') || (event.target.dataset.campaignField?.startsWith('npc-') && npcDraft)) return;
     if(event.target.dataset.campaignField)setTimeout(()=>{if(renderAgain)refresh(renderAgain);},0);
   });
-  window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/invite/')) {inviteLoaded='';invite=null;} if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
+  window.addEventListener('hashchange',()=>{if(location.hash!=='#/campaigns')clearCardSheets();if(!location.hash.startsWith('#/create-character')&&!location.hash.startsWith('#/characters/')&&!(decodedRoute().startsWith('campaigns/')&&resolveCampaign(decodedRoute().split('/')[1])===creatorCampaign))creatorCampaign=null;});
   // Start page row: the campaign cards (or Sign in).
   // Every campaign is listed for anyone signed in (from the public lookup: id and title only).
   // One you are not in opens its page, where you ask to be invited.

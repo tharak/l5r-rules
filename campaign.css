@@ -8,7 +8,7 @@
 
 .campaign-grid{display:grid;grid-template-columns:1fr;gap:20px;margin-top:24px}.campaign-segments{display:flex;gap:0;border:1px solid #506566;border-radius:6px;overflow:hidden;margin-bottom:24px}.workspace .campaign-segments button{flex:1;border:0;border-radius:0;background:transparent;padding:12px;min-width:0}.workspace .campaign-segments button+button{border-left:1px solid #506566}.workspace .campaign-segments button[aria-pressed=true]{background:#465f59;color:#fff3e1}.workspace .campaign-segments button:focus-visible{outline:2px solid var(--red);outline-offset:-3px}.npc-list{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
 
-.campaign-actions{display:flex;align-items:center;gap:8px}.invite-settings{margin-top:18px}.invite-settings summary{cursor:pointer;color:var(--muted)}
+.campaign-actions{display:flex;align-items:center;gap:8px}
 
 .plot-list{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.entry-help,.campaign-note small,.campaign-plot>small{color:var(--muted)}.entry-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}.campaign-notes{margin-top:8px}.campaign-notes h3{margin:0}.campaign-note{padding:16px 0;border-bottom:1px solid var(--line)}.entry-editor{margin:18px 0;padding:18px;border:1px solid var(--line);border-radius:6px}.entry-editor>button+button{margin-left:8px}.workspace select{display:block;max-width:100%;margin-top:6px}.campaign-note .workspace-head{align-items:flex-start}.campaign-note .campaign-actions{flex-wrap:wrap}
 
@@ -118,7 +118,7 @@
 /* One campaign view: a row per kind like the start page; entries are tiles in an auto-fit grid. */
 .campaign-rows{display:grid;gap:28px;margin-top:20px}
 .campaign-row .campaign-entries{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:12px;margin:0}
-.campaign-row .campaign-entry-new,.campaign-row .pc-picker,.campaign-row .invite-settings{margin:0 0 12px}
+.campaign-row .campaign-entry-new,.campaign-row .pc-picker{margin:0 0 12px}
 .campaign-entry>summary::before,.campaign-entry[open]>summary::before{content:none}
 .campaign-entry>summary{height:100%;min-height:64px;border-radius:3px}
 .campaign-entry:hover{border-color:var(--red)}
@@ -142,8 +142,6 @@ body:has(.campaign-entry[open]){overflow:hidden}
 /* Invite popup: the link with Copy link, then Replace link and Revoke. */
 .campaign-invite-popup header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .campaign-invite-popup h3{margin:0;font:22px var(--serif)}
-.campaign-invite-link{display:flex;gap:8px}
-.campaign-invite-link input{flex:1;min-width:0;font-size:13px}
 .campaign-invite-note{margin:8px 0 12px;font-size:12px;color:var(--muted)}
 .campaign-popup header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .campaign-popup h3{margin:0;font:22px var(--serif)}
@@ -154,10 +152,9 @@ body:has(.campaign-entry[open]){overflow:hidden}
 .route-campaigns .topbar.topbar-slim{padding-left:clamp(12px,2vw,24px);padding-right:clamp(12px,2vw,24px)}
 .campaign-timeline-row>.campaign-content{width:var(--page-width,100vw);margin-left:calc(50% - var(--page-width,100vw) / 2);border-width:1px 0 0;border-radius:0;padding:12px clamp(12px,2vw,24px) 0}
 .campaign-timeline-row .timeline-list{flex-wrap:wrap;overflow-x:visible}
-/* Invite players, inside the + PC popup (GM only). */
-.campaign-invite{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+/* Players, inside the + PC popup (GM only). */
 .campaign-players{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}.campaign-players ul{list-style:none;margin:6px 0 0;padding:0}.campaign-players h4 small{font-weight:400;color:var(--muted)}
-.campaign-invite h4{margin:0 0 8px;font:17px var(--serif)}
+.campaign-players h4{margin:0 0 8px;font:17px var(--serif)}
 
 /* Campaign lists: tiles size to their content and wrap (long titles wrap within a cap). */
 .campaign-row .campaign-entries{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px}
@@ -297,4 +294,3 @@ details[open]>.map-tray-title::before,details[open]>.map-tray-branch-title::befo
 .campaign-list-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
 .campaign-list-row small{color:var(--muted)}
 
-.campaign-invite-warning{padding:10px 12px;border:1px solid var(--red);border-radius:3px;background:#fff4ec}
