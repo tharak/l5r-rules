@@ -505,6 +505,9 @@ test('players who joined show for the GM in the Add PC popup, with their PCs or 
  const render=()=>d.window.CampaignUI.render('campaigns/c');render();
  await d.click('pc-picker');await new Promise(r=>setTimeout(r));
  const html=render();
+ assert.match(html,/<strong>Carol<\/strong> <small>asks to join<\/small><\/span><button[^>]*data-campaign="request-approve" data-id="carol"[^]*data-campaign="request-add" data-id="carol"[^>]*>Add now</,'the GM adds someone who asked, at once');
+ const added=[];d.store.backend.addRequester=async(c,who)=>added.push([c,who]);d.window.confirm=()=>true;
+ await d.click('request-add','carol');await new Promise(r=>setTimeout(r));assert.deepEqual(added,[['c','carol']]);
  assert.match(html,/campaign-players"><h4>Players <small>3<\/small><\/h4><ul><li[^>]*><span><strong>GM<\/strong> <span class="campaign-gm-tag">Lead GM<\/span>[^]*<strong>Alice<\/strong> <small>joined · no PC yet<\/small>[^]*<strong>Bob<\/strong> <small>[^<]+<\/small>[^]*<strong>Carol<\/strong> <small>asks to join<\/small>[^]*data-campaign="request-approve" data-id="carol"/);
  const a=campaignCards();a.store.uid='alice';a.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});a.data.set('campaigns/c/members/alice',{displayName:'Alice'});
  assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Create your character[^]*data-campaign="pc-create"[^>]*>Create PC</);

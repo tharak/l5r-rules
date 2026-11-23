@@ -299,3 +299,13 @@ test('each player keeps their own list of hidden library pictures; nobody else r
  await assertFails(getDoc(r(db('bob'),'users/alice/settings/library')));
  await assertFails(setDoc(r(db('bob'),'users/alice/settings/library'),{hidden:[]}));
 });
+test('Add now: a GM adds someone who asked to join, with the name from their request, removing the request',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/a',{title:'Add',gmUid:'gm'}],['campaigns/a/members/gm',{gmUid:'gm',membershipId:'gm-m',inviteToken:''}],['users/gm/campaigns/a',{gmUid:'gm',membershipId:'gm-m'}],['campaigns/a/members/alice',{gmUid:'gm',membershipId:'alice-m',inviteToken:''}],['users/alice/campaigns/a',{gmUid:'gm',membershipId:'alice-m'}],['campaigns/a/requests/carol',{displayName:'Carol',createdAt:'now'}]]);});
+ const add=(who,u,extra={})=>batch(db(who),[[`campaigns/a/members/${u}`,{gmUid:'gm',membershipId:'m1',inviteToken:'',displayName:'Carol',...extra}],[`users/${u}/campaigns/a`,{gmUid:'gm',membershipId:'m1'}],[`campaigns/a/requests/${u}`,null]]);
+ await assertFails(add('alice','carol'),'a player cannot add people');
+ await assertFails(add('gm','dave'),'only someone who asked');
+ await assertFails(add('gm','carol',{displayName:'Someone else'}),'the name comes from the request');
+ await assertFails(batch(db('gm'),[['campaigns/a/members/carol',{gmUid:'gm',membershipId:'m1',inviteToken:'',displayName:'Carol'}],['users/carol/campaigns/a',{gmUid:'gm',membershipId:'m1'}]]),'the request is removed in the same step');
+ await assertSucceeds(add('gm','carol'));
+ await assertSucceeds(getDoc(r(db('carol'),'campaigns/a')),'Carol is in');
+});

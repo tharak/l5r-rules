@@ -592,7 +592,7 @@
     const rows = [
       ...(noPC ? [`<div class="campaign-offer"><span>You joined this campaign. Create your character so the GM and the other players see you (or link one you already have with <strong>Add PC</strong>).</span>${button('pc-create','Create PC')}</div>`] : []),
       ...mine.map(t => `<div class="campaign-offer"><span><strong>${e(memberName(active,t.fromUid))}</strong> offers you <strong>${e(t.name)}</strong></span>${button('transfer-accept','Accept',t.id)}${button('transfer-decline','Decline',t.id)}</div>`),
-      ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
+      ...requests.map(r => `<div class="campaign-offer"><span><strong>${e(r.displayName || 'Someone')}</strong> asks to join${r.inviteToken ? ' · approved, waiting for them to join' : ''}</span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-add','Add now',r.id)}${button('request-decline',r.inviteToken ? 'Withdraw' : 'Decline',r.id)}</div>`),
     ];
     return rows.length ? `<div class="campaign-offers">${rows.join('')}</div>` : '';
   }
@@ -687,7 +687,7 @@
       const lead = m.id === campaign?.gmUid;
       const toggle = !canManage || lead ? '' : isGM ? button('gm-remove',m.id === store().uid ? 'Stop being GM' : 'Remove GM',m.id) : button('gm-add','Make GM',m.id);
       return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong>${isGM ? ` <span class="campaign-gm-tag">${lead ? 'Lead GM' : 'GM'}</span>` : ''} <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span>${toggle}</li>`; })
-      .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}</li>`));
+      .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}${button('request-add','Add now',r.id)}</li>`));
     return `<div class="campaign-players"><h4>Players <small>${members.length}</small></h4>${rows.length ? `<ul>${rows.join('')}</ul>` : '<p class="campaign-invite-note">Nobody has joined yet. Players find the campaign on the start page and ask to be invited; you approve them here or on the campaign page.</p>'}</div>`;
   }
   // Places are NPC records too: the GM ticks Place, and older records are guessed from the name (or a role like "O Castelo…" / "Onde…").
@@ -974,6 +974,11 @@
       else if (action==='close-sheet') {sheetId='';editor=null;}
       else if (action==='pc-transfer') {transferPopup=`pc:${id}`;focusPopup=true;}
       else if (action==='transfer-close') transferPopup='';
+      else if (action==='request-add') {
+        const r=store().get(path('requests',id));
+        if (!gm() || !r || !window.confirm(`Add ${r.displayName || 'this player'} to the campaign now? They asked to join; they will not need to open an invitation.`)) return;
+        await backend.addRequester(active,id);
+      }
       else if (action==='gm-add') {
         if (!gm() || !window.confirm(`Make ${memberName(active,id)} a GM too? They can do everything a GM does, except delete the campaign.`)) return;
         await backend.setGM(active,id,true);

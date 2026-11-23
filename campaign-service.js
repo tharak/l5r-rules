@@ -279,6 +279,14 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     },
     async setLibraryHidden(hidden) { await sdk.setDoc(ref(`users/${uid}/settings/library`),{hidden:[...new Set(hidden)].slice(0,1000)}); },
     async deleteLibrary(id,{link = false} = {}) { await commit(link ? [[`library/${id}`,null]] : [[`library/${id}`,null],[`libraryFull/${id}`,null]]); },
+    // Add now: a GM adds someone who asked to join, without waiting for them to open the campaign.
+    async addRequester(c,who) {
+      const [campaign,request] = await Promise.all([get(`campaigns/${c}`),get(`campaigns/${c}/requests/${who}`)]);
+      if (!campaign) throw new Error('This campaign is gone.');
+      if (!request) throw new Error('That request is gone.');
+      const membershipId = crypto.randomUUID(), gmUid = campaign.gmUid;
+      await commit([[memberPath(c,who),{gmUid,membershipId,inviteToken:'',displayName:request.displayName}],[indexPath(c,who),{gmUid,membershipId}],[`campaigns/${c}/requests/${who}`,null]]);
+    },
     // More GMs: any GM makes a current member GM too, or takes an extra GM off the list.
     async setGM(c,who,on) {
       const campaign = await get(`campaigns/${c}`);

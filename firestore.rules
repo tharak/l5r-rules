@@ -160,6 +160,16 @@ service cloud.firestore {
           && request.resource.data.gmUid == getAfter(/databases/$(database)/documents/campaigns/$(c)).data.gmUid
           && (request.resource.data.gmUid == u || invitation())
           && getAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c)).data.membershipId == request.resource.data.membershipId;
+        // Add now: a GM adds someone who asked to join (their request is their consent), with the
+        // name from the request, in the same step that removes the request.
+        allow create: if gm(c) && !owner(u) && exists(/databases/$(database)/documents/campaigns/$(c)/requests/$(u))
+          && !existsAfter(/databases/$(database)/documents/campaigns/$(c)/requests/$(u))
+          && request.resource.data.keys().hasOnly(['gmUid','membershipId','inviteToken','displayName'])
+          && request.resource.data.displayName == get(/databases/$(database)/documents/campaigns/$(c)/requests/$(u)).data.displayName
+          && request.resource.data.inviteToken == ''
+          && request.resource.data.membershipId is string && request.resource.data.membershipId.size() <= 80
+          && request.resource.data.gmUid == campaign(c).gmUid
+          && getAfter(/databases/$(database)/documents/users/$(u)/campaigns/$(c)).data.membershipId == request.resource.data.membershipId;
         // A member changes their display name (and the colour kept from the old board).
         allow update: if owner(u) && joined(c) && validName()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','color'])
