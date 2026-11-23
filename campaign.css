@@ -318,8 +318,8 @@ details[open]>.map-tray-title::before,details[open]>.map-tray-branch-title::befo
 /* Zoom: the map grows inside a scrolling frame (100%–400%); − 100% + sit at the frame's top centre.
    Zoomed in, the frame is at most a screen tall, so the whole map scrolls inside it. */
 .timeline-frame{position:relative}
-.timeline-viewport{overflow:auto;overscroll-behavior:contain}
-.timeline-viewport.timeline-zoomed{max-height:calc(100vh - 60px)}
+.timeline-viewport{overflow:hidden}
+.timeline-viewport.timeline-zoomed{overflow:auto;overscroll-behavior:contain;max-height:calc(100vh - 60px)}
 .timeline-viewport>.timeline-map{max-width:none}
 .map-zoom{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:16px;background:#fffbf2ee;box-shadow:0 2px 8px #0003}
 .map-zoom .ui-button{min-width:30px;font-variant-numeric:tabular-nums}
