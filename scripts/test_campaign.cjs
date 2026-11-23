@@ -447,6 +447,11 @@ test('maps: the GM lists several maps (Add Map, pick one to show it, ✕ to take
  html=render();assert.doesNotMatch(html,/data-pin-id="old"/,'the new map has none of the old pins');assert.match(html,/map-list-active"><button[^>]*data-id="m2"[^>]*>Kyuden Doji</);
  d.data.set('campaigns/c/timeline/new',{kind:'npcs',targetId:'n',mapId:'m2',x:50,y:50,createdAt:'b',updatedAt:'b'});
  assert.match(render(),/data-pin-id="new"/);
+ // ✎ renames a map (an untitled first map shows as "Map" until then).
+ assert.match(render(),/data-id="m1"[^>]*>Map<[^]*data-campaign="map-rename" data-id="m1"/);
+ d.window.prompt=()=>'  Terras do Dragao ';await d.click('map-rename','m1');await settle();
+ c=d.data.get('campaigns/c');assert.equal(c.maps.find(m=>m.id==='m1').title,'Terras do Dragao');assert.equal(c.mapId,'m2','renaming does not change the shown map');
+ assert.match(render(),/data-id="m1"[^>]*>Terras do Dragao</);
  await d.click('map-show','m1');await settle();
  html=render();assert.match(html,/data-pin-id="old"/);assert.doesNotMatch(html,/data-pin-id="new"/);
  // Taking the first map off pins its older pins to it, so they do not move to the next map.

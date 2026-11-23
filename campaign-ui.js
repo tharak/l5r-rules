@@ -524,7 +524,7 @@
     // The GM's map panel: Maps folds open (+/−) to the list of maps (pick one to show it, ✕ takes
     // it off), then Add Map and the cell size of the shown map. ▸ tucks the whole panel away.
     const cellSlider = shown ? `<label class="map-cell"><span>Cell size</span><input type="range" min="0.5" max="6" step="0.05" value="${cellSize()}" data-map-cell aria-label="Hex cell size"${busy ? ' disabled' : ''}></label>` : '';
-    const mapRows = maps.length ? `<ul class="map-list">${maps.map(m => `<li${m.id === shown ? ' class="map-list-active"' : ''}>${UI.button({text:m.title || 'Map',variant:'quiet',size:'compact',attrs:{class:'map-list-show','data-campaign':'map-show','data-id':m.id,'aria-pressed':String(m.id === shown),disabled:busy}})}${UI.button({text:'✕',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-remove','data-id':m.id,'aria-label':`Remove ${m.title || 'map'} from the list`,title:'Remove from the list',disabled:busy}})}</li>`).join('')}</ul>` : '<p class="map-list-empty">No maps yet.</p>';
+    const mapRows = maps.length ? `<ul class="map-list">${maps.map(m => `<li${m.id === shown ? ' class="map-list-active"' : ''}>${UI.button({text:m.title || 'Map',variant:'quiet',size:'compact',attrs:{class:'map-list-show','data-campaign':'map-show','data-id':m.id,'aria-pressed':String(m.id === shown),disabled:busy}})}${UI.button({text:'✎',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-rename','data-id':m.id,'aria-label':`Rename ${m.title || 'map'}`,title:'Rename',disabled:busy}})}${UI.button({text:'✕',variant:'quiet',size:'compact',attrs:{'data-campaign':'map-remove','data-id':m.id,'aria-label':`Remove ${m.title || 'map'} from the list`,title:'Remove from the list',disabled:busy}})}</li>`).join('')}</ul>` : '<p class="map-list-empty">No maps yet.</p>';
     const mapsPanel = !isGM ? '' : `<div class="timeline-pin-controls map-panel${mapsHidden ? ' map-tray-hidden' : ''}" aria-label="Maps"><div class="map-panel-head">${mapsHidden ? '' : `<details class="map-tray-group" data-tray-group="Maps"${trayClosed.has('Maps') ? '' : ' open'}><summary class="map-tray-title">Maps <small>${maps.length}</small></summary><div class="map-tray-maps">${mapRows}${button('map-add','Add Map')}${cellSlider}</div></details>`}${foldButton('maps-toggle',mapsHidden,'maps','▸','◂')}</div></div>`;
     const campaignGroup = !groups ? '' : `${items.length > 8 ? `<div class="map-tray-head">${UI.field({attrs:{type:'search','data-tray-search':true,placeholder:'Find','aria-label':'Find a PC or NPC'}})}</div>` : ''}<details class="map-tray-group map-tray-root" data-tray-group="Campaign"${trayClosed.has('Campaign') ? '' : ' open'}><summary class="map-tray-title" title="Fold or open everything; drop a name here to take it out of its clan or parent">Campaign <small>${items.length}</small></summary><div class="map-tray-root-body">${groups}</div></details>`;
     const tray = !campaignGroup ? '' : `<div class="timeline-pin-controls map-tray${trayHidden ? ' map-tray-hidden' : ''}" aria-label="Drag PCs, NPCs and their numbered notes onto the map; drop a name on another name or a clan to put it under it, or on a group title to take it out">${foldButton('tray-toggle',trayHidden,'tray','◂','▸')}${trayHidden ? '' : campaignGroup}</div>`;
@@ -1014,7 +1014,7 @@
       else if (action==='zoom-reset') setZoom(1);
       else if (action==='tray-toggle') {trayHidden=!trayHidden;try{localStorage.setItem('l5r-rules-map-tray-hidden',trayHidden?'1':'0');}catch{}}
       else if (action==='maps-toggle') {mapsHidden=!mapsHidden;try{localStorage.setItem('l5r-rules-map-panel-hidden',mapsHidden?'1':'0');}catch{}}
-      else if (action==='map-add'||action==='map-show'||action==='map-remove') {
+      else if (action==='map-add'||action==='map-show'||action==='map-remove'||action==='map-rename') {
         if (!gm()) return;
         const c=store().get(`campaigns/${active}`); if (!c) return;
         let maps=mapList(c), mapId=c.mapId||'';
@@ -1024,6 +1024,11 @@
           if (!maps.some(m=>m.id===picked)) { if (maps.length>=30) throw new Error('A campaign keeps up to 30 maps.'); maps.push({id:picked,title:String(title).slice(0,200),cell:DEFAULT_CELL}); }
           mapId=picked;
         } else if (action==='map-show') { if (!maps.some(m=>m.id===id)) return; mapId=id; }
+        else if (action==='map-rename') {
+          const map=maps.find(m=>m.id===id); if (!map) return;
+          const title=window.prompt('Map name',map.title||'Map'); if (!title?.trim()) return;
+          maps=maps.map(m=>m.id===id?{...m,title:title.trim().slice(0,200)}:m);
+        }
         else {
           const gone=maps.find(m=>m.id===id); if (!gone || !window.confirm(`Remove ${gone.title||'this map'} from the list? Its pins are kept and come back if it is added again.`)) return;
           // Older pins follow the first map; pin them to it before the list changes.
