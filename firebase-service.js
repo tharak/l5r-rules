@@ -6,6 +6,7 @@ const status = document.getElementById('account-status');
 const login = document.getElementById('account-sign-in');
 const logout = document.getElementById('account-sign-out');
 const copy = document.getElementById('account-import');
+const ai = document.getElementById('account-ai');
 let busy = false, user = null;
 const showError = error => {
   const messages = {
@@ -24,6 +25,7 @@ function update() {
   login.hidden = !!user;
   logout.hidden = !user;
   copy.hidden = !user;
+  if (ai) { ai.hidden = !user; ai.disabled = busy; }
   login.disabled = logout.disabled = copy.disabled = busy;
 }
 
@@ -109,6 +111,18 @@ try {
     }
     catch (error) { showError(error); }
     finally { busy = false; login.disabled = logout.disabled = copy.disabled = false; }
+  });
+  // AI access: a fresh sign-in token for the Firestore REST API (see /llms.txt). It lasts one
+  // hour and allows exactly what this account may do; the security rules still apply.
+  ai?.addEventListener('click', async () => {
+    const account = auth.currentUser;
+    if (!account) return;
+    try {
+      const token = await account.getIdToken(true), until = new Date(Date.now() + 55 * 60000);
+      const text = `l5r-rules AI access (read https://l5r-rules.web.app/llms.txt)\nproject: ${firebaseConfig.projectId}\nuid: ${account.uid}\nexpires: ${until.toISOString()}\ntoken: ${token}`;
+      await navigator.clipboard.writeText(text);
+      status.textContent = `AI access copied (valid until ${until.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}). Give it only to an AI you trust: it can do what you can.`;
+    } catch (error) { status.textContent = 'The AI access could not be copied.'; console.error(error); }
   });
   copy.addEventListener('click', () => {
     const count = window.CharacterStorage.importDevice();

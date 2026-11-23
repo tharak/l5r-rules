@@ -6,8 +6,9 @@
 
 ## How you use it
 
-- There is no API. Use the website in a browser, the way a person would: click buttons, fill
-  fields, read the page. Everything below names the visible button text.
+- Two ways: use the website in a browser, the way a person would (click buttons, fill
+  fields, read the page; everything below names the visible button text), or call the
+  endpoints described under "Endpoints" with an access token the person copies for you.
 - Sign-in is with Google ("Sign in with Google"). The person signs in; never type passwords.
 - The site saves as you go. There is no global Save; editors have their own Save buttons.
 - Deleting or removing asks for confirmation in a browser dialog (OK/Cancel). Do not delete
@@ -115,6 +116,110 @@ chip for every session (newest first) and every plot. A chip opens that item as 
   disadvantages, experience points). **Public view** shows what other players see.
 - Journal entries on a sheet have a **Public** box; unticked entries stay private to the
   owner and the GM.
+
+## Endpoints (Firestore REST API)
+
+Instead of clicking, you can read and write the campaign directly. The site keeps its data
+in Google Cloud Firestore; its REST API is the endpoint. The same security rules apply:
+you can do exactly what the signed-in person can do on the website, nothing more.
+
+### Access
+
+The person signs in on the website, opens **Account → Copy AI access**, and gives you the
+text. It holds their `uid` and a `token` valid for about one hour (ask for a new one when
+calls start failing with 401/403 "unauthenticated" or an expired token). Treat the token
+like a password: do not log it, store it, or send it anywhere but the URLs below.
+
+Every request:
+
+    Authorization: Bearer <token>
+    Content-Type: application/json
+
+Base URL (call it `$DOCS`):
+
+    https://firestore.googleapis.com/v1/projects/l5r-rules/databases/(default)/documents
+
+### Reading
+
+- One document: `GET $DOCS/<path>`.
+- A collection: `GET $DOCS/<path>?pageSize=300` (follow `nextPageToken` with `&pageToken=`).
+- The person's campaigns: `GET $DOCS/users/<uid>/campaigns` (each document id is a campaign id),
+  then `GET $DOCS/campaigns/<campaignId>` (title, `gmUid` = lead GM, `gmUids` = extra GMs,
+  `mapId`, `maps`).
+- Inside a campaign (`$C` = `campaigns/<campaignId>`): `$C/members`, `$C/sessions`, `$C/plots`,
+  `$C/notes`, `$C/npcs`, `$C/pcs`, `$C/timeline`, `$C/tree`, `$C/requests` (GMs only).
+- The text of a plot or journal entry is in a separate document:
+  `$C/plots/<id>/content/body` and `$C/notes/<id>/content/body`.
+
+Documents come as `{"name": ".../<id>", "fields": {...}}`; the id is the last part of
+`name`. Values are typed: `{"stringValue": "…"}`, `{"booleanValue": true}`,
+`{"integerValue": "3"}`, `{"doubleValue": 41.5}`, `{"arrayValue": {"values": [...]}}`,
+`{"mapValue": {"fields": {...}}}`.
+
+### Writing
+
+Send every write through one endpoint, so the records that belong together are saved
+together:
+
+    POST $DOCS:commit
+    {"writes": [
+      {"update": {"name": "projects/l5r-rules/databases/(default)/documents/<path>", "fields": {...}}},
+      {"delete": "projects/l5r-rules/databases/(default)/documents/<path>"}
+    ]}
+
+An `update` without an `updateMask` replaces the whole document (or creates it), so always
+send every field. New ids: make a random UUID. Times: ISO strings, e.g.
+`"2026-11-23T20:00:00.000Z"`. The rules reject any field not listed below.
+
+**Session** (GMs) — `$C/sessions/<id>`:
+`title` (string ≤ 200), `text` (string, use ""), `createdAt`, `updatedAt` (strings),
+`images` (array, may be empty). Write what happened as journal entries (below).
+
+**Journal entry** — two writes in one commit, with the same `revision` (a new random UUID
+on every save):
+
+1. `$C/notes/<id>`: `creatorUid` (your uid), `public` (true), `createdAt`, `updatedAt`,
+   `revision`, `targetKind`, `targetId`, and for a plot also `targetCreatorUid` (the plot's
+   `creatorUid`). `targetKind` is `sessions` (anyone), `plots` (GMs or the plot's creator),
+   `npcs` (GMs), or `clans` with `targetId` one of Crab, Crane, Dragon, Lion, Mantis, Phoenix,
+   Scorpion, Unicorn, Imperial (anyone).
+2. `$C/notes/<id>/content/body`: `text` (string, not empty), `revision`, optional `title`.
+
+Edit an entry you wrote by writing both again with a new `revision` (keep `createdAt`).
+Delete it with two deletes in one commit: the body, then the note.
+
+**Plot** (anyone; edited by its creator) — two writes in one commit:
+
+1. `$C/plots/<id>`: `creatorUid`, `public` (true), `createdAt`, `updatedAt`, `revision`.
+2. `$C/plots/<id>/content/body`: `title` (not empty), `text` (may be ""), `revision`.
+
+Its story goes in journal entries with `targetKind` `plots`.
+
+**NPC or place** (GMs) — `$C/npcs/<id>`: `name` (≤ 200), `role` (≤ 200), `description`
+(≤ 20000), `notes` (always ""), `place` (true for a location), `updatedAt`. Leave
+`portrait` out (pictures are added on the website).
+
+**Map token** — `$C/timeline/<id>`: `kind` (`pcs`, `npcs` or `clans`), `targetId` (the PC
+or NPC id, or a clan name), optional `noteId` (a journal entry id: shows that entry's number
+instead), `x` and `y` (numbers 0–100: percent of the map's width and height from the top
+left), `mapId` (the campaign's `mapId`, the map shown), `creatorUid` (your uid),
+`createdAt`, `updatedAt`. Move a token by writing it again with new `x`/`y`; delete it to
+take it off the map. Players move only their own tokens; GMs move any.
+
+**Clans and families** — `$C/tree/<kind>:<id>` (for example `npcs:<npcId>`):
+`parentKind` (`clans`, `pcs` or `npcs`), `parentId` (a clan name or a PC/NPC id),
+`updatedAt`. Delete it to take the PC or NPC out again.
+
+**Join requests** (GMs) — `$C/requests/<uid>` has `displayName`. To add the person
+("Add now"), make a random UUID `m` and commit three writes:
+`$C/members/<uid>` = `gmUid` (the campaign's `gmUid`), `membershipId` = m,
+`inviteToken` = "", `displayName` (exactly the request's); `users/<uid>/campaigns/<campaignId>` =
+`gmUid`, `membershipId` = m; and delete `$C/requests/<uid>`.
+
+**Things to do on the website instead:** pictures (NPC portraits, session images, maps),
+character sheets, making someone GM, and anything you are not sure the rules allow. A
+rejected write answers 403 `PERMISSION_DENIED`: re-check the fields above rather than
+retrying.
 
 ## Good habits for a GM's assistant
 

@@ -853,3 +853,14 @@ test('older session pins all show on the map; repeats of one character collapse 
  const html=d.window.CampaignUI.render('campaigns/c');
  assert.match(html,/data-pin-id="p2"/);assert.doesNotMatch(html,/data-pin-id="p1"/);assert.doesNotMatch(html,/timeline-pin-other/);
 });
+test('llms.txt documents every field the rules allow for the records an AI writes, and the AI access button',()=>{
+ const guide=fs.readFileSync('llms.txt','utf8'),rules=fs.readFileSync('firestore.rules','utf8');
+ const fieldsOf=match=>{const block=rules.slice(rules.indexOf(match));const m=block.match(/hasOnly\(\[([^\]]+)\]\)/);return m[1].split(',').map(f=>f.trim().replace(/'/g,''));};
+ for(const [match,skip] of [['match /sessions/{id}',[]],['match /npcs/{id}',['portrait']],['match /timeline/{id}',['sessionId']],['match /tree/{id}',[]]])
+  for(const field of fieldsOf(match))if(!skip.includes(field))assert.ok(guide.includes('`'+field+'`'),`${match}: ${field}`);
+ for(const field of ['creatorUid','public','createdAt','updatedAt','revision','targetKind','targetId','targetCreatorUid'])assert.ok(guide.includes('`'+field+'`'),field);
+ assert.match(guide,/POST \$DOCS:commit/);assert.match(guide,/content\/body/);
+ const html=fs.readFileSync('index.html','utf8');
+ assert.match(html,/id="account-ai" type="button" hidden[^>]*>Copy AI access</,'signed-out visitors do not see it');
+ assert.ok(fs.readFileSync('scripts/build_site.cjs','utf8').includes("'llms.txt'"),'served at /llms.txt');
+});
