@@ -4,7 +4,14 @@ service cloud.firestore {
     function signed() { return request.auth != null; }
     function owner(u) { return signed() && request.auth.uid == u; }
     function campaign(c) { return get(/databases/$(database)/documents/campaigns/$(c)).data; }
-    function gm(c) { return signed() && campaign(c).gmUid == request.auth.uid; }
+    // A campaign has several GMs: the lead GM (gmUid, who made it) and the members any GM made
+    // GM too (gmUids). An extra GM stops being one as soon as they leave the campaign.
+    function gm(c) {
+      let d = campaign(c);
+      return signed() && (d.gmUid == request.auth.uid
+        || (request.auth.uid in d.get('gmUids',[]) && exists(/databases/$(database)/documents/campaigns/$(c)/members/$(request.auth.uid))));
+    }
+    function leadGm(c) { return signed() && campaign(c).gmUid == request.auth.uid; }
     function member(c,u) {
       return exists(/databases/$(database)/documents/campaigns/$(c))
         && exists(/databases/$(database)/documents/campaigns/$(c)/members/$(u));
@@ -114,11 +121,17 @@ service cloud.firestore {
         && (!('timelineHidden' in request.resource.data) || (request.resource.data.timelineHidden is list && request.resource.data.timelineHidden.size() <= 1000))
         && (!('mapId' in request.resource.data) || (request.resource.data.mapId is string && request.resource.data.mapId.size() <= 80))
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 200;
-      // GM handover: the GM passes the campaign to another current member, at once.
-      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gmUid'])
-        && request.resource.data.gmUid is string && request.resource.data.gmUid != request.auth.uid
-        && member(c,request.resource.data.gmUid);
-      allow delete: if gm(c);
+      // More GMs: any GM makes one current member GM (added at the end of gmUids) or takes extra
+      // GMs off the list (themselves too). The lead GM is never on it and cannot be removed.
+      allow update: if gm(c) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gmUids'])
+        && request.resource.data.gmUids is list && request.resource.data.gmUids.size() <= 20
+        && !(resource.data.gmUid in request.resource.data.gmUids)
+        && (resource.data.get('gmUids',[]).hasAll(request.resource.data.gmUids)
+          || (request.resource.data.gmUids.size() == resource.data.get('gmUids',[]).size() + 1
+            && request.resource.data.gmUids[0:resource.data.get('gmUids',[]).size()] == resource.data.get('gmUids',[])
+            && member(c,request.resource.data.gmUids[resource.data.get('gmUids',[]).size()])));
+      // Only the lead GM deletes the whole campaign.
+      allow delete: if leadGm(c);
       // Someone who is not a member asks to be invited. The GM sees the requests and approves one by
       // attaching an invite token, which the asker then uses to join; either side can withdraw it.
       match /requests/{u} {
@@ -368,7 +381,7 @@ service cloud.firestore {
       allow get: if signed() && resource.data.expiresAt > request.time;
       allow create: if gm(request.resource.data.campaignId)
         && request.resource.data.keys().hasOnly(['campaignId','gmUid','createdAt','expiresAt'])
-        && request.resource.data.gmUid == request.auth.uid
+        && request.resource.data.gmUid == campaign(request.resource.data.campaignId).gmUid
         && request.resource.data.createdAt is timestamp && request.resource.data.expiresAt is timestamp
         && request.resource.data.createdAt <= request.time && request.resource.data.createdAt > request.time - duration.value(5,'m')
         && request.resource.data.expiresAt > request.time

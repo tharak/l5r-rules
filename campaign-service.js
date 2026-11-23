@@ -9,6 +9,8 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     await batch.commit();
   };
   const memberPath = (c,u=uid) => `campaigns/${c}/members/${u}`;
+  // The lead GM (gmUid) and the extra GMs (gmUids) all run the campaign.
+  const isGM = (data,who = uid) => !!data && (data.gmUid === who || (Array.isArray(data.gmUids) && data.gmUids.includes(who)));
   const indexPath = (c,u=uid) => `users/${u}/campaigns/${c}`;
   const records = async path => (await sdk.getDocs(sdk.collection(db,path))).docs.map(d=>({id:d.id,...d.data()}));
   async function saveCharacter(owner,id,sheet,updatedAt) {
@@ -104,14 +106,14 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
             const data = s.exists() ? s.data() : null;
             events.receive(`campaigns/${id}`,data);
             if (!data) return;
-            if (data.gmUid === uid && !invitationStop) {
+            if (isGM(data) && !invitationStop) {
               invitationStop = sdk.onSnapshot(ref(`campaigns/${id}/private/invitation`),i=>events.receive(`campaigns/${id}/private/invitation`,i.exists()?i.data():null),()=>{});
               // Join requests from people who are not members yet.
               requestsStop = sdk.onSnapshot(sdk.collection(db,`campaigns/${id}/requests`),r=>{
                 for (const change of r.docChanges()) events.receive(`campaigns/${id}/requests/${change.doc.id}`,change.type==='removed'?null:change.doc.data());
               },()=>{});
             }
-            if (data.gmUid !== uid && invitationStop) { invitationStop(); requestsStop?.(); invitationStop = requestsStop = null; events.receive(`campaigns/${id}/private/invitation`,null); }
+            if (!isGM(data) && invitationStop) { invitationStop(); requestsStop?.(); invitationStop = requestsStop = null; events.receive(`campaigns/${id}/private/invitation`,null); }
             if (indexed.gmUid !== data.gmUid) { indexed.gmUid = data.gmUid; sdk.updateDoc(ref(indexPath(id)),{gmUid:data.gmUid}).catch(()=>{}); }
           },fail));
           // NPCs are public to every member.
@@ -162,7 +164,9 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     async invite(c) {
       const previous = await get(`campaigns/${c}/private/invitation`);
       const token = crypto.randomUUID(), createdAt = sdk.serverTimestamp(), expiresAt = sdk.Timestamp.fromMillis(Date.now()+7*86400000-60000);
-      const changes = [[`invites/${token}`,{campaignId:c,gmUid:uid,createdAt,expiresAt}],[`campaigns/${c}/private/invitation`,{token}]];
+      // Any GM makes the invitation; it names the lead GM, as members' records do.
+      const gmUid = (await get(`campaigns/${c}`))?.gmUid || uid;
+      const changes = [[`invites/${token}`,{campaignId:c,gmUid,createdAt,expiresAt}],[`campaigns/${c}/private/invitation`,{token}]];
       if (previous) changes.push([`invites/${previous.token}`,null]);
       await commit(changes); return token;
     },
@@ -207,7 +211,10 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     async removeMember(c,target) {
       const pcs = (await records(`campaigns/${c}/pcs`)).filter(pc=>pc.ownerUid===target);
       for (const pc of pcs) await write(`campaigns/${c}/pcs/${pc.id}`,null);
-      await commit([[memberPath(c,target),null],[indexPath(c,target),null]]);
+      // An extra GM who leaves or is removed comes off the GM list in the same step.
+      const campaign = await get(`campaigns/${c}`);
+      const gmChange = campaign?.gmUids?.includes(target) ? [[`campaigns/${c}`,{...campaign,gmUids:campaign.gmUids.filter(u=>u!==target)}]] : [];
+      await commit([...gmChange,[memberPath(c,target),null],[indexPath(c,target),null]]);
     },
     async deleteCampaign(c) {
       // Metadata contains no secret text, so the GM can clean up every body without reading it.
@@ -272,12 +279,17 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
     },
     async setLibraryHidden(hidden) { await sdk.setDoc(ref(`users/${uid}/settings/library`),{hidden:[...new Set(hidden)].slice(0,1000)}); },
     async deleteLibrary(id,{link = false} = {}) { await commit(link ? [[`library/${id}`,null]] : [[`library/${id}`,null],[`libraryFull/${id}`,null]]); },
-    // GM handover: another current member becomes GM at once; this account stays a member.
-    async handOver(c,to) {
-      if (!(await get(memberPath(c,to)))) throw new Error('That player is no longer in the campaign.');
-      await sdk.updateDoc(ref(`campaigns/${c}`),{gmUid:to});
-      await sdk.updateDoc(ref(indexPath(c)),{gmUid:to}).catch(()=>{});
+    // More GMs: any GM makes a current member GM too, or takes an extra GM off the list.
+    async setGM(c,who,on) {
+      const campaign = await get(`campaigns/${c}`);
+      if (!campaign) throw new Error('This campaign is gone.');
+      if (who === campaign.gmUid) throw new Error('The lead GM stays GM.');
+      const list = Array.isArray(campaign.gmUids) ? campaign.gmUids : [];
+      if (on && !(await get(memberPath(c,who)))) throw new Error('That player is no longer in the campaign.');
+      if (on === list.includes(who)) return;
+      await sdk.updateDoc(ref(`campaigns/${c}`),{gmUids:on ? [...list,who] : list.filter(u=>u!==who)});
     },
+    isGM,
     // PC handover. The owner offers a copy of the sheet to another member; the GM's notes on the
     // character (readable by the owner) travel inside the sheet's own journal.
     async offerPC(c,pcId,to,sheet,name) {

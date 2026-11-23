@@ -505,7 +505,7 @@ test('players who joined show for the GM in the Add PC popup, with their PCs or 
  const render=()=>d.window.CampaignUI.render('campaigns/c');render();
  await d.click('pc-picker');await new Promise(r=>setTimeout(r));
  const html=render();
- assert.match(html,/campaign-players"><h4>Players <small>2<\/small><\/h4><ul><li[^>]*><span><strong>Alice<\/strong> <small>joined · no PC yet<\/small>[^]*<strong>Bob<\/strong> <small>[^<]+<\/small>[^]*<strong>Carol<\/strong> <small>asks to join<\/small>[^]*data-campaign="request-approve" data-id="carol"/);
+ assert.match(html,/campaign-players"><h4>Players <small>3<\/small><\/h4><ul><li[^>]*><span><strong>GM<\/strong> <span class="campaign-gm-tag">Lead GM<\/span>[^]*<strong>Alice<\/strong> <small>joined · no PC yet<\/small>[^]*<strong>Bob<\/strong> <small>[^<]+<\/small>[^]*<strong>Carol<\/strong> <small>asks to join<\/small>[^]*data-campaign="request-approve" data-id="carol"/);
  const a=campaignCards();a.store.uid='alice';a.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});a.data.set('campaigns/c/members/alice',{displayName:'Alice'});
  assert.match(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign\. Create your character[^]*data-campaign="pc-create"[^>]*>Create PC</);
  a.data.set('campaigns/c/pcs/q',{ownerUid:'alice',characterId:'x'});assert.doesNotMatch(a.window.CampaignUI.render('campaigns/c'),/You joined this campaign/);
@@ -737,21 +737,33 @@ test('NPCs have a name, role, description and a notes list (journal entries)',as
  await d.click('npc-save');
  assert.equal(d.data.get(id).role,'Former magistrate');
 });
-test('GM handover: the GM picks a member, confirms, and the service makes them GM',async()=>{
+test('several GMs: any GM makes a player GM too or takes an extra GM off; only the lead GM deletes the campaign; no Hand over',async()=>{
  const d=campaignCards();
  d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm'});
- d.data.set('campaigns/c/members/gm',{displayName:'Tharak'});d.data.set('campaigns/c/members/alice',{displayName:'Alice'});
- const calls=[];Object.assign(d.store.backend,{handOver:async(c,to)=>calls.push([c,to]),watchTransfers:()=>()=>{}});
+ for(const [u,n] of [['gm','Tharak'],['alice','Alice'],['bob','Bob']])d.data.set(`campaigns/c/members/${u}`,{displayName:n});
+ const calls=[];Object.assign(d.store.backend,{setGM:async(c,who,on)=>calls.push([c,who,on]),watchTransfers:()=>()=>{}});
  d.window.confirm=()=>true;
- const render=()=>d.window.CampaignUI.render('campaigns/c');
- assert.match(render(),/data-campaign="handover"[^>]*>Hand over</);
- await d.click('handover');
- const html=render();
- assert.match(html,/Hand over the campaign[^]*data-campaign="handover-to" data-id="alice"[^>]*>Alice</);
- assert.doesNotMatch(html,/data-campaign="handover-to" data-id="gm"/,'not to yourself');
- await d.click('handover-to','alice');
- assert.deepEqual(calls,[['c','alice']]);
- d.store.uid='alice';assert.doesNotMatch(render(),/data-campaign="handover"/,'players have no Hand over');
+ const render=()=>d.window.CampaignUI.render('campaigns/c'),settle=async()=>{for(let i=0;i<5;i++)await new Promise(r=>setImmediate(r));};
+ let html=render();
+ assert.doesNotMatch(html,/data-campaign="handover/,'no Hand over');
+ assert.match(html,/data-campaign="delete-campaign"/,'the lead GM deletes the campaign');
+ await d.click('pc-picker');await settle();html=render();
+ assert.match(html,/<strong>Tharak<\/strong> <span class="campaign-gm-tag">Lead GM<\/span>/,'the lead GM is listed, with no button');
+ assert.doesNotMatch(html,/data-campaign="gm-(add|remove)" data-id="gm"/);
+ assert.match(html,/data-campaign="gm-add" data-id="alice"[^>]*>Make GM</);
+ await d.click('gm-add','alice');await settle();assert.deepEqual(calls.at(-1),['c','alice',true]);
+ // Alice, now GM too, runs the campaign but cannot delete it; she can step down or remove other extra GMs.
+ d.data.set('campaigns/c',{title:'Campaign',gmUid:'gm',gmUids:['alice']});
+ d.store.uid='alice';html=render();
+ assert.match(html,/data-campaign-field="title"/,'an extra GM edits like the GM');
+ assert.doesNotMatch(html,/data-campaign="delete-campaign"/);assert.match(html,/data-campaign="leave"/);
+ // Switching account closes the popup; open it again.
+ if(!/new-popup-title/.test(html)){await d.click('pc-picker');await settle();html=render();}
+ assert.match(html,/<strong>Alice<\/strong> <span class="campaign-gm-tag">GM<\/span>[^]*data-campaign="gm-remove" data-id="alice"[^>]*>Stop being GM</);
+ assert.match(html,/data-campaign="gm-add" data-id="bob"/);
+ await d.click('gm-remove','alice');await settle();assert.deepEqual(calls.at(-1),['c','alice',false]);
+ // Players manage nobody.
+ d.store.uid='bob';html=render();assert.doesNotMatch(html,/data-campaign="gm-(add|remove)"/);assert.doesNotMatch(html,/data-campaign-field="title"/);
 });
 test('PC handover: the owner offers to a member; the member accepts into their account; the owner\'s copy is then removed',async()=>{
  const d=campaignCards();

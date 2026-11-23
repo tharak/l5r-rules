@@ -7,13 +7,13 @@
   let timelineSession='', notePopup='', clanPopup='', focusPopup=false;
   const trayClosed=new Set();
   // Handovers: live PC offers to and from this account, and which handover popup is open
-  // ('campaign' for the GM handover, or 'pc:<pcId>' for a PC offer).
+  // ('pc:<pcId>' for a PC offer).
   let transfers=[], transferPopup='', stopTransfers=null, transfersBackend=null;
   const cleaning=new Set();
   const sheets = new Map(), stops = new Map();
   const cardSheets = new Map();
   const changed = () => window.dispatchEvent(new Event('campaign-sheet-changed'));
-  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|invite|entry-close|revoke|handover|transfer|decline|withdraw|library|map-|arrange/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
+  const button = (action,text,id='',disabled=false) => UI.button({text,variant:action!=='pc-picker'&&/cancel|close|edit|open|notes|link|picker|delete-campaign|leave|invite|gm-|entry-close|revoke|handover|transfer|decline|withdraw|library|map-|arrange/.test(action)?'secondary':'primary',attrs:{'data-campaign':action,'data-id':id,disabled:busy||disabled}});
   const statusMessage = () => error || (store().status === 'Connected' ? '' : store().status);
   const statusPanel = () => UI.feedback({text:statusMessage(),kind:error?'error':'status',attrs:{class:'campaign-status',hidden:!statusMessage()}});
   const path = (kind,id) => `campaigns/${active}/${kind}/${id}`;
@@ -53,7 +53,10 @@
   // Apps that open links in their own browser (WhatsApp, Instagram, Facebook, Line, TikTok…),
   // where Google refuses to sign in.
   const own = pc => pc.ownerUid === store().uid;
-  const gm = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
+  // Every GM runs the campaign: the lead GM (who made it) and the members made GM too.
+  const gmsOf = c => c ? [c.gmUid,...(Array.isArray(c.gmUids) ? c.gmUids : [])].filter(Boolean) : [];
+  const gm = () => gmsOf(store().get(`campaigns/${active}`)).includes(store().uid);
+  const leadGM = () => store().get(`campaigns/${active}`)?.gmUid === store().uid;
   const cardKey = pc => `${pc.ownerUid}/${pc.characterId}`;
   // Read marks: campaigns/{c}/reads/{uid} keeps, per member, the update each session or plot
   // was last read at. An entry's update time is the latest of its own and its notes'.
@@ -127,7 +130,7 @@
       const player = store().get(`campaigns/${campaign.id}/members/${pc.ownerUid}`)?.displayName || 'Player';
       return `<li>${e(name || 'Private PC')} - ${e(player)}</li>`;
     }).join('');
-    return UI.card({attrs:{'class':'panel campaign-card'},href:campaignHref(campaign.id),bodyHtml:`<h2>${e(campaign.title)}${READ_KINDS.some(kind => unreadIn(campaign.id,kind)) ? ` ${unreadMark}` : ''}</h2><p class="campaign-card-role">${campaign.gmUid===store().uid?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:''}`});
+    return UI.card({attrs:{'class':'panel campaign-card'},href:campaignHref(campaign.id),bodyHtml:`<h2>${e(campaign.title)}${READ_KINDS.some(kind => unreadIn(campaign.id,kind)) ? ` ${unreadMark}` : ''}</h2><p class="campaign-card-role">${gmsOf(campaign).includes(store().uid)?'GM':'Player'}</p>${pcs.length?`<ul class="campaign-card-pcs" aria-label="Player characters">${names}</ul>`:''}`});
   }
   function reset(next) {
     if (next === active) return;
@@ -633,12 +636,11 @@
     if (lookup.state === 'loading') return '<div class="workspace"><p class="campaign-invite-note">Looking up the campaign…</p></div>';
     return `<div class="workspace campaign-not-invited"><h1>You were not invited to ${title ? `the campaign <em>${e(title)}</em>` : 'this campaign'}</h1>${found ? '' : '<p class="campaign-invite-note">Check the address, or find the campaign on the <a href="#/start">start page</a>.</p>'}${action}</div>`;
   }
-  // Pick a member: the new GM, or who receives a PC.
+  // Pick a member to receive a PC.
   function renderTransferPopup(pcs) {
     if (!transferPopup) return '';
     const others = store().list(path('members','')).filter(m => m.id !== store().uid);
-    const list = others.length ? `<div class="campaign-transfer-list">${others.map(m => button(transferPopup === 'campaign' ? 'handover-to' : 'pc-transfer-to',m.displayName || 'Player',m.id)).join('')}</div>` : '<p class="campaign-invite-note">No other players yet.</p>';
-    if (transferPopup === 'campaign') return gm() ? popup('transfer-popup-title','Hand over the campaign',`<p class="campaign-invite-note">The member you pick becomes GM at once. You stay in the campaign as a player.</p>${list}`,'transfer-close') : '';
+    const list = others.length ? `<div class="campaign-transfer-list">${others.map(m => button('pc-transfer-to',m.displayName || 'Player',m.id)).join('')}</div>` : '<p class="campaign-invite-note">No other players yet.</p>';
     const pc = pcs.find(item => `pc:${item.id}` === transferPopup);
     return pc && own(pc) ? popup('transfer-popup-title',`Transfer ${label(pc)}`,`<p class="campaign-invite-note">They accept it into their account; then it leaves yours.</p>${list}`,'transfer-close') : '';
   }
@@ -676,10 +678,15 @@
   }
   function playersSection(pcs) {
     const campaign = store().get(`campaigns/${active}`);
-    const members = store().list(path('members','')).filter(m => m.id !== campaign?.gmUid).sort((a,b) => (a.displayName || '').localeCompare(b.displayName || ''));
+    // The lead GM is listed first; everyone else by name.
+    const members = store().list(path('members','')).sort((a,b) => (b.id === campaign?.gmUid) - (a.id === campaign?.gmUid) || (a.displayName || '').localeCompare(b.displayName || ''));
     const requests = openRequests();
-    const rows = members.map(m => { const theirs = pcs.filter(pc => pc.ownerUid === m.id).map(pc => label(pc));
-      return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong> <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span></li>`; })
+    // Any GM makes a player GM too, or takes an extra GM off the list (themselves included).
+    const gms = gmsOf(campaign), canManage = gm();
+    const rows = members.map(m => { const theirs = pcs.filter(pc => pc.ownerUid === m.id).map(pc => label(pc)), isGM = gms.includes(m.id);
+      const lead = m.id === campaign?.gmUid;
+      const toggle = !canManage || lead ? '' : isGM ? button('gm-remove',m.id === store().uid ? 'Stop being GM' : 'Remove GM',m.id) : button('gm-add','Make GM',m.id);
+      return `<li class="campaign-list-row"><span><strong>${e(m.displayName || 'Player')}</strong>${isGM ? ` <span class="campaign-gm-tag">${lead ? 'Lead GM' : 'GM'}</span>` : ''} <small>${theirs.length ? e(theirs.join(', ')) : 'joined · no PC yet'}</small></span>${toggle}</li>`; })
       .concat(requests.map(r => `<li class="campaign-list-row"><span><strong>${e(r.displayName || 'Someone')}</strong> <small>${r.inviteToken ? 'approved · has not joined yet' : 'asks to join'}</small></span>${r.inviteToken ? '' : button('request-approve','Approve',r.id)}</li>`));
     return `<div class="campaign-players"><h4>Players <small>${members.length}</small></h4>${rows.length ? `<ul>${rows.join('')}</ul>` : '<p class="campaign-invite-note">Nobody has joined yet. Players find the campaign on the start page and ask to be invited; you approve them here or on the campaign page.</p>'}</div>`;
   }
@@ -798,7 +805,7 @@
     // The GM reads every PC's full sheet for its private notes on the map.
     if (isGM) for (const pc of pcs) if (!own(pc)) watch(pc,true);
     const invitation = isGM ? store().get(path('private','invitation')) : null;
-    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${isGM?button('handover','Hand over')+button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
+    return `<div class="workspace campaign-workspace campaign-workspace-wide"><div class="workspace-head" data-topbar-head>${isGM?UI.field({labelAttrs:{'class':'campaign-title'},attrs:{'data-campaign-field':'title','maxlength':'200','value':c.title,'aria-label':'Campaign title'}}):`<h1>${e(c.title)}</h1>`}${leadGM()?button('delete-campaign','Delete campaign'):button('leave','Leave campaign')}</div>${statusPanel()}
       ${renderOffers()}<div class="campaign-rows">
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="sessions">${renderSessions(sessions,isGM)}</section>
       <section class="home-row campaign-row campaign-row-hidden" data-campaign-row="plots">${renderPlots(plots)}</section>
@@ -965,12 +972,16 @@
         else location.hash=`#/pc/${encodeURIComponent(pc.ownerUid)}/${encodeURIComponent(pc.characterId)}`;
       } else if (action==='pc-remove') {const pc=store().get(path('pcs',id));if(pc&&(gm()||own(pc))&&window.confirm(`Remove ${label({...pc,id})} from the campaign? The sheet stays with its player.`)){store().queue(path('pcs',id),null);if(store().get(path('tree',`pcs:${id}`)))store().queue(path('tree',`pcs:${id}`),null);store().flush();if(sheetId===id)sheetId='';}}
       else if (action==='close-sheet') {sheetId='';editor=null;}
-      else if (action==='handover') {transferPopup='campaign';focusPopup=true;}
       else if (action==='pc-transfer') {transferPopup=`pc:${id}`;focusPopup=true;}
       else if (action==='transfer-close') transferPopup='';
-      else if (action==='handover-to') {
-        if (!gm() || !window.confirm(`Make ${memberName(active,id)} the GM? You stay in the campaign as a player.`)) return;
-        await backend.handOver(active,id);transferPopup='';
+      else if (action==='gm-add') {
+        if (!gm() || !window.confirm(`Make ${memberName(active,id)} a GM too? They can do everything a GM does, except delete the campaign.`)) return;
+        await backend.setGM(active,id,true);
+      }
+      else if (action==='gm-remove') {
+        const self=id===store().uid;
+        if (!gm() || !window.confirm(self?'Stop being a GM? You stay in the campaign as a player.':`Take ${memberName(active,id)} off the GMs? They stay in the campaign as a player.`)) return;
+        await backend.setGM(active,id,false);
       }
       else if (action==='pc-transfer-to') {
         const pc=store().get(path('pcs',transferPopup.slice(3)));

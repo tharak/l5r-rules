@@ -215,17 +215,24 @@ test('timeline events: members read them, only the GM writes them',async()=>{
  for(const bad of [{...event,kind:'sessions'},{...event,x:120},{...event,extra:1}])await assertFails(setDoc(r(db('gm'),'campaigns/c/timeline/t'),bad));
  await assertSucceeds(deleteDoc(r(db('gm'),'campaigns/c/timeline/t')));
 });
-test('GM handover: only the GM, only to a current member; members then align their own index copy',async()=>{
- await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/h',{title:'Handover',gmUid:'gm'}],...['gm','alice'].flatMap(u=>[[`campaigns/h/members/${u}`,{gmUid:'gm',membershipId:u+'-m',inviteToken:''}],[`users/${u}/campaigns/h`,{gmUid:'gm',membershipId:u+'-m'}]])]);});
- await assertFails(updateDoc(r(db('alice'),'campaigns/h'),{gmUid:'alice'}),'a player cannot take the campaign');
- await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'bob'}),'not to a non-member');
- await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'alice',title:'Renamed'}),'the handover changes nothing else');
- await assertFails(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice'}),'index follows the campaign, not the reverse');
- await assertSucceeds(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'alice'}));
- await assertSucceeds(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice'}));
- await assertFails(updateDoc(r(db('alice'),'users/alice/campaigns/h'),{gmUid:'alice',membershipId:'forged'}));
- await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{title:'Old GM edit'}),'the old GM is a player now');
- await assertSucceeds(updateDoc(r(db('alice'),'campaigns/h'),{title:'New GM edit'}));
+test('several GMs: any GM adds a current member or removes extra GMs; extra GMs act as GM but cannot delete the campaign; leaving ends it',async()=>{
+ await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/h',{title:'Several',gmUid:'gm'}],...['gm','alice','bob'].flatMap(u=>[[`campaigns/h/members/${u}`,{gmUid:'gm',membershipId:u+'-m',inviteToken:''}],[`users/${u}/campaigns/h`,{gmUid:'gm',membershipId:u+'-m'}]])]);});
+ await assertFails(updateDoc(r(db('alice'),'campaigns/h'),{gmUids:['alice']}),'a player cannot make themselves GM');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUids:['outsider']}),'only a current member');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUids:['gm']}),'the lead GM is never on the list');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUids:['alice'],title:'Renamed'}),'changes nothing else');
+ await assertFails(updateDoc(r(db('gm'),'campaigns/h'),{gmUid:'alice'}),'no handover');
+ await assertSucceeds(updateDoc(r(db('gm'),'campaigns/h'),{gmUids:['alice']}));
+ await assertSucceeds(updateDoc(r(db('alice'),'campaigns/h'),{title:'Extra GM edit'}));
+ await assertSucceeds(getDocs(collection(db('alice'),'campaigns/h/members')),'an extra GM lists members');
+ await assertSucceeds(updateDoc(r(db('alice'),'campaigns/h'),{gmUids:['alice','bob']}),'an extra GM makes another GM');
+ await assertFails(updateDoc(r(db('alice'),'campaigns/h'),{gmUids:['bob','alice','gm']}));
+ await assertSucceeds(updateDoc(r(db('bob'),'campaigns/h'),{gmUids:['bob']}),'any GM takes an extra GM off');
+ await assertFails(deleteDoc(r(db('bob'),'campaigns/h')),'only the lead GM deletes the campaign');
+ await assertFails(deleteDoc(r(db('bob'),'campaigns/h/members/gm')),'nobody removes the lead GM');
+ // Leaving ends GM powers, even before the list is updated.
+ await assertSucceeds(deleteDoc(r(db('bob'),'campaigns/h/members/bob')));
+ await assertFails(updateDoc(r(db('bob'),'campaigns/h'),{title:'Gone'}));
 });
 test('PC handover offers: the owner offers to a member; only the recipient reads and accepts; either side withdraws',async()=>{
  await env.withSecurityRulesDisabled(async c=>{const d=c.firestore();await batch(d,[['campaigns/t',{title:'Transfers',gmUid:'gm'}],...['gm','alice','bob'].flatMap(u=>[[`campaigns/t/members/${u}`,{gmUid:'gm',membershipId:u+'-m',inviteToken:''}],[`users/${u}/campaigns/t`,{gmUid:'gm',membershipId:u+'-m'}]]),['users/alice/characters/sold',full],['users/alice/publicCharacters/sold',projection],['campaigns/t/pcs/p',{ownerUid:'alice',characterId:'sold',membershipId:'alice-m'}]]);});
