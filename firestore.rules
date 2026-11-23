@@ -84,6 +84,12 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/users/$(u)/characters/$(id)).data.profile == request.resource.data.profile;
       allow delete: if owner(u) && !existsAfter(/databases/$(database)/documents/users/$(u)/characters/$(id));
     }
+    // The pictures a player hid from their own media library (ids only); theirs alone.
+    match /users/{u}/settings/library {
+      allow read, delete: if owner(u);
+      allow create, update: if owner(u) && request.resource.data.keys().hasOnly(['hidden'])
+        && request.resource.data.hidden is list && request.resource.data.hidden.size() <= 1000;
+    }
     match /users/{u}/campaigns/{c} {
       allow read: if owner(u);
       allow create: if (owner(u) || gm(c)) && request.resource.data.keys().hasOnly(['gmUid','membershipId'])

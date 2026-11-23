@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname,'..');
 const context = vm.createContext({window:{},crypto:require('node:crypto').webcrypto});
-for(const file of ['character-catalog.js','character-rules.js','character-dice.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
+for(const file of ['official-images.js','character-catalog.js','character-rules.js','character-dice.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context);
 const R=context.window.CharacterRules,D=context.window.CharacterDice;
 const plain=value=>JSON.parse(JSON.stringify(value));
 const sequence=values=>{let i=0;return ()=>{assert.ok(i<values.length,'Unexpected extra die roll');return values[i++];};};

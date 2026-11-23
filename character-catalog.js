@@ -114,7 +114,9 @@
   // Clock positions in the mandala (12:00 at the top), and identifications that are guesses.
   const MANDALA = {Raven:'11:30',Dragonfly:'12:30',Tortoise:'1:00',Monkey:'2:00',Tiger:'2:30',Bat:'3:30',Mantis:'4:00',Badger:'5:00',Falcon:'5:30',Nezumi:'6:30',Snake:'7:00',Hare:'8:00',Sparrow:'8:30',Boar:'9:30',Ox:'10:00',Fox:'11:00'};
   const MON_GUESSES = {mandala:['Badger','Hare','Sparrow','Tiger']};
-  const monFile = (kind,name) => `public/assets/clans/${kind}/${name.toLowerCase()}.webp`;
+  // Official art loads from its original file (official-images.js); other paths stay as they are.
+  const art = path => (globalThis.window || globalThis).OfficialImages?.src(path) || path;
+  const monFile = (kind,name) => art(`public/assets/clans/${kind}/${name.toLowerCase()}.webp`);
   // Every available mon for a clan, best first.
   const clanMonCandidates = name => MON_PRIORITY.filter(kind => MON_FILES[kind].includes(name)).map(kind => ({
     kind,src:monFile(kind,name),source:MON_SOURCES[kind],position:kind === 'mandala' ? MANDALA[name] || '' : '',guess:!!MON_GUESSES[kind]?.includes(name)
@@ -122,16 +124,16 @@
   const CLAN_MONS = [...new Set(MON_PRIORITY.flatMap(kind => MON_FILES[kind]))];
   // Clans without a mon from any source use the official five-rings mark (also the site
   // logo and favicon); no clan, no mon.
-  const DEFAULT_MON = 'public/assets/l5r-mark.webp';
+  const DEFAULT_MON = art('public/assets/l5r-mark.webp');
   const clanMon = name => clanMonCandidates(name)[0]?.src || (typeof name === 'string' && name.trim() ? DEFAULT_MON : '');
   // Official clan cover art from legendofthefiverings.com: a wide image (1200×1125) and a
   // tall one (780×2000) per Great Clan; other clans have none.
   const CLAN_COVERS = ['Crab','Crane','Dragon','Lion','Phoenix','Scorpion','Unicorn'];
-  const clanCover = (name,{tall = false} = {}) => CLAN_COVERS.includes(name) ? `public/assets/clans/covers/${name.toLowerCase()}${tall ? '-tall' : ''}.webp` : '';
+  const clanCover = (name,{tall = false} = {}) => CLAN_COVERS.includes(name) ? art(`public/assets/clans/covers/${name.toLowerCase()}${tall ? '-tall' : ''}.webp`) : '';
   // Five square illustrations per Great Clan (03a–03e on the site), 600px.
-  const clanIllustrations = name => CLAN_COVERS.includes(name) ? ['a','b','c','d','e'].map(letter => ({letter,src:`public/assets/clans/illustrations/${name.toLowerCase()}-${letter}.webp`})) : [];
+  const clanIllustrations = name => CLAN_COVERS.includes(name) ? ['a','b','c','d','e'].map(letter => ({letter,src:art(`public/assets/clans/illustrations/${name.toLowerCase()}-${letter}.webp`)})) : [];
   // Tall brush-edged hero banner from the clans pages (500×1000, transparent edges).
-  const clanBanner = name => CLAN_COVERS.includes(name) ? `public/assets/clans/banners/${name.toLowerCase()}.webp` : '';
+  const clanBanner = name => CLAN_COVERS.includes(name) ? art(`public/assets/clans/banners/${name.toLowerCase()}.webp`) : '';
   // Official family art from the Great Clan pages of legendofthefiverings.com, saved as
   // public/assets/clans/families/<clan>-<letter>.webp in the site's file order (04a, 04b…).
   // The site does not label them, so each letter is matched to a family by its content;
@@ -146,7 +148,7 @@
     Unicorn:{a:'Shinjo',b:'Utaku',c:'Moto',d:'Iuchi'}
   };
   const FAMILY_ART_GUESSES = {Crane:['Doji','Kakita','Asahina'],Lion:['Matsu','Akodo','Ikoma'],Phoenix:['Shiba','Kaito'],Unicorn:['Utaku','Moto']};
-  const familyArtFile = (clan,letter) => `public/assets/clans/families/${clan.toLowerCase()}-${letter}.webp`;
+  const familyArtFile = (clan,letter) => art(`public/assets/clans/families/${clan.toLowerCase()}-${letter}.webp`);
   const familyArt = (clan,family) => {
     const letter = Object.entries(FAMILY_ART[clan] || {}).find(([,name]) => name && name === family)?.[0];
     return letter ? familyArtFile(clan,letter) : '';

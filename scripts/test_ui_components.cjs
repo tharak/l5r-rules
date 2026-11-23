@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const context = {window:{}};
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../official-images.js'),'utf8'),context);
 vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../ui-components.js'),'utf8'),context);
 const UI = context.window.UI;
 
@@ -96,7 +97,9 @@ test('character avatars fall back from the picture to the clan mon to the Five R
   context.window.CharacterCatalog={clanMon:clan=>clan==='Crab'?'public/assets/clans/mandala/crab.webp':''};
   assert.match(UI.characterAvatar({portrait:picture,clan:'Crab',name:'Kenta'}),/src="data:image\/png/);
   assert.match(UI.characterAvatar({clan:'Crab',name:'Kenta'}),/class="character-avatar character-avatar-mon" src="public\/assets\/clans\/mandala\/crab\.webp"/);
-  assert.match(UI.characterAvatar({clan:'Ronin',name:'Kenta'}),/character-avatar-rings" src="public\/assets\/l5r-mark\.webp"/);
-  assert.match(UI.characterAvatar({name:'Mario'}),/l5r-mark\.webp/);
+  // The Five Rings mark is official art: it loads from its original file.
+  const mark=context.window.OfficialImages.src('public/assets/l5r-mark.webp');assert.match(mark,/^https:\/\/cdn\.svc\.asmodee\.net\//);
+  assert.ok(UI.characterAvatar({clan:'Ronin',name:'Kenta'}).includes(`character-avatar-rings" src="${mark}"`));
+  assert.ok(UI.characterAvatar({name:'Mario'}).includes(mark));
   delete context.window.CharacterCatalog;
 });

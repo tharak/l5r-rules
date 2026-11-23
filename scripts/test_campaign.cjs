@@ -88,7 +88,7 @@ function campaignCards() {
  }};
  const window={CampaignStorage:store,CharacterBuilder:{list:()=>characters},addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent(){}};
  const location={hash:'#/campaigns',href:'http://localhost/#/campaigns'};
- vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('sheet-sharing.js','utf8'),{window,structuredClone,crypto:require('node:crypto')});
+ vm.runInNewContext(fs.readFileSync('official-images.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('ui-components.js','utf8'),{window});vm.runInNewContext(fs.readFileSync('sheet-sharing.js','utf8'),{window,structuredClone,crypto:require('node:crypto')});
  const doc={addEventListener:(name,fn)=>documentListeners[name]=fn,querySelector:()=>null};
  vm.runInNewContext(fs.readFileSync('campaign-ui.js','utf8'),{window,document:doc,location,Event,console,setTimeout,crypto:require('node:crypto')});
  // Like the app, render the address a click moved to (a section or item inside this campaign).
@@ -191,11 +191,11 @@ test('the GM adds, keeps and removes NPC pictures for new and existing NPCs',asy
 });
 test('the public view shows the profile, escapes text, and handles missing or old documents',()=>{
  const window={addEventListener(){}};
- for(const file of ['ui-components.js','character-catalog.js','sheet-sharing.js','character-public.js'])vm.runInNewContext(fs.readFileSync(file,'utf8'),{window,structuredClone,crypto:require('node:crypto')});
+ for(const file of ['official-images.js','ui-components.js','character-catalog.js','sheet-sharing.js','character-public.js'])vm.runInNewContext(fs.readFileSync(file,'utf8'),{window,structuredClone,crypto:require('node:crypto')});
  const P=window.PublicCharacter;
  const html=P.page({revision:'r',profile:{name:'Doji <Ren>',portrait:'javascript:alert(1)',clan:'Crane',family:'Doji',school:'Kakita Bushi',insightRank:2,gear:['Katana'],stats:{glory:2.5},advantages:[{name:'Fame',selection:''}],disadvantages:[],journal:[{id:'a',text:'Old <b>entry</b>',createdAt:'2026-11-01'},{id:'b',text:'New entry',createdAt:'2026-11-05'}]}});
  assert.match(html,/Doji &lt;Ren&gt;/);assert.ok(!html.includes('javascript:'));
- assert.match(html,/public\/assets\/clans\/official\/crane\.webp/,'falls back to the clan mon without a valid picture');
+ assert.ok(html.includes(window.OfficialImages.src('public/assets/clans/official/crane.webp')),'falls back to the clan mon (its original file) without a valid picture');
  assert.match(html,/Glory<\/span><strong>2\.5/);assert.match(html,/Carries<\/h2><p>Katana/);assert.match(html,/Fame/);
  assert.ok(!html.includes('Disadvantages'),'empty sections are left out');
  assert.ok(html.indexOf('Old &lt;b&gt;entry')<html.indexOf('New entry'),'journal entries run oldest first, 1..n');assert.match(html,/data-journal-jump="a"[^>]*>1<[\s\S]*data-journal-jump="b"[^>]*>2</,'jump buttons numbered 1..n');

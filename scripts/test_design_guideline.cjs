@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname,'..');
 const context = {window:{}};
-for(const file of ['ui-components.js','design-guideline.js']) vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),context);
+for(const file of ['official-images.js','ui-components.js','design-guideline.js']) vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),context);
 const {entries,examples} = context.window.DesignGuideline;
 
 test('32 families retain all 117 permanent example IDs exactly once',()=>{

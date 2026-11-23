@@ -266,6 +266,11 @@ export function createCampaignBackend(db,sdk,uid,displayName='') {
       return id;
     },
     async libraryImage(id) { return (await get(`libraryFull/${id}`))?.image || ''; },
+    // The pictures this account hid from its own library (ids), saved with the account.
+    watchLibraryHidden(receive,fail = () => {}) {
+      return sdk.onSnapshot(ref(`users/${uid}/settings/library`),s=>receive(Array.isArray(s.data()?.hidden) ? s.data().hidden : []),fail);
+    },
+    async setLibraryHidden(hidden) { await sdk.setDoc(ref(`users/${uid}/settings/library`),{hidden:[...new Set(hidden)].slice(0,1000)}); },
     async deleteLibrary(id,{link = false} = {}) { await commit(link ? [[`library/${id}`,null]] : [[`library/${id}`,null],[`libraryFull/${id}`,null]]); },
     // GM handover: another current member becomes GM at once; this account stays a member.
     async handOver(c,to) {

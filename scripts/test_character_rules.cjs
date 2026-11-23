@@ -5,8 +5,11 @@ const vm=require('node:vm');
 const {randomUUID}=require('node:crypto');
 const catalog=JSON.parse(fs.readFileSync('public/character-data.json','utf8'));
 const window={};const context=vm.createContext({window,console,Date,crypto:{randomUUID},structuredClone});
-for(const file of ['character-catalog.js','character-rules.js','sheet-sharing.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
+for(const file of ['official-images.js','character-catalog.js','character-rules.js','sheet-sharing.js'])vm.runInContext(fs.readFileSync(file,'utf8'),context);
 const R=window.CharacterRules,C=window.CharacterCatalog,S=window.SheetSharing;
+// Official art loads from its original file (official-images.js); other pictures are site files.
+const O=window.OfficialImages,art=p=>O.src(p);
+const available=src=>!!O.original(src)||O.paths().some(p=>O.src(p)===src)||fs.existsSync(src);
 const plain=v=>JSON.parse(JSON.stringify(v));
 const calc=s=>R.calculate(s,catalog);
 const starting=(clan='Crab',name='Hida Bushi')=>R.normalize({name:'Test PC',clan,family:catalog.clans.find(c=>c.name===clan).families[0]?.name || '',school:C.schools(catalog).find(s=>s.name===name).slug+'#'+C.schools(catalog).find(s=>s.name===name).anchor});
@@ -518,7 +521,9 @@ test('clan mons come from the highest-priority source that has one, and every li
   Mantis:'wiki',Spider:'wiki',Imperial:'wiki',Badger:'mandala',Bat:'mandala',Boar:'mandala',Dragonfly:'mandala',Falcon:'mandala',Fox:'mandala',
   Hare:'mandala',Monkey:'mandala',Ox:'mandala',Snake:'mandala',Sparrow:'mandala',Tiger:'mandala',Tortoise:'mandala',Raven:'mandala'};
  for(const [clan,kind] of Object.entries(expect)) {
-  assert.equal(C.clanMon(clan),`public/assets/clans/${kind}/${clan.toLowerCase()}.webp`,clan);
+  assert.equal(C.clanMon(clan),art(`public/assets/clans/${kind}/${clan.toLowerCase()}.webp`),clan);
+  // Official mons load from the official site; the cut and recoloured ones stay on this site.
+  assert.equal(C.clanMon(clan).startsWith('https://'),kind==='official',clan);
   assert.ok(catalog.clans.some(c=>c.name===clan),clan);
  }
  // Mantis also has a mandala mon, but l5r.wiki outranks it.
@@ -527,28 +532,28 @@ test('clan mons come from the highest-priority source that has one, and every li
  assert.equal(C.clanMonInfo('Badger').guess,true);assert.equal(C.clanMonInfo('Fox').guess,false);
  // Clans with no mon from any source fall back to the five-rings seal; no clan means no mon.
  for(const clan of ['Oriole','Ronin','Brotherhood of Shinsei'])assert.equal(C.clanMon(clan),C.DEFAULT_MON,clan);
- assert.ok(fs.existsSync(C.DEFAULT_MON));
+ assert.ok(available(C.DEFAULT_MON));
  for(const clan of ['','  ',undefined,null])assert.equal(C.clanMon(clan),'',String(clan));
- for(const name of C.CLAN_MONS)for(const candidate of C.clanMonCandidates(name))assert.ok(fs.existsSync(candidate.src),candidate.src);
+ for(const name of C.CLAN_MONS)for(const candidate of C.clanMonCandidates(name))assert.ok(available(candidate.src),candidate.src);
 });
 
 test('the seven Great Clans have wide and tall cover art; other clans have none',()=>{
  for(const clan of C.CLAN_COVERS) {
-  assert.equal(C.clanCover(clan),`public/assets/clans/covers/${clan.toLowerCase()}.webp`);
-  for(const tall of [false,true])assert.ok(fs.existsSync(C.clanCover(clan,{tall})),clan+(tall?' tall':''));
+  assert.equal(C.clanCover(clan),C.officialSourceUrl('cover',clan));assert.equal(C.clanCover(clan,{tall:true}),C.officialSourceUrl('tall',clan));
+  for(const tall of [false,true])assert.ok(available(C.clanCover(clan,{tall})),clan+(tall?' tall':''));
  }
  for(const clan of ['Mantis','Ronin','',undefined])assert.equal(C.clanCover(clan),'',String(clan));
 });
 
 test('family art maps catalog families to bundled images and marks uncertain matches',()=>{
- for(const clan of Object.keys(C.FAMILY_ART))for(const item of C.familyArtList(clan))assert.ok(fs.existsSync(item.src),item.src);
- assert.equal(C.familyArt('Crab','Yasuki'),'public/assets/clans/families/crab-d.webp');
- assert.equal(C.familyArt('Dragon','Togashi'),'public/assets/clans/families/dragon-b.webp');
+ for(const clan of Object.keys(C.FAMILY_ART))for(const item of C.familyArtList(clan))assert.ok(available(item.src),item.src);
+ assert.equal(C.familyArt('Crab','Yasuki'),C.officialSourceUrl('family','Crab','d'));
+ assert.equal(C.familyArt('Dragon','Togashi'),C.officialSourceUrl('family','Dragon','b'));
  assert.equal(C.familyArt('Crab','Toritaka'),'');assert.equal(C.familyArt('Mantis','Yoritomo'),'');assert.equal(C.familyArt('Scorpion',''),'');
  assert.equal(C.familyArtList('Crab').some(item=>item.guess),false);
  // Scorpion a–d were identified by the user; e is still unknown.
- assert.equal(C.familyArt('Scorpion','Yogo'),'public/assets/clans/families/scorpion-a.webp');
- assert.equal(C.familyArt('Scorpion','Bayushi'),'public/assets/clans/families/scorpion-c.webp');
+ assert.equal(C.familyArt('Scorpion','Yogo'),C.officialSourceUrl('family','Scorpion','a'));
+ assert.equal(C.familyArt('Scorpion','Bayushi'),C.officialSourceUrl('family','Scorpion','c'));
  assert.deepEqual(plain(C.familyArtList('Scorpion').map(item=>[item.letter,item.family,item.guess])),[['a','Yogo',false],['b','Shosuro',false],['c','Bayushi',false],['d','Soshi',false],['e','',true]]);
  // Every named family exists in the catalog, except Kaito (Phoenix on the official site only).
  for(const [clan,map] of Object.entries(C.FAMILY_ART))for(const family of Object.values(map).filter(Boolean))
@@ -564,12 +569,19 @@ test('official images link back to their original files on legendofthefiverings.
  assert.equal(C.officialSourceUrl('tall','Unicorn'),cdn+'UI_L5R_Clan_Cover_Unicorn_Mobile.webp');
  assert.equal(C.officialSourceUrl('mon','Mantis'),'');
  assert.equal(C.officialSourceUrl('banner','Crab'),cdn+'01_Clans_Page_Crab-1.webp');
- for(const clan of C.CLAN_COVERS)assert.ok(fs.existsSync(C.clanBanner(clan)),clan);
+ // The site keeps no copies: banners, illustrations and mons load from these original files.
+ for(const clan of C.CLAN_COVERS){
+  assert.equal(C.clanBanner(clan),C.officialSourceUrl('banner',clan),clan);
+  assert.equal(C.clanMonCandidates(clan)[0].src,C.officialSourceUrl('mon',clan),clan);
+  for(const item of C.clanIllustrations(clan))assert.equal(item.src,C.officialSourceUrl('illustration',clan,item.letter),item.src);
+  for(const item of C.familyArtList(clan))assert.equal(item.src,C.officialSourceUrl('family',clan,item.letter),item.src);
+ }
+ for(const file of O.paths())assert.ok(!fs.existsSync(file),'no copy kept: '+file);
  assert.equal(C.clanBanner('Mantis'),'');
- for(const clan of C.CLAN_COVERS)for(const item of C.clanIllustrations(clan))assert.ok(fs.existsSync(item.src),item.src);
+ for(const clan of C.CLAN_COVERS)for(const item of C.clanIllustrations(clan))assert.ok(available(item.src),item.src);
  assert.equal(C.officialSourceUrl('illustration','Scorpion','c'),cdn+'03c_Clan_Squared_Illustrations-1200x1200.webp');
  assert.deepEqual(plain(C.clanIllustrations('Mantis')),[]);
- for(const f of ['clans','clans-tall'])assert.ok(fs.existsSync(`public/assets/clans/covers/${f}.webp`),f);
+ for(const f of ['clans','clans-tall'])assert.ok(available(`public/assets/clans/covers/${f}.webp`),f);
  assert.deepEqual(Object.keys(C.OFFICIAL_CLAN_NUMBERS).sort(),[...C.CLAN_COVERS].sort());
 });
 

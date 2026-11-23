@@ -283,3 +283,12 @@ test('clans and family trees: any member puts a PC or NPC under a clan or anothe
  await assertSucceeds(deleteDoc(r(db('bob'),'campaigns/c/tree/pcs:p1')));
  await assertFails(deleteDoc(r(db('outsider'),'campaigns/c/tree/npcs:n1')));
 });
+test('each player keeps their own list of hidden library pictures; nobody else reads or writes it',async()=>{
+ const own=r(db('alice'),'users/alice/settings/library');
+ await assertSucceeds(setDoc(own,{hidden:['asset:public/assets/rings/air.webp','u1']}));
+ await assertSucceeds(getDoc(own));
+ await assertFails(setDoc(own,{hidden:['x'],extra:true}));
+ await assertFails(setDoc(own,{hidden:'x'}));
+ await assertFails(getDoc(r(db('bob'),'users/alice/settings/library')));
+ await assertFails(setDoc(r(db('bob'),'users/alice/settings/library'),{hidden:[]}));
+});

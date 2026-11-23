@@ -1,8 +1,12 @@
-// Lists the images bundled with the site for the media library, grouped by source.
+// Lists the site's images for the media library, grouped by source.
 // Run: node scripts/build_library.cjs  → public/assets/library.json
 const fs = require('node:fs'), path = require('node:path');
 const root = path.join(__dirname,'..'), assets = path.join(root,'public/assets');
-const images = dir => fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /\.(webp|jpe?g|png|gif)$/i.test(f)).sort() : [];
+// Official art is not kept on the site (it loads from its original file), so its paths come
+// from official-images.js; the other pictures are the files under public/assets.
+require(path.join(root,'official-images.js'));
+const officialIn = dir => globalThis.OfficialImages.paths().map(p => path.join(root,p)).filter(p => path.dirname(p) === dir).map(p => path.basename(p));
+const images = dir => [...new Set([...(fs.existsSync(dir) ? fs.readdirSync(dir) : []),...officialIn(dir)])].filter(f => /\.(webp|jpe?g|png|gif)$/i.test(f)).sort();
 const title = file => file.replace(/\.[^.]+$/,'').replace(/[-_]+/g,' ').replace(/\b(\w)/g,c => c.toUpperCase());
 const from = (folder,files = images(path.join(assets,folder))) => files.map(f => ({src:`public/assets/${folder ? folder + '/' : ''}${f}`,title:title(f)}));
 const groups = [

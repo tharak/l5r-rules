@@ -29,7 +29,7 @@ async function character(saved,preferences = {}) {
     fetch:async () => ({ok:true, json:async () => catalog}),
     URL:{createObjectURL(blob){exported = blob; return 'blob:test';}, revokeObjectURL(){}},
     document, setTimeout:fn=>timers.push(fn)});
-  for (const file of ['ui-components.js','routes.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
+  for (const file of ['official-images.js','ui-components.js','routes.js','character-catalog.js','character-rules.js']) vm.runInContext(fs.readFileSync(path.join(rootDir,file),'utf8'),context);
   vm.runInContext(source, context);
   await window.CharacterBuilder.mount(root);
   const change = (dataset,value,extra={}) => root.onchange({target:{dataset,value,...extra}});

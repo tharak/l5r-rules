@@ -137,6 +137,7 @@
   function image(file) {
     if (!images.has(file)) images.set(file,new Promise((resolve,reject) => {
       const img = new Image();
+      if (/^https:/.test(file)) img.crossOrigin = 'anonymous'; // official art on its own site: keeps the canvas saveable
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error(`Missing layer ${file}`));
       img.src = file.startsWith('public/') ? file : ROOT+file;

@@ -283,7 +283,7 @@
     const mon = window.CharacterCatalog?.clanMon(clan || '');
     if (mon) return `<img class="character-avatar character-avatar-mon" src="${escape(mon)}" alt="">`;
     // No picture and no clan: the Five Rings mark.
-    return `<img class="character-avatar character-avatar-mon character-avatar-rings" src="public/assets/l5r-mark.webp" alt="">`;
+    return `<img class="character-avatar character-avatar-mon character-avatar-rings" src="${escape(window.OfficialImages?.src('public/assets/l5r-mark.webp') || '')}" alt="">`;
   }
   // The tile shows the name with the family under it; the clan mon also sits behind as a faint,
   // centred, cropped background (see clanTileStyle). The avatar: picture, else clan mon, else rings.

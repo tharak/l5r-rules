@@ -196,15 +196,15 @@ const OFFICIAL_LORE = [
     ['clan-landscape.webp','Landscape background',OFFICIAL_CDN+'06/06_Clan_Landscape_Background_Bottom-1900x2019.webp',true]]}
 ];
 
-// Every image downloaded from legendofthefiverings.com, grouped by Great Clan, each linked
-// to its original file. Family art shows which family each image was matched to.
+// Every image used from legendofthefiverings.com (loaded from its original file, not kept
+// on this site), grouped by Great Clan, each linked to its original file. Family art shows which family each image was matched to.
 async function mountOfficialImages(element) {
   const C = window.CharacterCatalog;
   let clans = [];
   try { clans = (await (await fetch('public/character-data.json')).json()).clans; } catch { element.innerHTML = '<p>The clan list could not be loaded.</p>'; return; }
   if (currentSlug() !== 'official-images') return;
   const original = href => href ? `<a href="${href}" target="_blank" rel="noopener">Original file ↗</a>` : '';
-  const tile = ({src,title,lines,flag,wide}) => `<figure class="official-tile${wide?' official-tile-wide':''}${flag?' mon-debug-flag':''}"><img src="${src}" alt="${esc(title)}" loading="lazy"><figcaption><strong>${esc(title)}</strong>${lines.filter(Boolean).map(line => `<small>${line}</small>`).join('')}</figcaption></figure>`;
+  const tile = ({src,title,lines,flag,wide}) => `<figure class="official-tile${wide?' official-tile-wide':''}${flag?' mon-debug-flag':''}"><img src="${esc(window.OfficialImages.src(src))}" alt="${esc(title)}" loading="lazy"><figcaption><strong>${esc(title)}</strong>${lines.filter(Boolean).map(line => `<small>${line}</small>`).join('')}</figcaption></figure>`;
   const path = src => `<code>${esc(src)}</code>`;
   const clanBlock = clan => {
     const known = new Set((clans.find(c => c.name === clan)?.families || []).map(f => f.name));
@@ -226,7 +226,7 @@ async function mountOfficialImages(element) {
     tile({src:'public/assets/rokugan-map.webp',title:'Map of Rokugan',wide:true,lines:['Campaign page background',path('public/assets/rokugan-map.webp'),original('https://cdn.svc.asmodee.net/production-l5r/uploads/image-converter/2023/06/03_Map_Background-Rokugan-1900x2755.webp')]})
   ].join('');
   element.innerHTML = `<div class="workspace mon-debug official-images">${UI.sectionHeading({title:'Official images',level:1})}
-    <p class="mon-debug-priority">Images downloaded from <a href="https://www.legendofthefiverings.com/" target="_blank" rel="noopener">legendofthefiverings.com</a> (© Legend of the Five Rings / Asmodee). The site does not label the family art; each image is matched to a family by its content, and red outlines mark guesses. Clan mons for every clan are on <a href="#/clan-mons">Clan mons</a>.</p>
+    <p class="mon-debug-priority">Images used from <a href="https://www.legendofthefiverings.com/" target="_blank" rel="noopener">legendofthefiverings.com</a> (© Legend of the Five Rings / Asmodee). The site does not label the family art; each image is matched to a family by its content, and red outlines mark guesses. Clan mons for every clan are on <a href="#/clan-mons">Clan mons</a>.</p>
     ${C.CLAN_COVERS.map(clanBlock).join('')}
     <section class="official-clan"><h2>Site images</h2><div class="official-art">${site}</div></section>
     ${OFFICIAL_LORE.map(group => `<section class="official-clan"><h2>${esc(group.title)}</h2><p class="mon-debug-priority">${esc(group.note)}</p><div class="official-art">${group.items.map(([file,title,url,wide]) => tile({src:`public/assets/lore/${file}`,title,wide,lines:[path(`public/assets/lore/${file}`),original(url)]})).join('')}</div></section>`).join('')}</div>`;
@@ -394,8 +394,8 @@ function render() {
   // pages. The character page sets its own clan art (CharacterBuilder.render).
   const SHADOWLANDS_PAGES = ['shadowlands-taint','maho','mutations','minor-shadowlands-powers','major-shadowlands-powers','akutenshi-powers','the-nothing'];
   // The start landscape is already pale, so it takes a lighter wash.
-  if (slug === 'start') setPageArt('public/assets/lore/clan-landscape.webp','#f2e9d659');
-  else setPageArt(SHADOWLANDS_PAGES.includes(slug) ? 'public/assets/lore/shadowlands-map.webp' : '');
+  if (slug === 'start') setPageArt(window.OfficialImages.src('public/assets/lore/clan-landscape.webp'),'#f2e9d659');
+  else setPageArt(SHADOWLANDS_PAGES.includes(slug) ? window.OfficialImages.src('public/assets/lore/shadowlands-map.webp') : '');
   const title = slug === 'start' ? 'Start' : slug === 'library' ? 'Library' : designGuide ? 'Design Guideline' : campaignRoute ? 'Campaigns' : slug === 'characters' ? 'Characters' : slug === 'books' ? 'Books' : characterEditor || characterMissing ? 'Character' : portraitCreator ? 'Portrait creator' : clanMons ? 'Clan mons' : officialImages ? 'Official images' : publicPC ? 'Character' : page?.title || (slug === 'all-pages' ? 'All pages' : 'Page unavailable');
   $('#breadcrumb').textContent = title;
   // The page label only appears on rule pages; elsewhere the heading and nav already say it.
