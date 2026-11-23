@@ -1,0 +1,127 @@
+# l5r-rules — guide for AI assistants
+
+> l5r-rules (https://l5r-rules.web.app) is a website for playing Legend of the Five Rings,
+> fourth edition: a searchable rulebook, character sheets, and shared campaigns. This guide
+> tells an AI assistant how to use it on behalf of a Game Master (GM) who runs a campaign.
+
+## How you use it
+
+- There is no API. Use the website in a browser, the way a person would: click buttons, fill
+  fields, read the page. Everything below names the visible button text.
+- Sign-in is with Google ("Sign in with Google"). The person signs in; never type passwords.
+- The site saves as you go. There is no global Save; editors have their own Save buttons.
+- Deleting or removing asks for confirmation in a browser dialog (OK/Cancel). Do not delete
+  anything the GM did not ask you to delete. Browser-automation tools can get stuck on these
+  dialogs: tell the GM before you click a Delete/Remove button.
+- Changes are live for every player at once. Players see what you write.
+- Do not reload pages in a loop: the site runs on a free database quota.
+- Rules questions: the books are on the site (Books, All pages). Official errata overrides
+  the printed rules.
+
+## Addresses
+
+- `#/start` — start page: Campaigns, Characters, Books, Library.
+- `#/campaigns/<title>-<id>` — a campaign. Sections: `/timeline` (the map), `/sessions`,
+  `/plots`, `/npcs`, `/pcs`, then optionally `/<item name>-<id>` to open one item.
+  Only the id part matters; names in links may be out of date after a rename.
+- `#/characters/<name>-<id>` — a character sheet you own. `#/create-character` makes one.
+- `#/pc/<owner>/<id>` — someone else's character, public view.
+- `#/library` — the media library (pictures for maps, NPCs and sessions).
+- `#/books`, `#/all-pages`, `#/books/<book>/<page>` — the rules.
+
+## Who can do what in a campaign
+
+- **GMs.** A campaign can have several. The lead GM made the campaign; extra GMs do
+  everything the lead GM does except delete the campaign. Any GM makes a player GM too
+  ("Make GM") or takes an extra GM off ("Remove GM"; "Stop being GM" for yourself).
+- **Players** add their PCs, write in session journals, write plots, and place their own
+  tokens on the map.
+- **Nothing is secret inside a campaign.** Every member can read every session, plot, NPC
+  and journal entry. Keep GM-only secrets out of the campaign (tell the GM so).
+- **Full sheets.** A GM reads every player's full sheet ("Full sheet"); players see each
+  other's public view.
+
+## The campaign page
+
+A row of buttons sits on top of the map: Add Session, Add Plot, Add NPC, Add PC, then a
+chip for every session (newest first) and every plot. A chip opens that item as a panel.
+
+### Sessions (what happened at each game night)
+
+- **Add Session** → Session title, First entry (what happened), optional pictures
+  ("Add image" picks from the Library) → **Save session**.
+- Open a session → **Edit** to rename it or change pictures (**Delete session** shows
+  while editing). **Add Entry** adds another journal entry (Title, text) → **Save entry**.
+- Any member writes in a session's journal. "✓ names" under an item shows who read it.
+
+### Plots (story threads, rumours, quests)
+
+- **Add Plot** → Plot title, First entry → **Save plot**. Any member can add one; the
+  GM or the plot's creator edits it (**Edit plot**) and adds entries (**Add Entry**).
+
+### NPCs and places
+
+- **Add NPC** → Name, Role (e.g. "Magistrate of the Lion"), Description, a picture
+  (upload, **Create picture**, or **Library**), and the box "Place (a location, not a
+  person)" for castles, villages, temples → **Save**.
+- Open an NPC → **Edit**. NPC journals are written by GMs only (**Add Entry**).
+- The Add NPC popup also has "Edit list" to remove NPCs.
+
+### PCs and players
+
+- **Add PC** opens a popup. A GM sees the **Players** list there: the lead GM first,
+  "GM" tags, each player's PCs or "joined · no PC yet", and anyone who asks to join.
+- Someone who wants in finds the campaign on the start page and asks to be invited. A GM
+  answers: **Approve** (they join when they next open the campaign), **Add now** (they
+  join at once, without opening anything), or **Decline**. Requests also show as a notice
+  on the campaign page.
+- A GM opens a PC with **Full sheet**. **Transfer** gives a PC to another player (they
+  must **Accept**). Removing a PC from the campaign keeps the sheet with its player.
+
+### The map (timeline)
+
+- The map shows tokens for PCs, NPCs, places, clans, and numbered journal entries.
+- On the left, a tray lists the clans, PCs, people and places, each followed by the
+  numbers of its journal entries. Drag a name or a number onto the map; it snaps to the
+  hex grid. Drag a token off the map to remove it. Clicking a token opens its item.
+- Drop a name onto a clan or onto another name to nest it under it (for example, an NPC
+  under their clan); drop it on a group title to take it out.
+- Zoom with − 100% + at the top of the map (100%–400%), or Ctrl/⌘ + scroll.
+- **GMs only, the map panel at the top right:** "Maps" lists the maps; click one to show
+  it, ✎ renames it, ✕ takes it off the list (its tokens are kept), **Add Map** picks a
+  picture from the Library. "Cell size" sets the hex grid size of the shown map. Each map
+  keeps its own tokens.
+
+### Campaign settings
+
+- A GM edits the campaign title at the top of the page.
+- **Delete campaign** (lead GM only) deletes everything for everyone. Never do this
+  unless the GM explicitly asks, and confirm first.
+- **Leave campaign** — players and extra GMs.
+
+## The library
+
+- `#/library`: pictures added by players, then official Legend of the Five Rings art
+  (loaded from legendofthefiverings.com) and the site's own images.
+- **Upload** a picture, or paste an image link (https://…) and **Add link**.
+- Click a picture to open it large (**Original ↗** opens its source).
+- **Remove** hides a picture for you only (**Restore** under "Hidden by you"); on your own
+  upload it is **Delete**, which deletes it for everyone.
+
+## Characters
+
+- `#/create-character` or "Add PC" on the start page makes a character; the sheet follows
+  the fourth-edition rules (clan, family, school, rings and traits, skills, advantages,
+  disadvantages, experience points). **Public view** shows what other players see.
+- Journal entries on a sheet have a **Public** box; unticked entries stay private to the
+  owner and the GM.
+
+## Good habits for a GM's assistant
+
+- Before a session: add the session with a title and a short first entry; add the NPCs and
+  places the players will meet (with Role and Description); put them on the map.
+- After a session: add journal entries for what happened, move tokens to where the party
+  is, and update plots with new clues.
+- Use the GM's language and tone. Keep entries short and readable; the players read them.
+- Ask the GM before anything that removes or overwrites content, and before making
+  someone a GM or adding a player.
