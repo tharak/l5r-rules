@@ -424,8 +424,169 @@
     if(trained(/Shiba Artisan/,3) && s.schoolDecisions.shibaSocialArt)effect('Shiba Artisan: The Art Speaks',{skill:n=>SOCIAL.includes(n)},{note:`You may use your ${s.schoolDecisions.shibaSocialArt} ranks in place of this Skill (no Mastery benefits).`});
     if(trained(/Otomo Diplomat/))effect('Otomo Diplomat',{skill:n=>n==='Etiquette'},{rolled:1});
     if(trained(/First Dawn Scholars/))effect('First Dawn Scholars',{skill:n=>n==='Etiquette' || n.startsWith('Lore:')},{rolled:1});
-    if(trained(/Utaku Infantry/) && s.schoolDecisions.weaponFocus)effect('Utaku Mounted Infantry',{skill:n=>n===s.schoolDecisions.weaponFocus,attack:true,attackOnly:true},{rolled:1});
-    const effectsFor=(kind,name,trait,skill)=>effects.filter(e=>kind==='skill'?!e.attackOnly && e.skill?.(name,trait,skill):kind==='attack'?e.attack && e.skill?.(name,trait,skill):kind==='trait'?e.trait?.(name):e.ring?.(name))
+    // An attack roll is a Weapon Skill roll, so attack bonuses show on Kenjutsu, Kyujutsu and the rest.
+    if(trained(/Utaku Infantry/) && s.schoolDecisions.weaponFocus)effect('Utaku Mounted Infantry',{skill:n=>n===s.schoolDecisions.weaponFocus,attack:true},{rolled:1});
+    const WEAPONS=[...C.WEAPON_SKILLS,'Jiujutsu'];
+    const named=(...names)=>n=>names.some(x=>x.endsWith(':')?n.startsWith(x):n===x);
+    const on={
+      attack:{skill:n=>WEAPONS.includes(n),attack:true},
+      ranged:{skill:n=>n==='Kyujutsu',attack:true},
+      melee:{skill:n=>WEAPONS.includes(n) && n!=='Kyujutsu',attack:true},
+      unarmed:{skill:n=>n==='Jiujutsu',attack:true},
+      skills:(...names)=>({skill:named(...names)}),
+      social:{skill:n=>SOCIAL.includes(n)},
+      school:{skill:(n,t,sk)=>sk?.school},
+      anySkill:{skill:()=>true},
+      contested:{skill:()=>true,trait:()=>true},
+      resist:{skill:n=>n==='Etiquette',trait:t=>['Awareness','Willpower'].includes(t)},
+      perception:{skill:(n,t)=>t==='Perception',trait:t=>t==='Perception'},
+      trait:(...names)=>({trait:t=>names.includes(t)}),
+      earth:{ring:r=>r==='Earth'}
+    };
+    const and=(...targets)=>({skill:(...a)=>targets.some(x=>x.skill?.(...a)),trait:t=>targets.some(x=>x.trait?.(t)),ring:r=>targets.some(x=>x.ring?.(r)),attack:targets.some(x=>x.attack)});
+    const FREE='One Free Raise.';
+    const rankIn=pattern=>Math.max(0,...d.techniques.filter(t=>pattern.test(t.school)).map(t=>t.schoolRank || 1));
+    // [school, technique rank, target, modifier]. Situational bonuses carry `when`.
+    const techniqueRolls=[
+      [/Hida Pragmatist/,1,on.unarmed,{rolled:1,when:'Unarmed or with an improvised weapon'}],
+      [/Hida Pragmatist/,1,on.resist,{rolled:1,when:'Resisting Intimidation or Fear'}],
+      [/Hiruma Bushi/,1,on.attack,{rolled:1,when:'In the Attack Stance'}],
+      [/Hiruma Scout/,1,on.skills('Stealth'),{rolled:1,when:'In the Shadowlands'}],
+      [/Kaiu Engineer/,1,on.school,{rolled:1,note:'A Void Point spent on this roll grants +2k2 instead of +1k1.'}],
+      [/Kuni Witch-Hunter/,1,on.attack,{rolled:1,kept:1,when:'Against a Shadowlands creature or a foe you know to be Tainted'}],
+      [/Kuni Witch-Hunter/,1,on.earth,{rolled:1,kept:1,when:'Resisting the Shadowlands Taint'}],
+      [/Kuni Witch-Hunter/,5,on.attack,{rolled:4,kept:1,when:'Against a Shadowlands creature or a foe you know to be Tainted'}],
+      [/Toritaka Bushi/,1,on.perception,{rolled:1}],
+      [/Yasuki Courtier/,1,on.skills('Commerce'),{note:FREE}],
+      [/Yasuki Courtier/,5,on.social,{rolled:5,when:'Contested roll against someone you supplied a needed item (24 hours)'}],
+      [/Daidoji Iron Warrior/,1,on.attack,{rolled:1,when:'In the Attack Stance'}],
+      [/Daidoji Iron Warrior/,4,on.attack,{rolled:2,kept:1,when:'Against the opponent you Guarded against, the next Round'}],
+      [/Daidoji Scout/,1,on.skills('Stealth','Hunting'),{rolled:1}],
+      [/Daidoji Scout/,2,on.attack,{rolled:2,when:'Against an unaware opponent'}],
+      [/Doji Courtier/,1,on.skills('Courtier','Sincerity','Etiquette'),{note:FREE,honor:6}],
+      [/Doji Magistrate/,1,on.attack,{rolled:1,when:'With a jitte or sasumata'}],
+      [/Kakita Bushi/,1,and(on.attack,on.skills('Iaijutsu')),{rolled:1,kept:1,bonus:rankIn(/Kakita Bushi/),when:'In the Center Stance (attack or Focus roll)'}],
+      [/Kakita Bushi/,2,on.attack,{rolled:2,when:'Against someone with lower Initiative'}],
+      [/Kitsuki Investigator/,1,on.skills('Investigation'),{note:FREE}],
+      [/Kitsuki Investigator/,5,on.skills('Investigation'),{rolled:5,when:'Contested roll against someone you know is lying'}],
+      [/Mirumoto Bushi/,4,on.attack,{rolled:3,when:'Against the target of your Rank 4 Technique, next Turn'}],
+      [/Togashi Tattooed/,2,on.unarmed,{rolled:1,kept:1,when:'Unarmed attack'}],
+      [/Hoshi Tsurui Zumi/,1,on.unarmed,{rolled:1,kept:1,when:'Unarmed attack while the Technique is active'}],
+      [/Akodo Bushi/,1,on.attack,{note:'One Free Raise, or ignore the Armor portion of the target’s Armor TN.'}],
+      [/Akodo Bushi/,1,on.attack,{rolled:1,when:'First melee attack against an opponent, or one who Raised against you since your last Turn'}],
+      [/Ikoma Lion's Shadow/,1,and(on.attack,on.contested),{rolled:1,when:'Against opponents targeted with No Boundaries'}],
+      [/Ikoma Lion's Shadow/,2,on.school,{rolled:1}],
+      [/Ikoma Lion's Shadow/,3,and(on.attack,on.social),{rolled:2,kept:1,when:'After losing 3 Honor this Round (attack or Contested Social roll)'}],
+      [/Lion Elite Spearmen/,1,on.skills('Spears','Polearms'),{rolled:1}],
+      [/Mantis Brawler/,1,on.unarmed,{rolled:1,when:'Taking control of a Grapple'}],
+      [/Mantis Brawler/,5,on.melee,{rolled:4,kept:1,when:'Spending a Void Point on a melee attack (+4k2 if Prone)'}],
+      [/Tsuruchi Archer/,1,on.ranged,{rolled:1}],
+      [/Tsuruchi Archer/,5,on.ranged,{rolled:4,kept:1,when:'Ranged attack as a Complex Action'}],
+      [/Tsuruchi Bounty Hunter/,1,on.skills('Intimidation'),{rolled:1,kept:1,when:'Against someone of lower caste who can help find your prey'}],
+      [/Tsuruchi Bounty Hunter/,1,on.social,{rolled:1,when:'Dealing with samurai while hunting your prey'}],
+      [/Yoritomo Bushi/,1,on.attack,{rolled:1}],
+      [/Yoritomo Courtier/,1,on.social,{note:`${rankIn(/Yoritomo Courtier/)} Free Raises.`,when:'Against ronin, bandits, pirates and other lawless types'}],
+      [/Yoritomo Courtier/,5,and(on.skills('Intimidation'),on.resist),{rolled:5,when:'Using Intimidation, or resisting Intimidation, Temptation or Fear'}],
+      [/Asako Loremaster/,1,on.skills('Lore:'),{note:FREE}],
+      [/Asako Loremaster/,1,on.skills('Etiquette'),{note:'A Void Point spent on this roll grants +3k1 instead of +1k1.'}],
+      [/Asako Loremaster/,2,on.social,{rolled:2,when:'In a court you observed (two days after the Lore: History roll)'}],
+      [/Asako Loremaster/,5,on.skills('Lore:'),{rolled:5}],
+      [/Shiba Bushi/,1,on.anySkill,{note:'You may spend 2 Void Points for +2k2.'}],
+      [/Bayushi Courtier/,1,on.social,{note:'One Free Raise per 3 points of the target’s Mental or Social Disadvantages (up to 5).',when:'Contested Social roll'}],
+      [/Shosuro Actor/,1,on.skills('Acting','Sincerity'),{note:'A Void Point spent on Acting or Sincerity (Deceit) grants +3k1 instead of +1k1.'}],
+      [/Shosuro Actor/,2,on.attack,{rolled:2,when:'Wielding a Small weapon'}],
+      [/Shosuro Infiltrator/,1,on.skills('Stealth'),{rolled:2}],
+      [/Soshi Magistrate/,1,on.skills('Intimidation'),{rolled:1}],
+      [/Soshi Magistrate/,1,on.skills('Intimidation'),{rolled:1,when:'Against someone of lower Status'}],
+      [/Soshi Magistrate/,2,on.unarmed,{rolled:1,kept:1,when:'Controlling a Grapple'}],
+      [/Daigotsu Courtier/,1,on.skills('Sincerity'),{note:FREE,emphasis:'Deceit'}],
+      [/Free Ogre Bushi/,1,on.skills('Intimidation'),{note:FREE,emphasis:'Bullying'}],
+      [/Free Ogre Bushi/,2,on.attack,{rolled:1,when:'Against an opponent who failed to resist your Fear'}],
+      [/Goju Ninja/,2,on.attack,{note:FREE,when:'Against an opponent unaware of you'}],
+      [/Ide Emissary/,1,on.skills('Sincerity'),{note:FREE,emphasis:'Honest'}],
+      [/Moto Bushi/,2,on.attack,{bonus:10,when:'Against an opponent at the Crippled Wound Rank'}],
+      [/Moto Vindicator/,2,on.skills('Investigation'),{rolled:2}],
+      [/Moto Vindicator/,2,on.skills('Investigation'),{kept:1,when:'Noticing the effects of the Shadowlands Taint'}],
+      [/Moto Vindicator/,4,on.attack,{rolled:2,when:'Against an enemy who attacked you, or a Tainted creature'}],
+      [/Shinjo Bushi/,1,on.school,{note:'A Void Point spent on this roll also adds your Horsemanship rank to the total.'}],
+      [/Tonbo Shugenja/,1,on.social,{rolled:1,when:'Expending a spell slot'}],
+      [/Toku Bushi/,1,on.anySkill,{rolled:1,when:'TN 25 or higher'}],
+      [/Toku Bushi/,2,on.attack,{rolled:1,kept:1,when:'Facing several opponents or an enemy with higher Insight Rank'}],
+      [/Morito Bushi/,1,on.attack,{rolled:1,when:'While mounted'}],
+      [/Morito Bushi/,5,on.attack,{rolled:2,kept:2,when:'Against an opponent with lower Initiative'}],
+      [/Suzume Bushi/,1,on.attack,{rolled:1,when:'After reducing your Initiative by 5 this Round'}],
+      [/Suzume Bushi/,5,on.attack,{bonus:10,when:'The Round after adopting the Center Stance'}],
+      [/Yotsu Bushi/,1,on.skills('Stealth'),{rolled:1,when:'In an urban environment'}],
+      [/Kasuga Smuggler/,1,on.social,{rolled:2,when:'Dealing with heimin or hinin'}],
+      [/Kasuga Smuggler/,5,on.school,{rolled:5,when:`Up to ${rings.Void} times per session (your Void Ring)`}],
+      [/Hantei Bushi/,1,on.attack,{rolled:1,when:'With a samurai weapon'}],
+      [/Miya Herald/,5,on.skills('Courtier','Etiquette'),{rolled:5,when:'Against a target with Honor 1.0 or more'}],
+      [/Otomo Courtier/,5,on.social,{rolled:5,when:'Contested Social roll against someone who reveres Imperial authority'}],
+      [/Otomo Diplomat/,3,on.skills('Intimidation'),{note:'A Void Point spent on this roll grants +2k2 (+3k2 against a nonhuman) instead of +1k1.'}],
+      [/Seppun Guardsman/,1,on.skills('Investigation'),{rolled:1,kept:1,when:'Detecting an ambush or surprise attack'}],
+      [/Void Mystic/,1,on.skills('Divination'),{note:FREE}],
+      [/Four Temples/,1,on.skills('Acting','Artisan:','Calligraphy','Courtier','Divination','Etiquette','Games:','Investigation','Lore:','Medicine','Meditation','Perform:','Sincerity','Spellcraft','Tea Ceremony','Intimidation','Temptation'),{note:'A Void Point spent on a High or Social Skill roll grants +2k2 instead of +1k1.'}],
+      [/Shinmaki/,1,on.skills('Meditation'),{rolled:1}],
+      [/Shinmaki/,1,on.social,{rolled:1,when:'Involving heimin or hinin'}],
+      [/Tengoku.S Fist/,1,on.attack,{note:FREE,when:'Unarmed, bisento, bo or Monk weapon, if your Fire Ring is higher than the opponent’s'}],
+      [/Hachi Courtier/,1,on.skills('Games: Sadane'),{rolled:2}],
+      [/Hachi Courtier/,1,on.skills('Artisan:','Perform:'),{rolled:2,when:'Appraising someone else’s work'}],
+      [/Karasu Bushi/,1,on.attack,{rolled:1}],
+      [/Karasu Bushi/,2,on.skills('Investigation'),{rolled:2,when:'Avoiding being surprised'}],
+      [/Jirozame Bushi/,4,on.attack,{rolled:3,when:'Against an opponent you already wounded this fight'}],
+      [/Hotaru Bushi/,2,on.skills('Defense'),{rolled:2}],
+      [/Hotaru Bushi/,5,on.attack,{rolled:2,when:'Attacking from Full Defense with the Rank 5 Technique'}],
+      [/Tanuki Bushi/,4,on.anySkill,{rolled:3,when:'Your Stance differs from last Turn'}],
+      [/Kujaku Bushi/,1,on.skills('Temptation'),{rolled:1,emphasis:'Seduction'}],
+      [/Kujaku Bushi/,2,on.skills('Investigation'),{rolled:1,when:'Detecting ambushes or unseen opponents'}]
+    ];
+    for(const [pattern,rank,target,mod] of techniqueRolls) {
+      const t=d.techniques.find(t=>pattern.test(t.school) && (t.rank || 1)===rank);
+      if(!t || !Object.keys(mod).length)continue;
+      if(mod.honor && number(d.honor)<mod.honor)continue;
+      const {honor,...rest}=mod;
+      const title=String(t.name).replace(/^Rank \d+:\s*/i,'').replace(/^Starting technique$/i,'');
+      effect(title?`${t.school} · ${title}`:t.school,target,rest);
+    }
+    // Advantages and disadvantages that change rolls without asking for a choice.
+    const optionRolls={
+      'Balance':[on.resist,{rolled:1,when:'Adding your Honor Rank to resist Intimidation or Temptation'}],
+      'Broken Wave Citizen':[on.skills('Commerce','Sailing'),{rolled:1}],
+      'Clear Thinker':[on.resist,{rolled:1,when:'Contested roll against someone confusing or manipulating you'}],
+      'Dangerous Beauty':[on.skills('Temptation'),{rolled:1,when:'With members of the opposite sex'}],
+      'Daredevil':[on.skills('Athletics'),{note:'A Void Point spent on this roll grants +3k1 instead of +1k1.'}],
+      'Heart of Vengeance':[on.contested,{rolled:1,kept:1,when:'Contested roll against a member of the chosen Clan or faction'}],
+      'Heartless':[on.resist,{rolled:1,when:'Resisting persuasion or seduction'}],
+      'Imperial Spouse':[on.social,{rolled:1,kept:1,when:'With members of the Imperial families'}],
+      'Inheritance':[on.anySkill,{rolled:1,kept:1,when:'Using your inherited item'}],
+      'Iron Heart Native':[and(on.trait('Stamina','Strength'),{skill:(n,t)=>t==='Strength'}),{rolled:1,note:'Not on damage rolls.'}],
+      'Irreproachable':[on.resist,{rolled:1,when:'Contested roll against Temptation'}],
+      'Kharmic Tie':[on.attack,{rolled:1,kept:1,when:'Fighting for or protecting your bonded person (once per session per point)'}],
+      'Naga Ancestry':[on.social,{rolled:1,when:'With the Naga'}],
+      'Nikesake Citizen':[on.social,{rolled:1,when:'With a member of the Crane Clan'}],
+      'Ruined City Shadow':[on.skills('Stealth'),{rolled:1,emphasis:'Ambush',when:'Ambush in an urban environment'}],
+      'Sacred Forest Native':[on.skills('Lore: Theology','Lore: Spirit Realms'),{rolled:1}],
+      'Silent':[on.skills('Stealth'),{rolled:1}],
+      'Stolen Identity':[on.skills('Acting'),{note:'Two Free Raises.',when:'Deceiving others with your alternate identity'}],
+      'Voice':[on.skills('Perform:'),{rolled:1,kept:1,when:'A performance using your voice'}],
+      'Wary':[on.skills('Investigation'),{rolled:1,kept:1,when:'Notice roll to detect an ambush'}],
+      'Touch of the Void':[on.anySkill,{note:'A Void Point spent on a roll grants +2k1 instead of +1k1.'}],
+      'Antisocial':[on.social,{}],
+      'Bad Eyesight':[and(on.ranged,on.perception),{rolled:-1,kept:-1}],
+      'Blind':[on.ranged,{rolled:-3,kept:-3}],
+      'Broken Wave Stigma':[on.social,{rolled:-1,when:'Targeting members of the Phoenix Clan'}],
+      'Nikesake Stigma':[{skill:(n,t,sk)=>WEAPONS.includes(n) && !sk?.school,attack:true},{rolled:-1}],
+      'Water Hammer Stigma':[on.social,{rolled:-1,when:'With members of any clan but the Dragon'}]
+    };
+    for(const e of [...s.advantages,...s.disadvantages]) {
+      const rule=optionRolls[e.name];
+      if(!rule)continue;
+      let [target,mod]=rule;
+      if(e.name==='Antisocial')mod=optionCost(e,s,school,catalog,true)>=4?{rolled:-1,kept:-1}:{rolled:-1};
+      effect(sourceName(e),target,mod);
+      if(e.name==='Blind')effect(sourceName(e),on.melee,{rolled:-1,kept:-1});
+    }
+    const effectsFor=(kind,name,trait,skill)=>effects.filter(e=>kind==='skill'?e.skill?.(name,trait,skill):kind==='attack'?e.attack && e.skill?.(name,trait,skill):kind==='trait'?e.trait?.(name):e.ring?.(name))
       .map(({source,rolled,kept,bonus,note,when,emphasis})=>({source,rolled,kept,bonus,note:note || '',when:when || '',emphasis:emphasis || ''}));
     const applied=list=>list.filter(m=>!m.when && !m.emphasis).reduce((sum,m)=>({rolled:sum.rolled+m.rolled,kept:sum.kept+m.kept,bonus:sum.bonus+m.bonus}),{rolled:0,kept:0,bonus:0});
     const weapons=d.equipment.filter(e=>e.equipped && e.item?.kind==='weapon' && e.item.type!=='Arrow').map(e=>{

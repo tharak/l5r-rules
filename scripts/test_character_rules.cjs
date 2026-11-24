@@ -667,3 +667,18 @@ test('Options that ask for a Ring, Trait or Skill offer a picker and change the 
  // Older sheets wrote the choice as text.
  assert.deepEqual(plain(R.optionPicked({name:'Great Potential',selection:'Kenjutsu'})),['Kenjutsu']);
 });
+
+test('School techniques that change attack rolls show on Weapon Skill rolls: situational ones are offered, permanent ones applied',()=>{
+ const pc=(clan,name,extra={})=>calc(change(starting(clan,name),x=>{x.skills.Kenjutsu=1;x.skills.Courtier=1;Object.assign(x,extra);}));
+ let d=pc('Lion',"Ikoma Lion's Shadow");
+ const shadow=d.skills.Kenjutsu.mods.find(m=>m.source==="Ikoma Lion's Shadow · No Boundaries");
+ assert.ok(shadow && shadow.rolled===1 && /targeted/.test(shadow.when));
+ assert.equal(d.skills.Kenjutsu.roll.rolled,d.skills.Kenjutsu.rawBase.rolled);
+ assert.ok(d.skills.Courtier.mods.some(m=>/No Boundaries/.test(m.source)),'Contested rolls too');
+ d=pc('Lion','Akodo Bushi');
+ assert.deepEqual(plain(d.skills.Kenjutsu.mods.map(m=>[m.rolled,!!m.when])),[[0,false],[1,true]]);
+ d=pc('Mantis','Yoritomo Bushi');
+ assert.equal(d.skills.Kenjutsu.roll.rolled,d.skills.Kenjutsu.rawBase.rolled+1);
+ d=pc('Crab','Hida Bushi',{advantages:[{id:'silent',name:'Silent',baseCost:3}],skills:{Stealth:1}});
+ assert.equal(d.skills.Stealth.roll.rolled,d.skills.Stealth.rawBase.rolled+1);
+});
