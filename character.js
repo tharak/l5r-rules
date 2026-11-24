@@ -195,7 +195,7 @@
     const skills = rolling ? (skillFilters.rolls.zero ? data.skills : R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills) : {};
     const skillNames = Object.keys(skills).filter(name=>isSkillVisible(name,skills,skillFilters.rolls)).sort((a,b)=>a.localeCompare(b));
     const renderTrait = trait => {
-      const item = data.traits[trait], cost = (item.rank + 1) * (trait === 'Void' ? 6 : 4);
+      const item = data.traits[trait], cost = item.nextCost ?? (item.rank + 1) * (trait === 'Void' ? 6 : 4);
       const control = rolling ? `<button type="button" class="creator-rank-row creator-trait-display creator-roll-trait" data-action="open-roll" data-roll-kind="trait" data-roll-name="${trait}" aria-label="Roll ${trait} trait"><strong>${trait}</strong><output aria-label="${trait} rank">${item.rank}</output></button>` : `<div class="creator-rank-row"><span><strong>${trait}</strong></span>${UI.stepper({value:item.rank,size:'compact',attrs:{'aria-label':`${trait} rank`},outputAttrs:{'aria-label':`${trait} rank`},decrease:{'data-action':'trait','data-trait':trait,'data-delta':'-1','disabled':item.rank <= item.base,'aria-label':`Decrease ${trait}`},increase:{'data-action':'trait','data-trait':trait,'data-delta':'1','aria-label':`Increase ${trait} for ${cost} XP`}})}</div>`;
       if (!rolling) return control;
       return `<div class="creator-ring-trait-column" data-ring-trait="${trait}">${control}<ul class="creator-ring-skill-list creator-skill-list" aria-label="Skills using ${trait}">${skillNames.filter(name=>skills[name].trait===trait).map(name=>`<li data-ring-skill="${escapeHtml(name)}" data-trained="${skills[name].rank>0}">${renderSkillRow(name,skills[name],'rings')}</li>`).join('')}</ul></div>`;
@@ -219,7 +219,7 @@
   }
 
   function renderSkillName(name,skill) {
-    return `<strong${skill.base?' data-school-skill="true" title="School skill"':''}>${escapeHtml(name)}</strong>`;
+    return `<strong${skill.school?' data-school-skill="true" title="School skill"':''}>${escapeHtml(name)}</strong>`;
   }
 
   function renderCompactSkillRow(name,skill) {
@@ -331,9 +331,30 @@
   function renderOptionChoice(kind,entry,index) {
     const rule=catalog[kind==='advantage'?'advantages':'disadvantages'].find(item=>item.name===entry.name);
     if (!R.optionNeedsChoice(entry,rule)) return '';
-    const variants=R.optionVariants[entry.name], selected=entry.selection || '';
-    if(variants)return UI.field({label:'Specific choice',labelAttrs:{'class':'creator-option-choice'},attrs:{'data-option-detail':kind,'data-index':index,'aria-label':`Specific choice for ${entry.name}`},kind:'select',optionsHtml:`${option('', 'Choose a variant', !selected)}${Object.keys(variants).map(name=>option(name,name,name===selected)).join('')}`});
+    const variants=R.optionVariants[entry.name], selected=R.optionVariant(entry) || entry.selection || '';
+    const sheetEntry=sheet[kind==='advantage'?'advantages':'disadvantages'][index] || entry;
+    const picks=R.optionPicks(sheetEntry), picked=R.optionPicked(sheetEntry);
+    const pickFields=picks.map((spec,i)=>UI.field({label:spec.label,labelAttrs:{'class':'creator-option-choice'},attrs:{'data-option-pick':kind,'data-index':index,'data-pick':i,'aria-label':`${spec.label} for ${entry.name}`},kind:'select',optionsHtml:optionPickOptions(spec.from,picked[i],picked.filter((v,j)=>v && j!==i))})).join('');
+    if(variants){
+      const school=build().school, cost=name=>R.optionCost({...sheetEntry,selection:name,customCost:undefined,free:false,baseCost:sheetEntry.baseCost ?? rule?.costs?.[0] ?? 0},sheet,school,catalog,kind==='disadvantage');
+      return UI.field({label:'Specific choice',labelAttrs:{'class':'creator-option-choice'},attrs:{'data-option-detail':kind,'data-index':index,'aria-label':`Specific choice for ${entry.name}`},kind:'select',optionsHtml:`${option('', 'Choose a variant', !selected)}${Object.keys(variants).map(name=>option(name,`${name} · ${cost(name)} XP`,name===selected)).join('')}`})+pickFields;
+    }
+    if(picks.length)return pickFields;
     return UI.field({label:'Specific choice',labelAttrs:{'class':'creator-option-choice'},attrs:{'type':'text','data-option-detail':kind,'data-index':index,'value':selected,'placeholder':'Rank, skill, ally, or other choice','aria-label':`Specific choice for ${entry.name}`}});
+  }
+  // The Skills, Traits or Rings an option's picker offers; a saved choice stays listed.
+  function optionPickOptions(from,selected='',taken=[]) {
+    const d=build(), rings=['Air','Earth','Fire','Water','Void'];
+    const all=[...new Set([...skillOptions().suggestions,...Object.keys(d.skills)])].sort((a,b)=>a.localeCompare(b));
+    const school=Object.keys(d.skills).filter(name=>d.skills[name].school).sort((a,b)=>a.localeCompare(b));
+    const lists={rings:[['',rings]],elements:[['',rings.slice(0,4)]],traits:[['',C.TRAIT_NAMES]],skills:[['',all]],schoolSkills:[['',school]],
+      nonSchoolSkills:[['',all.filter(name=>!school.includes(name))]],craft:[['',all.filter(name=>name.startsWith('Craft:'))]],games:[['',all.filter(name=>name.startsWith('Games:'))]],
+      artisan:[['',all.filter(name=>name.startsWith('Artisan:'))]],ringsOrSkills:[['Rings',rings],['Skills',all]]}[from] || [];
+    if(selected && !lists.some(([,items])=>items.includes(selected)))lists.push(['Saved',[selected]]);
+    return option('','Choose',!selected)+lists.map(([title,items])=>{
+      const html=items.map(value=>UI.option({value,label:value,selected:value===selected,attrs:{disabled:taken.includes(value)}})).join('');
+      return title?`<optgroup label="${escapeHtml(title)}">${html}</optgroup>`:html;
+    }).join('');
   }
   function renderOptions(data) {
     const optionList = (kind) => {
@@ -341,7 +362,7 @@
       const owned = kind === 'advantage' ? data.advantages : data.disadvantages;
       const totalPoints = kind === 'advantage' ? data.advantageTotal : data.disadvantageTotal;
       const id = `${kind}-select`;
-      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} <small title="XP used / limit">${totalPoints}/${kind === 'advantage' ? 15 : 10}</small></h3>${rulesLink(kind === 'advantage' ? 'advantages' : 'disadvantages','',kind === 'advantage' ? 'Advantage rules' : 'Disadvantage rules')}</div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.map(baseCost=>R.optionCost({name:entry.name,baseCost},sheet,data.school,catalog,kind==='disadvantage')))].join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`}})}</div>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-'+kind,'data-index':index,'aria-label':`Remove ${entry.name}`}})}${publicToggle(`${entry.name} is public`,{'data-option-public':kind,'data-index':index},sheet[kind==='advantage'?'advantages':'disadvantages'][index]?.public)}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : ''}</div>`;
+      return `<div class="creator-option-column"><div class="creator-option-heading"><h3>${kind === 'advantage' ? 'Advantages' : 'Disadvantages'} <small title="XP used / limit">${totalPoints}/${kind === 'advantage' ? 15 : 10}</small></h3>${rulesLink(kind === 'advantage' ? 'advantages' : 'disadvantages','',kind === 'advantage' ? 'Advantage rules' : 'Disadvantage rules')}</div>${UI.actionRow({attrs:{'class':'creator-add-row'},bodyHtml:`${UI.field({attrs:{'data-option-search':kind,'type':'search','placeholder':`Search ${kind}s`,'aria-label':`Search ${kind}s`}})}${UI.field({kind:'select',attrs:{'id':id},optionsHtml:`${option('', `Choose ${kind}`, true)}${entries.map(entry => option(entry.name, `${entry.name}${entry.costs.length ? ` · ${[...new Set(entry.costs.flatMap(baseCost=>(R.optionVariants[entry.name]?Object.keys(R.optionVariants[entry.name]):['']).map(selection=>R.optionCost({name:entry.name,baseCost,selection},sheet,data.school,catalog,kind==='disadvantage'))))].sort((a,b)=>a-b).join('/')} XP` : ' · variable'}`, false)).join('')}`})}${UI.button({text:'Add',attrs:{'data-action':`add-${kind}`}})}`})}${owned.length ? `<div class="creator-option-list">${owned.map((entry,index) => UI.recordRow({attrs:{'class':'creator-option-row'},bodyHtml:`<span>${escapeHtml(entry.name)}</span><div class="creator-option-cost"><span>XP cost</span>${UI.stepper({value:Number(entry.cost) || 0,attrs:{'aria-label':`${entry.name} XP cost`},outputAttrs:{'data-kind':kind,'data-index':index,'aria-label':`${entry.name} point cost`},decrease:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'-1','aria-label':`Decrease ${entry.name} cost`,'disabled':entry.cost<=0},increase:{'data-action':'option-cost','data-kind':kind,'data-index':index,'data-delta':'1','aria-label':`Increase ${entry.name} cost`}})}</div>${UI.button({text:'×',variant:'quiet',size:'compact',attrs:{'data-action':'remove-'+kind,'data-index':index,'aria-label':`Remove ${entry.name}`}})}${publicToggle(`${entry.name} is public`,{'data-option-public':kind,'data-index':index},sheet[kind==='advantage'?'advantages':'disadvantages'][index]?.public)}${renderOptionChoice(kind,entry,index)}${catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name)?.description ? `<div class="creator-wide creator-option-rules"><p>${escapeHtml(catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name).description)}</p></div>` : ''}`})).join('')}</div>` : ''}</div>`;
     };
     return UI.panel({attrs:{'class':'creator-panel','id':'creator-options'},bodyHtml:`${UI.sectionHeading({step:'04',title:'Advantages & disadvantages'})}${data.disadvantageTotal > 10 ? `<p class="creator-rule">You selected ${data.disadvantageTotal} disadvantage points; only 10 count toward your budget.</p>` : ''}<div class="creator-option-grid">${optionList('advantage')}${optionList('disadvantage')}</div>${renderAncestors(data)}`});
   }
@@ -542,7 +563,7 @@
     const skills = Object.entries(data.skills).sort(([a],[b]) => a.localeCompare(b));
     const skillRows = Array.from({length:22}, (_,index) => {
       const [name,skill] = skills[index] || [];
-      return `<div class="print-skill-row"><span class="print-skill-school">${skill?.base ? '○' : ''}</span><span>${value(name)}</span><b>${skill?.rank ?? ''}</b><span title="${value(skill?.trait)}">${value(skill?.trait?.slice(0,3))}</span><span>${value(skill?.roll?.notation)}</span><span>${value([...(skill?.emphases || []),...(skill?.masteries || []).map(m=>m.description)].join('; '))}</span></div>`;
+      return `<div class="print-skill-row"><span class="print-skill-school">${skill?.school ? '○' : ''}</span><span>${value(name)}</span><b>${skill?.rank ?? ''}</b><span title="${value(skill?.trait)}">${value(skill?.trait?.slice(0,3))}</span><span>${value(skill?.roll?.notation)}</span><span>${value([...(skill?.emphases || []),...(skill?.masteries || []).map(m=>m.description)].join('; '))}</span></div>`;
     }).join('');
     const table = (title, rows) => `${bar(title)}<div class="print-stat-table">${rows.map(([label,item]) => `<div><span>${label}</span><strong>${value(item)}</strong></div>`).join('')}</div>`;
     const woundLevels = data.combat.wounds.levels;
@@ -616,11 +637,19 @@
     let fields='';
     if(section==='identity' && /Fudoist/.test(school.name))fields=select('fudoistFocus','Fudoist specialty',['Social','Attack'])+'<p>Set your chosen high or low starting Honor in Story & equipment.</p>';
     if(section==='skills') {
-      const arts=Object.entries(d.skills).filter(([name,s])=>s.base && /^(Acting|Artisan:|Perform:)/.test(name)).map(([name])=>name);
+      const arts=Object.entries(d.skills).filter(([name,s])=>s.school && /^(Acting|Artisan:|Perform:)/.test(name)).map(([name])=>name);
+      const taught=(pattern,rank=1)=>(d.techniques || []).some(t=>pattern.test(t.school) && (t.rank || 1)===rank);
       if(/Kakita Artisan/.test(school.name))fields+=select('chosenArt','Chosen art',arts);
+      if(taught(/Kakita Artisan/,3))fields+=select('chosenArt2','Second chosen art (Free the Spirit)',arts.filter(name=>name!==sheet.schoolDecisions.chosenArt));
+      const artisan=[...new Set([...skillOptions().suggestions,...Object.keys(d.skills)])].filter(name=>name.startsWith('Artisan:')).sort();
+      if(taught(/Shiba Artisan/))fields+=select('shibaArt','Soul of Brilliance: Artisan Skill',artisan);
+      if(taught(/Shiba Artisan/,3))fields+=select('shibaSocialArt','The Art Speaks: Artisan Skill',artisan);
       if(/Utaku Infantry/.test(school.name))fields+=select('weaponFocus','Chosen Weapon Skill',['Kenjutsu','Polearms','Spears'])+UI.field({label:'Free weapon emphasis',attrs:{'data-school-decision':'weaponEmphasis','value':sheet.schoolDecisions.weaponEmphasis || ''}});
     }
     if(section==='abilities') {
+      const taught=(pattern,rank)=>(d.techniques || []).some(t=>pattern.test(t.school) && (t.rank || 1)===rank);
+      if(taught(/Order of the Spider Monks/i,2))fields+=select('spiderReductionRing','Drawing in the Strike: Ring',['Air','Earth','Fire','Water']);
+      if(taught(/Order of the Spider Monks/i,4))fields+=select('spiderGuardRing','Guarded by Chi: Ring',['Air','Earth','Fire','Water']);
       if(school.discipline==='Shugenja') {
         const affinity=school.affinity || '', spells=school.spells || '';
         if(/choose|select|varies|any one non-Void/i.test(affinity)) {
@@ -881,12 +910,28 @@
     }
   }
 
+  // The base pool plus the advantage, disadvantage and technique modifiers ticked in the roll view.
+  function rollBase() {
+    return (rollState.mods || []).filter(m=>m.on).reduce((sum,m)=>({rolled:sum.rolled+m.rolled,kept:sum.kept+m.kept,bonus:sum.bonus+m.bonus}),{...rollState.base});
+  }
+  const modNotation = m => [m.rolled || m.kept ? `${m.rolled<0 || (!m.rolled && m.kept<0)?'−':'+'}${Math.abs(m.rolled)}k${Math.abs(m.kept)}` : '', m.bonus ? `${m.bonus>0?'+':'−'}${Math.abs(m.bonus)}` : ''].filter(Boolean).join(' ');
+  function renderRollMods() {
+    const mods = rollState.mods || [];
+    if (!mods.length) return '';
+    return `<ul class="creator-roll-mods" aria-label="Modifiers">${mods.map((m,i)=>{
+      const dice = m.rolled || m.kept || m.bonus;
+      const detail = [m.when ? `Only when: ${m.when}` : '', m.note].filter(Boolean).map(text=>`<small>${escapeHtml(text)}</small>`).join('');
+      const text = `<span>${escapeHtml(m.source)}</span>${dice?` <strong>${escapeHtml(modNotation(m))}</strong>`:''}`;
+      return `<li class="${m.on?'applied':''}">${dice?`<label class="creator-check"><input type="checkbox" data-roll-mod="${i}"${m.on?' checked':''}> ${text}</label>`:text}${detail}</li>`;
+    }).join('')}</ul>`;
+  }
+
   function renderRollBody() {
-    const pool = window.CharacterDice.adjustPool(rollState.base,rollState.bonuses);
+    const pool = window.CharacterDice.adjustPool(rollBase(),rollState.bonuses);
     const result = rollState.result;
     const kept = result?.dice.filter(die=>die.kept).map(die=>die.total).join(' + ') || '0';
     const equation = result ? `${kept}${result.pool.bonus ? ` ${result.pool.bonus < 0 ? '−' : '+'} ${Math.abs(result.pool.bonus)}` : ''}` : '';
-    return `<div class="creator-roll-fields" role="group" aria-label="Dice pool">${[['rolled','Rolled dice',''],['kept','Kept dice','k'],['bonus','Total bonus','+']].map(([key,label,separator])=>`${separator?`<span class="creator-roll-separator" aria-hidden="true">${separator}</span>`:''}${UI.stepper({value:pool[key],size:'compact',attrs:{'aria-label':label},outputAttrs:{'aria-label':label},decrease:{'data-action':'roll-bonus','data-roll-part':key,'data-delta':'-1','aria-label':`Decrease ${label}`,'disabled':key!=='bonus' && pool[key]===0},increase:{'data-action':'roll-bonus','data-roll-part':key,'data-delta':'1','aria-label':`Increase ${label}`}})}`).join('')}</div>${UI.actionRow({attrs:{'class':'creator-roll-actions'},bodyHtml:`${UI.button({text:'Roll',attrs:{'class':'creator-primary','data-action':'roll-dice'}})}${UI.button({text:'Reset bonuses',variant:'secondary',attrs:{'data-action':'reset-roll-bonuses'}})}`})}<div class="creator-roll-result" aria-live="polite" aria-atomic="true">${result?`<ol class="creator-roll-dice">${result.dice.map((die,index)=>`<li class="${die.kept?'kept':'discarded'}" aria-label="Die ${index+1}: ${die.total}, ${die.kept?'kept':'discarded'}"><strong>${die.total}</strong><span>${die.kept?'Kept':'Discarded'}</span>${die.faces.length>1 || die.rerolled?`<small>${die.rerolled?'1 → ':''}${die.faces.join(' + ')}</small>`:''}</li>`).join('')}</ol><div class="creator-roll-total"><span>${equation} =</span><strong>${result.total}</strong></div>`:''}</div>`;
+    return `<div class="creator-roll-fields" role="group" aria-label="Dice pool">${[['rolled','Rolled dice',''],['kept','Kept dice','k'],['bonus','Total bonus','+']].map(([key,label,separator])=>`${separator?`<span class="creator-roll-separator" aria-hidden="true">${separator}</span>`:''}${UI.stepper({value:pool[key],size:'compact',attrs:{'aria-label':label},outputAttrs:{'aria-label':label},decrease:{'data-action':'roll-bonus','data-roll-part':key,'data-delta':'-1','aria-label':`Decrease ${label}`,'disabled':key!=='bonus' && pool[key]===0},increase:{'data-action':'roll-bonus','data-roll-part':key,'data-delta':'1','aria-label':`Increase ${label}`}})}`).join('')}</div>${UI.actionRow({attrs:{'class':'creator-roll-actions'},bodyHtml:`${UI.button({text:'Roll',attrs:{'class':'creator-primary','data-action':'roll-dice'}})}${UI.button({text:'Reset bonuses',variant:'secondary',attrs:{'data-action':'reset-roll-bonuses'}})}`})}<div class="creator-roll-result" aria-live="polite" aria-atomic="true">${result?`<ol class="creator-roll-dice">${result.dice.map((die,index)=>`<li class="${die.kept?'kept':'discarded'}" aria-label="Die ${index+1}: ${die.total}, ${die.kept?'kept':'discarded'}"><strong>${die.total}</strong><span>${die.kept?'Kept':'Discarded'}</span>${die.faces.length>1 || die.rerolled?`<small>${die.rerolled?'1 → ':''}${die.faces.join(' + ')}</small>`:''}</li>`).join('')}</ol><div class="creator-roll-total"><span>${equation} =</span><strong>${result.total}</strong></div>`:''}</div>${renderRollMods()}`;
   }
 
   function renderRollDialog() {
@@ -896,6 +941,7 @@
   function refreshRollDialog(button) {
     const body = root.querySelector('.creator-roll-dialog-body');
     body.innerHTML = renderRollBody();
+    if (button.dataset.rollMod !== undefined) return body.querySelector(`[data-roll-mod="${button.dataset.rollMod}"]`)?.focus();
     Array.from(body.querySelectorAll('[data-action]')).find(target=>target.dataset.action===button.dataset.action && target.dataset.rollPart===button.dataset.rollPart && target.dataset.delta===button.dataset.delta)?.focus();
   }
 
@@ -910,7 +956,7 @@
     if (action === 'open-roll') {
       const kind = button.dataset.rollKind, name = button.dataset.rollName;
       const data = build();
-      let base, title, explodes = true;
+      let base, title, explodes = true, mods = [];
       if (kind === 'initiative') {
         base = data.combat.initiativeBase;
         title = 'Initiative';
@@ -924,17 +970,21 @@
         const rank = kind === 'ring' ? data.rings[name] : data.traits[name]?.rank;
         if (!rank) return true;
         base = {rolled:rank,kept:rank,bonus:0};
+        mods = (kind === 'ring' ? data.ringRolls : data.traitRolls)?.[name]?.mods || [];
         title = `${name} · ${kind === 'ring'?'Ring':'Trait'}`;
       } else {
         const skillName = kind === 'emphasis' ? button.dataset.rollSkill : name;
         const skill = data.skills[skillName] || R.calculate(sheet,catalog,{untrainedSkills:skillOptions().untrainedSkills}).skills[skillName];
         if (!skill?.roll || (kind === 'emphasis' && !skill.emphases.includes(name))) return true;
-        base = skill.rollBase || skill.roll;
-        explodes = skill.rank > 0;
+        base = skill.rawBase || skill.rollBase || skill.roll;
+        mods = skill.rawBase ? skill.mods || [] : [];
+        explodes = (skill.effectiveRank ?? skill.rank) > 0;
         title = kind === 'emphasis' ? `${skillName} · ${name}` : skillName;
       }
-      rollState = {base,title,explodes,emphasis:kind==='emphasis',bonuses:{rolled:0,kept:0,bonus:0},trigger:{kind,name,skill:button.dataset.rollSkill,label:button.getAttribute('aria-label')}};
-      rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(base),rollState);
+      // Situational modifiers, and those for another Emphasis, are offered unticked.
+      mods = mods.map(m=>({...m,when:m.when || (m.emphasis && !(kind==='emphasis' && m.emphasis===name) ? `${m.emphasis} rolls` : ''),on:!m.when && (!m.emphasis || (kind==='emphasis' && m.emphasis===name))}));
+      rollState = {base,mods,title,explodes,emphasis:kind==='emphasis',bonuses:{rolled:0,kept:0,bonus:0},trigger:{kind,name,skill:button.dataset.rollSkill,label:button.getAttribute('aria-label')}};
+      rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(rollBase()),rollState);
       render();
       return true;
     }
@@ -948,7 +998,7 @@
     } else if (action === 'reset-roll-bonuses') {
       // Only the pool resets; the last roll stays on screen.
       rollState.bonuses = {rolled:0,kept:0,bonus:0};
-    } else rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(rollState.base,rollState.bonuses),rollState);
+    } else rollState.result = window.CharacterDice.roll(window.CharacterDice.adjustPool(rollBase(),rollState.bonuses),rollState);
     refreshRollDialog(button);
     return true;
   }
@@ -1168,6 +1218,7 @@
   }
 
   function onChange(event) {
+    if (event.target.dataset?.rollMod !== undefined) { const mod = rollState?.mods?.[Number(event.target.dataset.rollMod)]; if (mod) { mod.on = event.target.checked; refreshRollDialog(event.target); } return; }
     if (['new-skill','skill-choice','training-choice','ancestor-pick','equipment-choice'].includes(event.target.id) || /^school-choice-/.test(event.target.id || '')) return;
     const {dataset} = event.target;
     if (dataset.hideZeroSkills !== undefined || dataset.hideZeroMacroSkills !== undefined) {
@@ -1225,7 +1276,8 @@
       const name=event.target.dataset.packPublic;sheet.packPublic={...(sheet.packPublic||{})};
       if(event.target.checked)sheet.packPublic[name]=true;else delete sheet.packPublic[name];
     }
-    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name])delete entry.customCost;commitEdit();return;}}
+    else if(event.target.dataset.optionPick){const collection=event.target.dataset.optionPick==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){const picks=R.optionPicked(entry);picks[Number(event.target.dataset.pick)]=event.target.value;entry.picks=picks;if(!R.optionVariants[entry.name])entry.selection=picks.filter(Boolean).join(', ');commitEdit();return;}}
+    else if(event.target.dataset.optionDetail){const collection=event.target.dataset.optionDetail==='advantage'?sheet.advantages:sheet.disadvantages;const entry=collection[Number(event.target.dataset.index)];if(entry){entry.selection=event.target.value;if(R.optionVariants[entry.name]){delete entry.customCost;entry.picks=R.optionPicked(entry);}commitEdit();return;}}
     else if (event.target.dataset.kind) {
       const collection = event.target.dataset.kind === 'advantage' ? sheet.advantages : sheet.disadvantages;
       const entry = collection[Number(event.target.dataset.index)];

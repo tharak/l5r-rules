@@ -617,3 +617,53 @@ test('Core pp. 205-207: miscellaneous equipment is in the catalog; a Traveling P
  assert.ok(gear.includes('Tea Set')&&gear.includes(d.school.equipment[2].name),'outfit and personal items ticked Public are shared');assert.ok(!gear.includes('Wig'),'the rest stay private');
  d=calc(change(s,x=>{x.school='';x.equipment=[{id:'p',name:'Traveling Pack'}];}));assert.ok(d.travelingPack.present,'a personal Traveling Pack also asks for its items');
 });
+
+test('Touch of the Spirit Realms: each realm has its price, Yomi asks for a School Skill, and the bonus reaches the roll',()=>{
+ const s=starting(),d0=calc(s),adv=(selection,picks)=>({id:'touch',name:'Touch of the Spirit Realms',baseCost:5,cost:5,selection,...(picks?{picks}:{})});
+ const cost=selection=>R.optionCost(adv(selection),s,d0.school,catalog);
+ assert.deepEqual(['Chikushudo','Toshigoku','Yomi','Yume-do'].map(cost),[5,8,7,5]);
+ // Shugenja pay 1 point less for every realm.
+ const shugenja=C.schools(catalog).find(x=>x.discipline==='Shugenja');
+ assert.deepEqual(['Chikushudo','Toshigoku','Yomi'].map(v=>R.optionCost(adv(v),s,shugenja,catalog)),[4,7,6]);
+ assert.deepEqual(plain(R.optionPicks(adv('Yomi')).map(p=>p.from)),['schoolSkills']);
+ assert.equal(R.optionPicks(adv('Gaki-do')).length,0);
+ let d=calc(change(s,x=>x.advantages.push(adv('Yomi'))));
+ assert.ok(d.violations.some(v=>v.message==='Choose the School Skill for Touch of the Spirit Realms.'));
+ d=calc(change(s,x=>x.advantages.push(adv('Yomi',['Kenjutsu']))));
+ assert.equal(d.advantages[0].cost,7);
+ assert.ok(!d.violations.some(v=>/Touch of the Spirit Realms/.test(v.message)));
+ const k=d.skills.Kenjutsu;
+ assert.deepEqual(plain(k.mods.map(m=>[m.source,m.rolled,m.kept])),[['Touch of the Spirit Realms (Yomi: Kenjutsu)',1,0]]);
+ assert.equal(k.roll.rolled,k.rawBase.rolled+1);
+ assert.equal(R.optionLabel(adv('Yomi',['Kenjutsu'])),'Yomi: Kenjutsu');
+ // Sakkaku only applies to Deceit; it is offered on Sincerity rolls, not added.
+ d=calc(change(s,x=>{x.advantages.push(adv('Sakkaku'));x.skills.Sincerity=1;}));
+ assert.deepEqual(plain(d.skills.Sincerity.mods.map(m=>m.emphasis)),['Deceit']);
+ assert.equal(d.skills.Sincerity.roll.rolled,d.skills.Sincerity.rawBase.rolled);
+});
+
+test('Options that ask for a Ring, Trait or Skill offer a picker and change the matching roll',()=>{
+ const s=starting(),opt=(name,picks,extra={})=>({id:name,name,baseCost:(catalog.advantages.find(a=>a.name===name) || catalog.disadvantages.find(a=>a.name===name)).costs[0],picks,...extra});
+ for(const name of ['Chosen by the Oracles','Friend of the Elements','Elemental Blessing','Great Potential','Reincarnated','Watanu-Trained','Water Hammer Citizen','Zakyo Toshi Citizen','Void Versatility','Friendly Kami'])assert.ok(R.optionPicks({name}).length,name);
+ for(const name of ['Doubt','Enlightened Madness','Weakness','Elemental Imbalance','Wrath of the Kami'])assert.ok(R.optionPicks({name}).length,name);
+ const d=calc(change(s,x=>{
+  x.advantages.push(opt('Chosen by the Oracles',['Earth']),opt('Reincarnated',['Hunting','Etiquette','Courtier']),opt('Elemental Blessing',['Air']),opt('Water Hammer Citizen',['Craft: Blacksmithing']));
+  x.disadvantages.push(opt('Weakness',['Agility']),opt('Doubt',['Kenjutsu']));
+  x.skills.Hunting=1;
+ }));
+ assert.equal(d.ringRolls.Earth.roll.notation,`${d.rings.Earth+1}k${d.rings.Earth+1}`);
+ assert.equal(d.skills.Hunting.roll.rolled,d.skills.Hunting.rawBase.rolled+1);
+ assert.equal(d.traitRolls.Agility.roll.rolled,d.traits.Agility.rank-1);
+ assert.equal(d.skills.Kenjutsu.roll.kept,d.skills.Kenjutsu.rawBase.kept-1);
+ assert.ok(d.skills.Kenjutsu.mods.some(m=>m.source==='Doubt (Kenjutsu)' && /Raise/.test(m.note)));
+ // Elemental Blessing: Air Traits cost 1 XP less per rank.
+ assert.equal(d.traits.Awareness.nextCost,(d.traits.Awareness.rank+1)*4-1);
+ assert.equal(d.traits.Stamina.nextCost,(d.traits.Stamina.rank+1)*4);
+ // Water Hammer Citizen: a free rank in the chosen Craft Skill, which is not a School Skill.
+ assert.equal(d.skills['Craft: Blacksmithing'].rank,1);assert.equal(d.skills['Craft: Blacksmithing'].school,false);
+ const dup=calc(change(s,x=>x.advantages.push(opt('Reincarnated',['Hunting','Hunting','']))));
+ assert.ok(dup.violations.some(v=>v.message==='Choose different Skills for Reincarnated.'));
+ assert.ok(dup.violations.some(v=>v.message==='Choose the Non-School Skill 3 for Reincarnated.'));
+ // Older sheets wrote the choice as text.
+ assert.deepEqual(plain(R.optionPicked({name:'Great Potential',selection:'Kenjutsu'})),['Kenjutsu']);
+});

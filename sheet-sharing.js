@@ -4,7 +4,7 @@
   // Status, Taint, advantages, disadvantages, equipment, Traveling Pack items and journal entries appear only when ticked
   // Public. The GM reads the full sheet instead.
   const STATS = ['honor','glory','status','taint'];
-  const option = entry => ({name:entry.name,selection:entry.selection || ''});
+  const option = entry => ({name:entry.name,selection:(window.CharacterRules?.optionLabel ? window.CharacterRules.optionLabel(entry) : entry.selection) || ''});
   const profile = (s,d) => ({
     name:s.name || '',
     portrait:s.portrait || '',

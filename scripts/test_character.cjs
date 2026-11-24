@@ -1271,3 +1271,25 @@ test('character toolbar: Save, Public view and Delete only; Delete asks, removes
   c.window.confirm=()=>true;c.click({action:'delete-character'});
   assert.equal(c.records().length,0);assert.equal(c.route(),'#/start');
 });
+
+test('Touch of the Spirit Realms shows each realm with its cost, a School Skill picker for Yomi, and its bonus in the roll view',async()=>{
+ const school=catalog.clans.find(c=>c.name==='Crab').schools.find(s=>s.name==='Hida Bushi');
+ const c=await character({clan:'Crab',family:'Hida',school:`${school.slug}#${school.anchor}`,advantages:[{id:'touch',name:'Touch of the Spirit Realms',baseCost:5,cost:5}]});
+ const options=()=>c.root.innerHTML.split('id="creator-options"')[1];
+ assert.match(options(),/<option value="Yomi"[^>]*>Yomi · 7 XP<\/option>/);
+ assert.match(options(),/<option value="Toshigoku"[^>]*>Toshigoku · 8 XP<\/option>/);
+ assert.match(options(),/Touch of the Spirit Realms · 5\/7\/8 XP/);
+ assert.doesNotMatch(options(),/data-option-pick=/);
+ c.change({optionDetail:'advantage',index:'0'},'Yomi');
+ assert.match(options(),/data-option-pick="advantage"[^>]*data-pick="0"/);
+ assert.match(options(),/<option value="Kenjutsu">Kenjutsu<\/option>/);
+ c.change({optionPick:'advantage',index:'0',pick:'0'},'Kenjutsu');
+ const saved=(await c.data()).character.advantages[0];
+ assert.equal(saved.selection,'Yomi');assert.deepEqual(saved.picks,['Kenjutsu']);
+ assert.equal((await c.data()).derived.advantages[0].cost,7);
+ vm.runInContext(fs.readFileSync(path.join(rootDir,'character-dice.js'),'utf8'),c.context);
+ c.context.crypto=globalThis.crypto;
+ c.root.onclick({target:{closest:()=>({dataset:{action:'open-roll',rollKind:'skill',rollName:'Kenjutsu'},getAttribute:()=>'Roll Kenjutsu'})}});
+ const dialog=c.root.innerHTML.split('creator-roll-dialog-body')[1];
+ assert.match(dialog,/class="creator-roll-mods"[^]*data-roll-mod="0" checked[^]*Touch of the Spirit Realms \(Yomi: Kenjutsu\)[^]*\+1k0/);
+});

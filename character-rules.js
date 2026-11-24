@@ -67,10 +67,46 @@
   const has = (s,name) => s.advantages.some(a => a.name.toLowerCase() === name.toLowerCase());
   const flaw = (s,name) => s.disadvantages.some(a => a.name.toLowerCase() === name.toLowerCase());
   const waived = (s,code) => s.exceptions.some(e => (e.code === code || e.code === '*') && String(e.explanation || '').trim());
-  const optionVariants={Consumed:{Control:4,Determination:6,Insight:4,Knowledge:4,Perfection:5,Strength:5,Will:4}};
+  // Touch of the Spirit Realms (Core p. 155): 5 points, Toshigoku 8 and Yomi 7. Cursed by the Realm lists the same ten realms.
+  const REALMS=['Chikushudo','Gaki-do','Jigoku','Maigo no Musha','Meido','Sakkaku','Tengoku','Toshigoku','Yomi','Yume-do'];
+  const optionVariants={Consumed:{Control:4,Determination:6,Insight:4,Knowledge:4,Perfection:5,Strength:5,Will:4},
+    'Touch of the Spirit Realms':Object.fromEntries(REALMS.map(realm=>[realm,{Toshigoku:8,Yomi:7}[realm] || 5])),
+    'Cursed by the Realm':Object.fromEntries(REALMS.map(realm=>[realm,4])),
+    'Soul of Artistry':{'Artisan Skills':4,'Craft Skills':4}};
+  const optionVariant=entry=>Object.keys(optionVariants[entry.name] || {}).find(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase()) || '';
+  // The Skill, Trait or Ring each option asks for when it is bought. `from` names the list a picker offers.
+  const optionPickSpecs={
+    'Chosen by the Oracles':[{label:'Ring',from:'rings'}],
+    'Friend of the Elements':[{label:'Ring',from:'elements'}],
+    'Elemental Blessing':[{label:'Ring',from:'elements'}],
+    'Void Versatility':[{label:'Ring',from:'elements'}],
+    'Friendly Kami':[{label:'Element',from:'rings'}],
+    'Great Potential':[{label:'Skill',from:'skills'}],
+    'Reincarnated':[1,2,3].map(n=>({label:`Non-School Skill ${n}`,from:'nonSchoolSkills'})),
+    'Watanu-Trained':[{label:'Craft Skill',from:'craft'}],
+    'Water Hammer Citizen':[{label:'Craft Skill',from:'craft'}],
+    'Zakyo Toshi Citizen':[{label:'Games Skill',from:'games'}],
+    'Doubt':[{label:'School Skill',from:'schoolSkills'}],
+    'Enlightened Madness':[{label:'Ring or Skill',from:'ringsOrSkills'}],
+    'Weakness':[{label:'Trait',from:'traits'}],
+    'Elemental Imbalance':[{label:'Element',from:'rings'}],
+    'Wrath of the Kami':[{label:'Element',from:'rings'}]
+  };
+  function optionPicks(entry) {
+    if(entry.name==='Touch of the Spirit Realms')return optionVariant(entry)==='Yomi'?[{label:'School Skill',from:'schoolSkills'}]:[];
+    return optionPickSpecs[entry.name] || [];
+  }
+  // Older sheets kept the choice as text in `selection`.
+  function optionPicked(entry) {
+    const specs=optionPicks(entry);
+    if(!specs.length)return [];
+    const picks=Array.isArray(entry.picks)?entry.picks:optionVariants[entry.name]?[]:String(entry.selection || '').split(/\s*,\s*/);
+    return specs.map((_,i)=>typeof picks[i]==='string'?picks[i].trim():'');
+  }
+  const optionLabel=entry=>[optionVariant(entry) || (optionPicks(entry).length?'':String(entry.selection || '').trim()),...optionPicked(entry)].filter(Boolean).join(': ');
   const optionChoiceNames = new Set(['Child of Chikushudo','Dark Paragon','Darling of the Court','Elemental Blessing','Friend of the Elements','Friendly Kami','Heart of Vengeance','Paragon','Soul of Artistry','Stolen Identity','Void Versatility','Watanu-Trained','Way of the Land','Well-Connected','Cursed by the Realm','Elemental Imbalance','Enlightened Madness','Failure of Bushido','Jealousy','Weakness','Wrath of the Kami']);
   function optionNeedsChoice(entry,rule) {
-    return Boolean(optionVariants[entry.name] || optionChoiceNames.has(entry.name) || /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) || rule?.costs.length===0);
+    return Boolean(optionVariants[entry.name] || optionPickSpecs[entry.name] || optionChoiceNames.has(entry.name) || /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) || rule?.costs.length===0);
   }
   function optionCost(entry, s, school, catalog, disadvantage = false) {
     if (entry.free) return 0;
@@ -105,7 +141,10 @@
     }
     // Some supplemental entries put contextual prices directly in their label.
     for(const m of (rule?.label || '').matchAll(/(\d+)\s+(?:points?\s+)?for ([^,;)]+)/gi))if(applies(m[2]))fixed.push(number(m[1]));
-    if(fixed.length)cost=disadvantage?Math.max(...fixed):Math.min(...fixed);
+    // A realm or other variant has its own price; a contextual price moves it by the same amount
+    // (a shugenja's Touch of the Spirit Realms: Yomi costs 6, Toshigoku 7).
+    if(fixed.length && variant){const base=positive(entry.baseCost);if(disadvantage)bonuses.push(Math.max(...fixed)-base);else reductions.push(base-Math.min(...fixed));}
+    else if(fixed.length)cost=disadvantage?Math.max(...fixed):Math.min(...fixed);
     if(reductions.length)cost=Math.max(1,cost-Math.max(...reductions));
     if(bonuses.length)cost+=Math.max(...bonuses);
     return cost;
@@ -231,30 +270,39 @@
     const familyTrait = family?.traitOptions ? (family.traitOptions.includes(s.familyTrait) ? s.familyTrait : '') : family?.trait;
     const traits={},rings={},traitCosts={},costItems={};
     const addCost=(id,cost,label)=>{costItems[id]={cost:positive(cost),label};};
+    const picked=name=>{const e=[...s.advantages,...s.disadvantages].find(a=>a.name===name);return e?optionPicked(e):[];};
+    // Elemental Blessing: raising either Trait of the chosen Ring costs 1 XP less.
+    const blessed=picked('Elemental Blessing')[0];
+    const traitStep=(trait,r)=>Math.max(1,r*(trait==='Void'?6:4)-number(blessed && blessed!=='Void' && C.TRAIT_GROUPS.find(g=>g.ring===blessed)?.traits.includes(trait)));
     for (const group of C.TRAIT_GROUPS) {
       for (const trait of group.traits) {
         const base = 2+number(familyTrait===trait)+number(school?.benefit===trait)+number(trait==='Void' && !!school?.brotherhood);
         const rank=base+integer(s.traitBuys[trait]);
-        traits[trait]={base,rank};traitCosts[trait]=C.purchasedRankCost(base,rank,trait==='Void'?6:4);
-        for(let r=base+1;r<=rank;r++)addCost(`trait:${trait}:${r}`,r*(trait==='Void'?6:4),`${trait} ${r}`);
+        let cost=0;for(let r=base+1;r<=rank;r++){cost+=traitStep(trait,r);addCost(`trait:${trait}:${r}`,traitStep(trait,r),`${trait} ${r}`);}
+        traits[trait]={base,rank,nextCost:traitStep(trait,rank+1)};traitCosts[trait]=cost;
       }
       rings[group.ring]=group.ring==='Void'?traits.Void.rank:Math.min(...group.traits.map(t=>traits[t].rank));
     }
     const grants = C.schoolGrants(school,s,catalog), starting=grants.skills, skills={},purchased={},legacyEmphases={...s.legacyEmphases};
+    // Water Hammer Citizen and Zakyo Toshi Citizen each give one free rank in the chosen Skill.
+    const optionRanks={};
+    for(const name of ['Water Hammer Citizen','Zakyo Toshi Citizen']){const skill=picked(name)[0];if(skill)optionRanks[skill]=(optionRanks[skill] || 0)+1;}
+    // Soul of Artistry: an unskilled roll with a Skill of the chosen type counts 1 rank.
+    const artistry=s.advantages.find(a=>a.name==='Soul of Artistry'),artistryType={'Artisan Skills':'Artisan','Craft Skills':'Craft'}[artistry?optionVariant(artistry):''];
     for(const [value,rank] of Object.entries(s.skills)) {
       const {name,emphases}=C.skillIdentity(value,catalog);purchased[name]=Math.max(purchased[name] || 0,integer(rank));
       if(emphases.length)legacyEmphases[name]=[...new Set([...(legacyEmphases[name] || []),...emphases])];
     }
     const untrained = new Set(untrainedSkills);
-    for(const name of new Set([...Object.keys(starting),...Object.keys(purchased),...untrained])) {
-      const base=starting[name]?.base || 0,rank=Math.max(base,purchased[name] || 0);
+    for(const name of new Set([...Object.keys(starting),...Object.keys(purchased),...Object.keys(optionRanks),...untrained])) {
+      const base=(starting[name]?.base || 0)+(optionRanks[name] || 0),rank=Math.max(base,purchased[name] || 0);
       if(!rank && !untrained.has(name))continue;
       const trait=C.skillTrait(name,s,catalog),traitRank=traits[trait]?.rank;
       const emphases=[...new Set([...(starting[name]?.emphases || []),...(legacyEmphases[name] || []),...(s.emphases[name] || [])])];
       const entry=catalog.skills.find(e=>e.name===name.split(':')[0]);
       const masteries=(entry?.masteries || []).filter(m=>m.rank<=rank);
       if(rank>=10)masteries.push({rank:10,description:'One Free Raise on all rolls using this skill.'});
-      skills[name]={base,rank,trait,traitRank:traitRank ?? null,roll:traitRank?dicePool(rank+traitRank,traitRank):null,emphases,masteries,notes:starting[name]?.notes || '',cost:C.purchasedRankCost(base,rank),slug:entry?.slug || 'skills'};
+      skills[name]={base,rank,school:!!starting[name]?.base,optionRank:optionRanks[name] || 0,effectiveRank:!rank && artistryType && name.split(':')[0]===artistryType?1:rank,trait,traitRank:traitRank ?? null,roll:traitRank?dicePool(rank+traitRank,traitRank):null,emphases,masteries,notes:starting[name]?.notes || '',cost:C.purchasedRankCost(base,rank),slug:entry?.slug || 'skills'};
       for(let r=base+1;r<=rank;r++)addCost(`skill:${name}:${r}`,r,`${name} ${r}`);
       for(const emphasis of s.emphases[name] || [])if(!(starting[name]?.emphases || []).includes(emphasis))addCost(`emphasis:${name}:${emphasis}`,2,`${name} (${emphasis})`);
     }
@@ -312,6 +360,9 @@
     if(trained(/Kakita Bushi/i))initiativeFlat+=(skills.Iaijutsu?.rank || 0)*2;
     if(trained(/Kitsuki Investigator/i))tn+=traits.Perception.rank;
     if(trained(/Hida Bushi/i,2))reduction+=rings.Earth;
+    // Order of the Spider Monks Rank 2: Reduction equal to the chosen non-Void Ring plus Taint Rank.
+    const taintRank=Math.floor(number(s.taint));
+    if(trained(/Order of the Spider Monks/i,2) && rings[s.schoolDecisions.spiderReductionRing] && s.schoolDecisions.spiderReductionRing!=='Void')reduction+=rings[s.schoolDecisions.spiderReductionRing]+taintRank;
     const tattooNames=abilities.filter(a=>a.kind==='tattoo').map(a=>a.name.toLowerCase());
     const earth=Math.max(1,rings.Earth-number(flaw(s,'Bad Health')));
     const ironWarrior=/Daidoji Iron Warrior/.test(school?.name || '') ? Math.max(1,Math.floor(d.honor)-4) : 0;
@@ -325,6 +376,58 @@
     const togashiBonus=trained(/Togashi Tattooed/,2) ? 1 : 0;
     const unarmedRoll=traits.Strength.rank+ancestorDamage+togashiBonus+(jiujutsu>=3?1:0)-number(flaw(s,'Small'))+number(mods.unarmedRoll);
     const unarmedKeep=1+togashiBonus+(jiujutsu>=7?1:0)+number(trained(/Temple of Osano-Wo/i))+number(mods.unarmedKeep);
+    // Roll modifiers from advantages, disadvantages, ancestors and techniques. Each names its source;
+    // `when` marks a situational one the roll view offers but does not apply on its own, and
+    // `emphasis` one that applies only to rolls with that Emphasis.
+    const PHYSICAL=['Stamina','Strength','Reflexes','Agility'],SOCIAL=['Acting','Courtier','Etiquette','Intimidation','Sincerity','Temptation'];
+    const ringTraits=ring=>C.TRAIT_GROUPS.find(g=>g.ring===ring)?.traits || [];
+    const effects=[];
+    const effect=(source,match,mod)=>effects.push({source,...match,rolled:0,kept:0,bonus:0,...mod});
+    const sourceName=e=>{const label=optionLabel(e);return label?`${e.name} (${label})`:e.name;};
+    for(const e of s.advantages) {
+      const v=optionVariant(e),p=optionPicked(e),src=sourceName(e);
+      if(e.name==='Touch of the Spirit Realms') {
+        if(v==='Chikushudo')effect(src,{skill:n=>n==='Animal Handling'},{rolled:1,kept:1});
+        if(v==='Yomi' && p[0])effect(src,{skill:n=>n===p[0]},{rolled:1});
+        if(v==='Sakkaku')effect(src,{skill:n=>n==='Sincerity'},{rolled:1,kept:1,emphasis:'Deceit'});
+        if(v==='Jigoku' && taintRank)effect(src,{skill:(n,t)=>PHYSICAL.includes(t),trait:t=>PHYSICAL.includes(t),attack:true},{bonus:taintRank,note:'Twice your Taint Rank instead if you are Lost.'});
+        if(v==='Tengoku')effect(src,{ring:r=>r==='Earth'},{rolled:2,when:'Resisting the Shadowlands Taint'});
+        if(v==='Meido')effect(src,{skill:n=>SOCIAL.includes(n),trait:t=>['Awareness','Willpower'].includes(t)},{rolled:2,when:'Contested roll against social manipulation'});
+      }
+      if(e.name==='Chosen by the Oracles' && p[0])effect(src,{ring:r=>r===p[0]},{rolled:1,kept:1});
+      if(e.name==='Friend of the Elements' && p[0])effect(src,{trait:t=>ringTraits(p[0]).includes(t)},{note:'One Free Raise.'});
+      if(e.name==='Great Potential' && p[0])effect(src,{skill:n=>n===p[0]},{note:'Raises are limited by your rank in this Skill (or Void, if higher).'});
+      if(e.name==='Reincarnated')for(const skill of p.filter(Boolean))effect(`${e.name} (${skill})`,{skill:n=>n===skill},{rolled:1,note:'Spending a Void Point on this roll brings on Anachronism for 1–10 hours.'});
+      if(e.name==='Watanu-Trained' && p[0])effect(src,{skill:n=>n===p[0]},{rolled:1,kept:1,when:'Creating metallic goods (not weapons or armor)'});
+      if(e.name==='Precise Memory')effect(src,{trait:t=>t==='Intelligence'},{rolled:1,kept:1,when:'Recalling something exactly as it was'});
+      if(e.name==='Prodigy')effect(src,{skill:(n,t,sk)=>sk?.school,attack:true},{rolled:1});
+    }
+    for(const e of s.disadvantages) {
+      const v=optionVariant(e),p=optionPicked(e),src=sourceName(e);
+      if(e.name==='Weakness' && p[0])effect(src,{skill:(n,t)=>t===p[0],trait:t=>t===p[0],attack:true},{rolled:-1,kept:-1,note:`${p[0]} counts one rank lower.`});
+      if(e.name==='Doubt' && p[0])effect(src,{skill:n=>n===p[0]},{note:'Declare one Raise that confers no benefit.'});
+      if(e.name==='Enlightened Madness' && p[0])effect(src,{skill:n=>n===p[0],ring:r=>r===p[0]},{note:`Roll Willpower at TN ${optionCost(e,s,school,catalog,true)>=6?30:20} or be consumed by madness for eight hours.`});
+      if(e.name==='Cursed by the Realm') {
+        if(v==='Chikushudo')effect(src,{skill:n=>n==='Animal Handling'},{rolled:-1,kept:-1});
+        if(v==='Jigoku')effect(src,{ring:r=>r==='Earth'},{rolled:-1,kept:-1,when:'Resisting the Shadowlands Taint'});
+        if(v==='Meido')effect(src,{skill:(n,t)=>t==='Perception',trait:t=>t==='Perception'},{rolled:-1,when:'Unoccupied by physical activity or social interaction'});
+        if(v==='Maigo no Musha')effect(src,{skill:()=>true,trait:()=>true,ring:()=>true},{rolled:-1,kept:-1,when:'Against a spirit'});
+      }
+    }
+    if(ancestorNames.includes('shiba'))effect('Shiba (ancestor)',{skill:(n,t)=>t==='Intelligence'},{rolled:1,kept:1});
+    effect('Forgery Mastery',{skill:(n,t,sk)=>n==='Forgery' && sk?.rank>=3},{rolled:1});
+    effect('Forgery Mastery',{skill:(n,t,sk)=>n==='Forgery' && sk?.rank>=7},{kept:1});
+    // Kakita Artisan: +2k0 with the chosen art; Rank 3 adds a second art and raises the bonus to +2k1.
+    const kakita3=trained(/Kakita Artisan/,3),arts=[s.schoolDecisions.chosenArt,kakita3 && s.schoolDecisions.chosenArt2].filter(Boolean);
+    if(trained(/Kakita Artisan/))effect(`Kakita Artisan: chosen art`,{skill:n=>arts.includes(n)},{rolled:2,kept:kakita3?1:0,note:'Raises are not limited by Void.'});
+    if(trained(/Shiba Artisan/) && s.schoolDecisions.shibaArt)effect('Shiba Artisan: Soul of Brilliance',{skill:n=>n===s.schoolDecisions.shibaArt},{note:'A Void Point spent on this roll grants +2k2 instead of +1k1.'});
+    if(trained(/Shiba Artisan/,3) && s.schoolDecisions.shibaSocialArt)effect('Shiba Artisan: The Art Speaks',{skill:n=>SOCIAL.includes(n)},{note:`You may use your ${s.schoolDecisions.shibaSocialArt} ranks in place of this Skill (no Mastery benefits).`});
+    if(trained(/Otomo Diplomat/))effect('Otomo Diplomat',{skill:n=>n==='Etiquette'},{rolled:1});
+    if(trained(/First Dawn Scholars/))effect('First Dawn Scholars',{skill:n=>n==='Etiquette' || n.startsWith('Lore:')},{rolled:1});
+    if(trained(/Utaku Infantry/) && s.schoolDecisions.weaponFocus)effect('Utaku Mounted Infantry',{skill:n=>n===s.schoolDecisions.weaponFocus,attack:true,attackOnly:true},{rolled:1});
+    const effectsFor=(kind,name,trait,skill)=>effects.filter(e=>kind==='skill'?!e.attackOnly && e.skill?.(name,trait,skill):kind==='attack'?e.attack && e.skill?.(name,trait,skill):kind==='trait'?e.trait?.(name):e.ring?.(name))
+      .map(({source,rolled,kept,bonus,note,when,emphasis})=>({source,rolled,kept,bonus,note:note || '',when:when || '',emphasis:emphasis || ''}));
+    const applied=list=>list.filter(m=>!m.when && !m.emphasis).reduce((sum,m)=>({rolled:sum.rolled+m.rolled,kept:sum.kept+m.kept,bonus:sum.bonus+m.bonus}),{rolled:0,kept:0,bonus:0});
     const weapons=d.equipment.filter(e=>e.equipped && e.item?.kind==='weapon' && e.item.type!=='Arrow').map(e=>{
       const w=e.item,skill={Sword:'Kenjutsu',Knife:'Knives',Knives:'Knives',Bow:'Kyujutsu','Heavy Weapon':'Heavy Weapons',Heavy:'Heavy Weapons','Chain Weapon':'Chain Weapons',Chain:'Chain Weapons',Spear:'Spears',Polearm:'Polearms',Stave:'Staves','War Fan':'War Fan','Ninja Weapon':'Ninjutsu'}[w.type] || w.type;
       const sk=skills[skill],rank=sk?.rank || 0;
@@ -335,7 +438,7 @@
       const sword=skill==='Kenjutsu',ninja=skill==='Ninjutsu';
       const bonusRoll=ancestorDamage+(sword && rank>=3?1:0)+(ninja && rank>=3?1:0)+number(has(s,'Large') && /Large/.test(w.keywords || '') && !bow)-number(flaw(s,'Small') && !bow)+number(trained(/Hida Bushi/i) && skill==='Heavy Weapons');
       const attackTrait=traits[s.skillTraits[skill] || (bow?'Reflexes':ninja?'Reflexes':'Agility')]?.rank || traits.Agility.rank;
-      return {name:e.name,skill,ignoreReduction:(ancestorNames.includes('hida')?4:0)+(skill==='Heavy Weapons'&&rank>=3?2:0),attack:dicePool(rank+attackTrait+number(has(s,'Prodigy') && sk?.base)+number(trained(/Utaku Infantry/) && skill===s.schoolDecisions.weaponFocus),attackTrait),damage:damage?dicePool(strength+number(damage[1])+bonusRoll,number(damage[2])+(ninja&&rank>=7?1:0)):null,special:w.special || '',explodes:!ninja || rank>=5,explodeOn:rank>=7&&['Kenjutsu','Heavy Weapons'].includes(skill)?9:10,untrained:!rank};
+      return {name:e.name,skill,ignoreReduction:(ancestorNames.includes('hida')?4:0)+(skill==='Heavy Weapons'&&rank>=3?2:0),attack:(()=>{const traitName=s.skillTraits[skill] || (bow?'Reflexes':ninja?'Reflexes':'Agility'),m=applied(effectsFor('attack',skill,traitName,sk));return dicePool(rank+attackTrait+m.rolled,attackTrait+m.kept,m.bonus);})(),damage:damage?dicePool(strength+number(damage[1])+bonusRoll,number(damage[2])+(ninja&&rank>=7?1:0)):null,special:w.special || '',explodes:!ninja || rank>=5,explodeOn:rank>=7&&['Kenjutsu','Heavy Weapons'].includes(skill)?9:10,untrained:!rank};
     });
     const initiativeBase={rolled:ir+traits.Reflexes.rank+number(trained(/Bayushi Bushi/))+number(mods.initiativeRoll),kept:traits.Reflexes.rank+number(trained(/Bayushi Bushi/))+number(mods.initiativeKeep),bonus:initiativeFlat};
     d.combat={initiativeBase,initiative:dicePool(initiativeBase.rolled,initiativeBase.kept,initiativeBase.bonus),baseArmorTN:traits.Reflexes.rank*5+5,armorTN:tn,reduction,armor:activeArmor?.name || '',armorPenalty:activeArmor?.special || '',healing:(traits.Stamina.rank+(has(s,'Quick Healer')?2:0))*2+ir+number(mods.healing),unarmedDamage:dicePool(unarmedRoll,unarmedKeep),unarmedAttack:dicePool(jiujutsu+traits.Agility.rank+togashiBonus,traits.Agility.rank+togashiBonus),voidPoints:rings.Void,wounds:{healthy:levels[0].capacity,perLevel:levels[1].capacity,maximum:woundTotal,current:s.woundsTaken,currentLevel:levels.find(e=>s.woundsTaken<=e.total)?.label || 'Dead',levels},woundPenaltyReduction:has(s,'Strength of the Earth')?3:0,movementWater:flaw(s,'Lame')?1:Math.max(1,rings.Water-number(flaw(s,'Small'))),weapons};
@@ -343,19 +446,18 @@
       skill.armorTNPenalty=0;
       if(activeArmor?.name==='Light Armor' && ['Athletics','Stealth'].includes(name))skill.armorTNPenalty=5;
       if(activeArmor?.name==='Heavy Armor' && ['Agility','Reflexes'].includes(skill.trait) && (!trained(/Hida Bushi/) || name==='Stealth'))skill.armorTNPenalty=5;
-      let bonus=0,kept=0;
-      if(ancestorNames.includes('shiba') && skill.trait==='Intelligence'){bonus++;kept++;}
-      if(name==='Forgery' && skill.rank>=3)bonus++;if(name==='Forgery' && skill.rank>=7)kept++;
-      if(has(s,'Prodigy') && skill.base)bonus++;
-      if(trained(/Kakita Artisan/) && name===s.schoolDecisions.chosenArt)bonus+=2;
-      if(trained(/Otomo Diplomat/) && name==='Etiquette')bonus++;
-      if(trained(/First Dawn Scholars/) && (name==='Etiquette' || name.startsWith('Lore:')))bonus++;
       const override=mods.skillRoll?.[name] || {};
+      skill.mods=effectsFor('skill',name,skill.trait,skill);
       if(skill.traitRank) {
-        skill.rollBase={rolled:skill.rank+skill.traitRank+bonus+number(override.rolled),kept:skill.traitRank+kept+number(override.kept),bonus:number(override.bonus)};
+        const rank=skill.effectiveRank ?? skill.rank,m=applied(skill.mods);
+        skill.rawBase={rolled:rank+skill.traitRank+number(override.rolled),kept:skill.traitRank+number(override.kept),bonus:number(override.bonus)};
+        skill.rollBase={rolled:skill.rawBase.rolled+m.rolled,kept:skill.rawBase.kept+m.kept,bonus:skill.rawBase.bonus+m.bonus};
         skill.roll=dicePool(skill.rollBase.rolled,skill.rollBase.kept,skill.rollBase.bonus);
       }
     }
+    // Raw Trait and Ring rolls, with the same kind of modifiers.
+    d.traitRolls=Object.fromEntries(Object.entries(traits).map(([trait,{rank}])=>{const list=effectsFor('trait',trait),m=applied(list),base={rolled:rank,kept:rank,bonus:0};return [trait,{base,mods:list,roll:dicePool(rank+m.rolled,rank+m.kept,m.bonus)}];}));
+    d.ringRolls=Object.fromEntries(Object.entries(rings).map(([ring,rank])=>{const list=effectsFor('ring',ring),m=applied(list),base={rolled:rank,kept:rank,bonus:0};return [ring,{base,mods:list,roll:dicePool(rank+m.rolled,rank+m.kept,m.bonus)}];}));
     d.creationCost=Object.values(costItems).reduce((sum,e)=>sum+e.cost,0);
     const history=s.progression.history;
     d.xpAwards=history.filter(e=>e.kind==='award').reduce((sum,e)=>sum+number(e.amount),0);
@@ -368,6 +470,7 @@
   }
   function validate(s,d,catalog,armor) {
     const violations=[];
+    const trained=(pattern,rank=1)=>d.techniques.some(t=>pattern.test(t.school) && (t.rank || 1)===rank);
     const issue=(code,message)=>violations.push({code,message,approved:waived(s,code),explanation:s.exceptions.find(e=>e.code===code || e.code==='*')?.explanation || ''});
     if(!s.name.trim())issue('name','Enter a character name.');
     if(!s.clan)issue('clan','Choose a clan or Brotherhood.');
@@ -433,8 +536,13 @@
     }
     if(/Kakita Artisan/.test(d.school?.name || '')) {
       const chosen=s.schoolDecisions.chosenArt;
-      if(!chosen || !d.skills[chosen]?.base || !/^(Acting|Artisan:|Perform:)/.test(chosen))issue('chosen-art','Select one granted art as the focus of your Kakita Artisan training.');
+      if(!chosen || !d.skills[chosen]?.school || !/^(Acting|Artisan:|Perform:)/.test(chosen))issue('chosen-art','Select one granted art as the focus of your Kakita Artisan training.');
     }
+    if(trained(/Kakita Artisan/,3) && (!s.schoolDecisions.chosenArt2 || s.schoolDecisions.chosenArt2===s.schoolDecisions.chosenArt))issue('chosen-art','Free the Spirit: select a second chosen art.');
+    if(trained(/Shiba Artisan/) && !s.schoolDecisions.shibaArt)issue('chosen-art','Soul of Brilliance: select an Artisan Skill.');
+    if(trained(/Shiba Artisan/,3) && !s.schoolDecisions.shibaSocialArt)issue('chosen-art','The Art Speaks: select an Artisan Skill.');
+    if(trained(/Order of the Spider Monks/i,2) && !s.schoolDecisions.spiderReductionRing)issue('chosen-art','Drawing in the Strike: select a non-Void Ring.');
+    if(trained(/Order of the Spider Monks/i,4) && !s.schoolDecisions.spiderGuardRing)issue('chosen-art','Guarded by Chi: select a non-Void Ring.');
     if(/Utaku Infantry/.test(d.school?.name || '') && (!['Kenjutsu','Polearms','Spears'].includes(s.schoolDecisions.weaponFocus) || !s.schoolDecisions.weaponEmphasis))issue('weapon-focus','Select Kenjutsu, Polearms, or Spears and the free emphasis for Utaku Infantry training.');
     if(/Fudoist/i.test(d.school?.name || '') && !s.schoolDecisions.fudoistFocus)issue('fudoist-choice','Choose the Fudoist social or attack specialty, and the school’s high or low starting Honor.');
     if(/Seven Thunders/i.test(d.school?.name || '')) {
@@ -447,7 +555,10 @@
       const rule=catalog[kind==='advantage'?'advantages':'disadvantages'].find(a=>a.name===entry.name);
       if(optionVariants[entry.name] && !Object.keys(optionVariants[entry.name]).some(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase()))issue(`option-choice:${kind}:${entry.id}`,`Choose the ${entry.name} variant.`);
       if(entry.baseCost!=null && rule?.costs.length===0 && !optionVariants[entry.name] && !entry.customCost && !entry.baseCost)issue(`option-choice:${kind}:${entry.id}`,`Set the variable cost and specific choice for ${entry.name}.`);
-      if(entry.baseCost!=null && /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) && !String(entry.selection || '').trim())issue(`option-choice:${kind}:${entry.id}`,`Record the skill, rank, person, or specific choice required by ${entry.name}.`);
+      const specs=optionPicks(entry),picks=optionPicked(entry);
+      specs.forEach((spec,i)=>{if(!picks[i])issue(`option-choice:${kind}:${entry.id}`,`Choose the ${spec.label} for ${entry.name}.`);});
+      if(new Set(picks.filter(Boolean)).size<picks.filter(Boolean).length)issue(`option-choice:${kind}:${entry.id}`,`Choose different Skills for ${entry.name}.`);
+      if(entry.baseCost!=null && !optionPickSpecs[entry.name] && /Great Potential|Different School|Chosen by the Oracles|Kharmic Tie|Sacred Weapon|Ally|Allies|Blackmail|Perceived Honor|Languages|Luck|Doubt|Phobia|Dark Secret/i.test(entry.name) && !String(entry.selection || '').trim())issue(`option-choice:${kind}:${entry.id}`,`Record the skill, rank, person, or specific choice required by ${entry.name}.`);
     }
     for(const a of s.ancestors) {
       const rule=catalog.ancestors?.find(e=>e.id===a.catalogId);
@@ -544,5 +655,5 @@
     if(kind==='kiho')return granted<d.freeLimits.kiho;
     return false;
   }
-  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,optionNeedsChoice,abilityQuote,abilityAccess,freeAbilityLeft,freeAbilityLimits,spellElements,award,resetSection};
+  (globalThis.window || globalThis).CharacterRules={normalize,calculate,dicePool,insightRank,optionCost,optionVariants,optionVariant,optionPicks,optionPicked,optionLabel,optionNeedsChoice,abilityQuote,abilityAccess,freeAbilityLeft,freeAbilityLimits,spellElements,award,resetSection};
 })();
