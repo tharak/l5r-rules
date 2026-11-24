@@ -69,10 +69,16 @@
   const waived = (s,code) => s.exceptions.some(e => (e.code === code || e.code === '*') && String(e.explanation || '').trim());
   // Touch of the Spirit Realms (Core p. 155): 5 points, Toshigoku 8 and Yomi 7. Cursed by the Realm lists the same ten realms.
   const REALMS=['Chikushudo','Gaki-do','Jigoku','Maigo no Musha','Meido','Sakkaku','Tengoku','Toshigoku','Yomi','Yume-do'];
+  const FORTUNES=['Benten','Bishamon','Daikoku','Ebisu','Fukurokujin','Hotei','Jurojin'];
   const optionVariants={Consumed:{Control:4,Determination:6,Insight:4,Knowledge:4,Perfection:5,Strength:5,Will:4},
     'Touch of the Spirit Realms':Object.fromEntries(REALMS.map(realm=>[realm,{Toshigoku:8,Yomi:7}[realm] || 5])),
     'Cursed by the Realm':Object.fromEntries(REALMS.map(realm=>[realm,4])),
-    'Soul of Artistry':{'Artisan Skills':4,'Craft Skills':4}};
+    'Soul of Artistry':{'Artisan Skills':4,'Craft Skills':4},
+    // Seven Fortunes' Blessing and Curse (Core p. 156 and p. 163): one Fortune each. Bishamon's Blessing costs 5 and Hotei's Curse is worth 6.
+    "Seven Fortunes' Blessing":Object.fromEntries(FORTUNES.map(f=>[f,f==='Bishamon'?5:4])),
+    "Seven Fortunes' Curse":Object.fromEntries(FORTUNES.map(f=>[f,f==='Hotei'?6:3]))};
+  // The Clans listed after each Blessing buy it for 1 point less.
+  const FORTUNE_CLANS={Benten:['Crane'],Bishamon:['Crab','Lion'],Daikoku:['Mantis'],Ebisu:['Unicorn'],Fukurokujin:['Dragon','Phoenix'],Hotei:[],Jurojin:['Scorpion']};
   const optionVariant=entry=>Object.keys(optionVariants[entry.name] || {}).find(name=>name.toLowerCase()===String(entry.selection || '').trim().toLowerCase()) || '';
   // The Skill, Trait or Ring each option asks for when it is bought. `from` names the list a picker offers.
   const optionPickSpecs={
@@ -94,6 +100,7 @@
   };
   function optionPicks(entry) {
     if(entry.name==='Touch of the Spirit Realms')return optionVariant(entry)==='Yomi'?[{label:'School Skill',from:'schoolSkills'}]:[];
+    if(entry.name==="Seven Fortunes' Blessing")return optionVariant(entry)==='Fukurokujin'?[{label:'Lore Skill',from:'lore'}]:[];
     return optionPickSpecs[entry.name] || [];
   }
   // Older sheets kept the choice as text in `selection`.
@@ -145,6 +152,11 @@
     // (a shugenja's Touch of the Spirit Realms: Yomi costs 6, Toshigoku 7).
     if(fixed.length && variant){const base=positive(entry.baseCost);if(disadvantage)bonuses.push(Math.max(...fixed)-base);else reductions.push(base-Math.min(...fixed));}
     else if(fixed.length)cost=disadvantage?Math.max(...fixed):Math.min(...fixed);
+    if(entry.name==="Seven Fortunes' Blessing" && variant) {
+      if(FORTUNE_CLANS[variant].includes(s.clan))reductions.push(1);
+      // Naishou Citizen: a Seven Fortunes' Blessing costs one less Experience Point, on top of a clan discount.
+      if(has(s,'Naishou Citizen'))cost--;
+    }
     if(reductions.length)cost=Math.max(1,cost-Math.max(...reductions));
     if(bonuses.length)cost+=Math.max(...bonuses);
     return cost;
@@ -394,6 +406,18 @@
         if(v==='Tengoku')effect(src,{ring:r=>r==='Earth'},{rolled:2,when:'Resisting the Shadowlands Taint'});
         if(v==='Meido')effect(src,{skill:n=>SOCIAL.includes(n),trait:t=>['Awareness','Willpower'].includes(t)},{rolled:2,when:'Contested roll against social manipulation'});
       }
+      if(e.name==="Seven Fortunes' Blessing") {
+        if(v==='Benten')effect(src,{skill:n=>SOCIAL.includes(n)},{kept:1,when:'Persuading someone (not coercion)'});
+        if(v==='Bishamon') {
+          effect(src,{trait:t=>t==='Strength'},{rolled:1});
+          effect(src,{skill:n=>[...C.WEAPON_SKILLS,'Jiujutsu'].includes(n),attack:true},{note:'Three declared Raises for Increased Damage (not Free Raises) grant one more Raise.'});
+        }
+        if(v==='Daikoku')effect(src,{skill:n=>n==='Commerce'},{rolled:1,kept:1});
+        if(v==='Ebisu')effect(src,{skill:n=>SOCIAL.includes(n)},{rolled:1,kept:1,when:'With non-samurai citizens of Rokugan'});
+        if(v==='Fukurokujin' && p[0])effect(src,{skill:n=>n===p[0]},{rolled:1,kept:1});
+        if(v==='Hotei')effect(src,{ring:r=>r==='Void'},{note:'An effect that would take your Void Points must first beat you in a Contested Void Roll; if it already calls for a Contested Roll, yours gets +10.'});
+        if(v==='Jurojin')effect(src,{ring:r=>r==='Earth',trait:t=>t==='Stamina'},{rolled:2,when:'Resisting disease or poison'});
+      }
       if(e.name==='Chosen by the Oracles' && p[0])effect(src,{ring:r=>r===p[0]},{rolled:1,kept:1});
       if(e.name==='Friend of the Elements' && p[0])effect(src,{trait:t=>ringTraits(p[0]).includes(t)},{note:'One Free Raise.'});
       if(e.name==='Great Potential' && p[0])effect(src,{skill:n=>n===p[0]},{note:'Raises are limited by your rank in this Skill (or Void, if higher).'});
@@ -407,6 +431,15 @@
       if(e.name==='Weakness' && p[0])effect(src,{skill:(n,t)=>t===p[0],trait:t=>t===p[0],attack:true},{rolled:-1,kept:-1,note:`${p[0]} counts one rank lower.`});
       if(e.name==='Doubt' && p[0])effect(src,{skill:n=>n===p[0]},{note:'Declare one Raise that confers no benefit.'});
       if(e.name==='Enlightened Madness' && p[0])effect(src,{skill:n=>n===p[0],ring:r=>r===p[0]},{note:`Roll Willpower at TN ${optionCost(e,s,school,catalog,true)>=6?30:20} or be consumed by madness for eight hours.`});
+      if(e.name==="Seven Fortunes' Curse") {
+        if(v==='Benten')effect(src,{skill:n=>n==='Etiquette'},{note:'TN +10.'});
+        if(v==='Bishamon')effect(src,{skill:n=>[...C.WEAPON_SKILLS,'Jiujutsu'].includes(n),attack:true},{note:'Strength counts one rank lower for your damage rolls.'});
+        if(v==='Daikoku')effect(src,{skill:n=>n==='Commerce'},{rolled:-1,kept:-1});
+        if(v==='Ebisu')effect(src,{skill:n=>SOCIAL.includes(n)},{rolled:-1,kept:-1,when:'With non-samurai citizens of Rokugan'});
+        if(v==='Fukurokujin')effect(src,{skill:n=>n.startsWith('Lore:')},{note:'TN +5.'});
+        if(v==='Hotei')effect(src,{ring:r=>r==='Void'},{note:'Techniques and Advantages that need a Void Point to activate need two.'});
+        if(v==='Jurojin')effect(src,{ring:r=>r==='Earth',trait:t=>t==='Stamina'},{rolled:-2,when:'Resisting disease or poison'});
+      }
       if(e.name==='Cursed by the Realm') {
         if(v==='Chikushudo')effect(src,{skill:n=>n==='Animal Handling'},{rolled:-1,kept:-1});
         if(v==='Jigoku')effect(src,{ring:r=>r==='Earth'},{rolled:-1,kept:-1,when:'Resisting the Shadowlands Taint'});

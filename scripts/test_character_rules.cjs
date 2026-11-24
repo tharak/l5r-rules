@@ -642,6 +642,27 @@ test('Touch of the Spirit Realms: each realm has its price, Yomi asks for a Scho
  assert.equal(d.skills.Sincerity.roll.rolled,d.skills.Sincerity.rawBase.rolled);
 });
 
+test("Seven Fortunes' Blessing and Curse: each Fortune has its price and clan discount, Fukurokujin asks for a Lore Skill",()=>{
+ const s=starting(),d0=calc(s),opt=(name,selection,picks)=>({id:name,name,baseCost:name.endsWith('Curse')?3:4,cost:4,selection,...(picks?{picks}:{})});
+ const cost=(clan,name,v,extra=x=>x)=>R.optionCost(opt(name,v),extra(change(s,x=>{x.clan=clan;})),d0.school,catalog,name.endsWith('Curse'));
+ const B="Seven Fortunes' Blessing",K="Seven Fortunes' Curse";
+ assert.deepEqual(['Benten','Bishamon','Hotei','Jurojin'].map(v=>cost('Phoenix',B,v)),[4,5,4,4]);
+ assert.deepEqual(['Bishamon','Benten'].map(v=>cost('Lion',B,v)),[4,4]);
+ assert.deepEqual(['Benten','Fukurokujin','Jurojin','Daikoku','Ebisu'].map(v=>cost(({Benten:'Crane',Fukurokujin:'Dragon',Jurojin:'Scorpion',Daikoku:'Mantis',Ebisu:'Unicorn'})[v],B,v)),[3,3,3,3,3]);
+ // Naishou Citizen takes one more point off.
+ assert.equal(cost('Crane',B,'Benten',x=>change(x,y=>y.advantages.push({id:'n',name:'Naishou Citizen',baseCost:3,cost:3}))),2);
+ assert.deepEqual(['Benten','Hotei'].map(v=>cost('Crab',K,v)),[3,6]);
+ assert.deepEqual(plain(R.optionPicks(opt(B,'Fukurokujin')).map(p=>p.from)),['lore']);
+ assert.equal(R.optionPicks(opt(B,'Benten')).length,0);
+ let d=calc(change(s,x=>{x.advantages.push(opt(B,'Fukurokujin',['Lore: History']));x.skills['Lore: History']=1;}));
+ assert.equal(d.skills['Lore: History'].roll.rolled,d.skills['Lore: History'].rawBase.rolled+1);
+ assert.equal(d.skills['Lore: History'].roll.kept,d.skills['Lore: History'].rawBase.kept+1);
+ d=calc(change(s,x=>{x.advantages.push(opt(B,'Bishamon'));x.disadvantages.push(opt(K,'Daikoku'));x.skills.Commerce=1;}));
+ assert.equal(d.traitRolls.Strength.roll.rolled,d.traitRolls.Strength.base.rolled+1);
+ assert.equal(d.skills.Commerce.roll.kept,d.skills.Commerce.rawBase.kept-1);
+ assert.ok(d.skills.Kenjutsu.mods.some(m=>/Bishamon/.test(m.source) && /Increased Damage/.test(m.note)));
+});
+
 test('Options that ask for a Ring, Trait or Skill offer a picker and change the matching roll',()=>{
  const s=starting(),opt=(name,picks,extra={})=>({id:name,name,baseCost:(catalog.advantages.find(a=>a.name===name) || catalog.disadvantages.find(a=>a.name===name)).costs[0],picks,...extra});
  for(const name of ['Chosen by the Oracles','Friend of the Elements','Elemental Blessing','Great Potential','Reincarnated','Watanu-Trained','Water Hammer Citizen','Zakyo Toshi Citizen','Void Versatility','Friendly Kami'])assert.ok(R.optionPicks({name}).length,name);

@@ -348,7 +348,7 @@
     const all=[...new Set([...skillOptions().suggestions,...Object.keys(d.skills)])].sort((a,b)=>a.localeCompare(b));
     const school=Object.keys(d.skills).filter(name=>d.skills[name].school).sort((a,b)=>a.localeCompare(b));
     const lists={rings:[['',rings]],elements:[['',rings.slice(0,4)]],traits:[['',C.TRAIT_NAMES]],skills:[['',all]],schoolSkills:[['',school]],
-      nonSchoolSkills:[['',all.filter(name=>!school.includes(name))]],craft:[['',all.filter(name=>name.startsWith('Craft:'))]],games:[['',all.filter(name=>name.startsWith('Games:'))]],
+      nonSchoolSkills:[['',all.filter(name=>!school.includes(name))]],craft:[['',all.filter(name=>name.startsWith('Craft:'))]],games:[['',all.filter(name=>name.startsWith('Games:'))]],lore:[['',all.filter(name=>name.startsWith('Lore:'))]],
       artisan:[['',all.filter(name=>name.startsWith('Artisan:'))]],ringsOrSkills:[['Rings',rings],['Skills',all]]}[from] || [];
     if(selected && !lists.some(([,items])=>items.includes(selected)))lists.push(['Saved',[selected]]);
     return option('','Choose',!selected)+lists.map(([title,items])=>{
